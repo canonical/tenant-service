@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package identity.platform.api.tenant;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/canonical/tenant-service/api/tenant/v0;tenantv0";
+
+service TenantService {
+  // Public Endpoints
+  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse) {
+    option (google.api.http) = {
+      get: "/me/tenants"
+    };
+  }
+
+  rpc InviteMember(InviteMemberRequest) returns (InviteMemberResponse) {
+    option (google.api.http) = {
+      post: "/tenants/{tenant_id}/invites"
+      body: "*"
+    };
+  }
+
+  // Internal Admin Endpoints
+  rpc ListUserTenants(ListUserTenantsRequest) returns (ListUserTenantsResponse) {
+    option (google.api.http) = {
+        get: "/admin/users/{user_id}/tenants"
+    };
+  }
+
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse) {
+    option (google.api.http) = {
+        post: "/admin/tenants"
+        body: "*"
+    };
+  }
+
+  rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse) {
+    option (google.api.http) = {
+        patch: "/admin/tenants/{tenant_id}"
+        body: "*"
+    };
+  }
+
+  rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse) {
+    option (google.api.http) = {
+        delete: "/admin/tenants/{tenant_id}"
+    };
+  }
+
+  rpc ProvisionUser(ProvisionUserRequest) returns (ProvisionUserResponse) {
+      option (google.api.http) = {
+          post: "/admin/tenants/{tenant_id}/users"
+          body: "*"
+      };
+  }
+
+  rpc ActivateTenant(ActivateTenantRequest) returns (ActivateTenantResponse) {
+      option (google.api.http) = {
+          post: "/admin/tenants/{tenant_id}/activate"
+          body: "*"
+      };
+  }
+}
+
+// Messages
+
+message ListTenantsRequest {}
+
+message ListTenantsResponse {
+    repeated Tenant tenants = 1;
+}
+
+message Tenant {
+    string id = 1;
+    string name = 2;
+    string created_at = 3;
+}
+
+message InviteMemberRequest {
+    string tenant_id = 1;
+    string email = 2;
+    string role = 3; // owner, admin, member
+}
+
+message InviteMemberResponse {
+    string status = 1;
+}
+
+message ListUserTenantsRequest {
+    string user_id = 1;
+}
+
+message ListUserTenantsResponse {
+    repeated Tenant tenants = 1;
+}
+
+message CreateTenantRequest {
+    string name = 1;
+}
+
+message CreateTenantResponse {
+    string id = 1;
+    string name = 2;
+}
+
+message UpdateTenantRequest {
+    string tenant_id = 1;
+    string name = 2;
+    string owner_id = 3;
+}
+
+message UpdateTenantResponse {
+    Tenant tenant = 1;
+}
+
+message DeleteTenantRequest {
+    string tenant_id = 1;
+}
+
+message DeleteTenantResponse {
+    string status = 1;
+}
+
+message ProvisionUserRequest {
+    string tenant_id = 1;
+    string email = 2;
+    string role = 3;
+}
+
+message ProvisionUserResponse {
+    string status = 1;
+}
+
+message ActivateTenantRequest {
+    string tenant_id = 1;
+    string status = 2;
+    string plan = 3;
+}
+
+message ActivateTenantResponse {
+    string status = 1;
+}
