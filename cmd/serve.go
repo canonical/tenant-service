@@ -14,8 +14,10 @@ import (
 	"time"
 
 	"github.com/canonical/tenant-service/internal/config"
+	"github.com/canonical/tenant-service/internal/db"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring/prometheus"
+	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/pkg/web"
 	"github.com/kelseyhightower/envconfig"
@@ -48,7 +50,24 @@ func serve() error {
 	monitor := prometheus.NewMonitor("tenant-service", logger)
 	tracer := tracing.NewTracer(tracing.NewConfig(specs.TracingEnabled, specs.OtelGRPCEndpoint, specs.OtelHTTPEndpoint, logger))
 
+	dbConfig := db.Config{
+		DSN:             specs.DSN,
+		MaxConns:        specs.DBMaxConns,
+		MinConns:        specs.DBMinConns,
+		MaxConnLifetime: specs.DBMaxConnLifetime,
+		MaxConnIdleTime: specs.DBMaxConnIdleTime,
+		TracingEnabled:  specs.TracingEnabled,
+	}
+	dbClient, err := db.NewDBClient(dbConfig, tracer, monitor, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create database client: %v", err)
+	}
+	defer dbClient.Close()
+	s := storage.NewStorage(dbClient, tracer, monitor, logger)
+
 	router := web.NewRouter(
+		s,
+		dbClient,
 		tracer,
 		monitor,
 		logger,

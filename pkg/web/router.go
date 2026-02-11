@@ -6,9 +6,11 @@ package web
 import (
 	"net/http"
 
+	"github.com/canonical/tenant-service/internal/db"
 	"github.com/canonical/tenant-service/internal/http/types"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
+	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/pkg/metrics"
 	"github.com/canonical/tenant-service/pkg/status"
@@ -19,6 +21,8 @@ import (
 )
 
 func NewRouter(
+	s storage.StorageInterface,
+	dbClient db.DBClientInterface,
 	tracer tracing.TracingInterface,
 	monitor monitoring.MonitorInterface,
 	logger logging.LoggerInterface,
