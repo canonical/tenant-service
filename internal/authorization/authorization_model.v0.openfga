@@ -1,0 +1,23 @@
+model
+  schema 1.1
+
+type user
+
+type privileged
+  relations
+    define admin: [user]
+
+type tenant
+  relations
+    # Defines the relationship with the privileged group
+    define privileged: [privileged]
+
+    # Roles
+    define owner: [user]
+    define member: [user] or owner
+
+    # Permissions
+    define can_view: member or admin from privileged
+    define can_edit: owner or admin from privileged
+    define can_create: owner or admin from privileged
+    define can_delete: owner or admin from privileged

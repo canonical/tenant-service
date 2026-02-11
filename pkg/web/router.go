@@ -6,6 +6,7 @@ package web
 import (
 	"net/http"
 
+	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/db"
 	"github.com/canonical/tenant-service/internal/http/types"
 	"github.com/canonical/tenant-service/internal/logging"
@@ -23,6 +24,7 @@ import (
 func NewRouter(
 	s storage.StorageInterface,
 	dbClient db.DBClientInterface,
+	authz authorization.AuthorizerInterface,
 	tracer tracing.TracingInterface,
 	monitor monitoring.MonitorInterface,
 	logger logging.LoggerInterface,

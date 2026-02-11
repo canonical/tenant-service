@@ -1,7 +1,6 @@
 package config
 
 import (
-	"flag"
 	"time"
 )
 
@@ -22,17 +21,11 @@ type EnvSpec struct {
 	DBMinConns        int32         `envconfig:"db_min_conns" default:"2"`
 	DBMaxConnLifetime time.Duration `envconfig:"db_max_conn_lifetime" default:"1h"`
 	DBMaxConnIdleTime time.Duration `envconfig:"db_max_conn_idle_time" default:"30m"`
-}
 
-type Flags struct {
-	ShowVersion bool
-}
-
-func NewFlags() *Flags {
-	f := new(Flags)
-
-	flag.BoolVar(&f.ShowVersion, "version", false, "Show the app version and exit")
-	flag.Parse()
-
-	return f
+	AuthorizationEnabled bool   `envconfig:"authorization_enabled" default:"false"`
+	OpenfgaApiScheme     string `envconfig:"openfga_api_scheme" default:""`
+	OpenfgaApiHost       string `envconfig:"openfga_api_host"`
+	OpenfgaApiToken      string `envconfig:"openfga_api_token"`
+	OpenfgaStoreId       string `envconfig:"openfga_store_id"`
+	OpenfgaModelId       string `envconfig:"openfga_authorization_model_id" default:""`
 }
