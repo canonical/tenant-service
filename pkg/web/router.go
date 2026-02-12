@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/pkg/metrics"
 	"github.com/canonical/tenant-service/pkg/status"
+	"github.com/canonical/tenant-service/pkg/webhooks"
 	chi "github.com/go-chi/chi/v5"
 	middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -37,7 +38,12 @@ func NewRouter(
 		middleware.RequestID,
 		monitoring.NewMiddleware(monitor, logger).ResponseTime(),
 		middlewareCORS([]string{"*"}),
+		middleware.RequestLogger(logging.NewLogFormatter(logger)),
 	)
+
+	if dbClient != nil {
+		middlewares = append(middlewares, db.TransactionMiddleware(dbClient, logger))
+	}
 
 	gRPCGatewayMux := runtime.NewServeMux(
 		runtime.WithForwardResponseRewriter(types.ForwardErrorResponseRewriter),
@@ -54,6 +60,7 @@ func NewRouter(
 
 	metrics.NewAPI(logger).RegisterEndpoints(router)
 	status.NewAPI(tracer, monitor, logger).RegisterEndpoints(router)
+	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger)).RegisterEndpoints(router)
 
 	router.Mount("/", gRPCGatewayMux)
 
