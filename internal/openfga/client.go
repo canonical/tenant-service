@@ -155,7 +155,11 @@ func (c *Client) WriteTuple(ctx context.Context, user, relation, object string) 
 		},
 	}
 
-	r = r.Body(body)
+	r = r.Body(body).Options(client.ClientWriteOptions{
+		Conflict: client.ClientWriteConflictOptions{
+			OnDuplicateWrites: client.CLIENT_WRITE_REQUEST_ON_DUPLICATE_WRITES_IGNORE,
+		},
+	})
 	_, err := c.c.WriteExecute(r)
 
 	return err
@@ -171,7 +175,11 @@ func (c *Client) DeleteTuple(ctx context.Context, user, relation, object string)
 			*openfga.NewTupleKeyWithoutCondition(user, relation, object),
 		},
 	}
-	r = r.Body(body)
+	r = r.Body(body).Options(client.ClientWriteOptions{
+		Conflict: client.ClientWriteConflictOptions{
+			OnMissingDeletes: client.CLIENT_WRITE_REQUEST_ON_MISSING_DELETES_IGNORE,
+		},
+	})
 	_, err := c.c.WriteExecute(r)
 
 	return err
