@@ -1,4 +1,3 @@
-CGO_ENABLED?=0
 GOOS?=linux
 GO_BIN?=app
 GO?=go
@@ -7,11 +6,13 @@ UI_FOLDER?=
 MICROK8S_REGISTRY_FLAG?=SKAFFOLD_DEFAULT_REPO=localhost:32000
 SKAFFOLD?=skaffold
 CONFIGMAP?=deployments/kubectl/configMap.yaml
-DSN?=postgresql://groups:groups@localhost:5432/groups?sslmode=disable
+DSN?=postgresql://tenants:tenants@localhost:5432/tenants?sslmode=disable
+BUF_BIN=buf
 
 
 .EXPORT_ALL_VARIABLES:
 
+# Go related
 mocks: vendor
 	$(GO) install go.uber.org/mock/mockgen@v0.3.0
 	# generate gomocks
@@ -42,9 +43,11 @@ build:
 	$(GO) build -o $(GO_BIN) ./
 .PHONY: build
 
+# Development
 dev:
 	./start.sh
 
+# Database migrations
 db-status:
 	$(GO) run . migrate --dsn $(DSN) status
 .PHONY: db-status
@@ -56,3 +59,17 @@ db:
 db-down:
 	$(GO) run . migrate --dsn $(DSN) down
 .PHONY: db-down
+
+# GRPC/OpenAPI
+generate:
+	$(BUF_BIN) generate
+.PHONY: generate
+
+openapi-v3:
+	cd convert && $(GO) run convert.go
+.PHONY: openapi-v3
+
+client-http:
+	$(GO) run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.1 -package httpclient -generate types,client -o client/http/client.gen.go openapi/openapi.yaml
+.PHONY: client-http
+
