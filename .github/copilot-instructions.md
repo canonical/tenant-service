@@ -12,9 +12,13 @@ This is the Tenant Service for the Identity Platform, providing authorization-aw
 
 ### Core Components
 - **API Layer**: `api/proto/v0/` defines the contract. `pkg/web/router.go` wires handlers.
-- **Service Layer**: Business logic lives in `pkg/<domain>/` (e.g., `pkg/tenant/`).
-  - Implements the gRPC server interface.
-  - orchestrates storage, authorization, and other dependencies.
+- **Handler Layer**: `pkg/<domain>/handlers.go` implements the gRPC server interface.
+  - Validates request parameters.
+  - Calls the Service layer.
+  - Maps domain errors/results to gRPC status codes and responses.
+- **Service Layer**: Business logic lives in `pkg/<domain>/service.go`.
+  - Pure Go code, decoupled from transport (gRPC/HTTP).
+  - Orchestrates storage, authorization, and external clients (e.g. Kratos).
 - **Storage Layer**: `internal/storage/` handles all database interactions.
   - Uses `Masterminds/squirrel` for query building.
   - **Transaction Middleware**: HTTP requests are automatically wrapped in lazy transactions.
@@ -74,24 +78,39 @@ All files must start with:
 ## Example Patterns
 
 ### Service Method (Tracing & Error Handling)
+#### `service.go`
 ```go
-func (s *Service) CreateTenant(ctx context.Context, req *v0.CreateTenantRequest) (*v0.CreateTenantResponse, error) {
+func (s *Service) CreateTenant(ctx context.Context, name string) (*types.Tenant, error) {
     ctx, span := s.tracer.Start(ctx, "tenant.Service.CreateTenant")
     defer span.End()
 
     // Authorization
     if allowed, err := s.authz.Check(ctx, ...); err != nil {
-         return nil, status.Errorf(codes.Internal, "auth check failed: %v", err)
+         return nil, fmt.Errorf("auth check failed: %w", err)
     } else if !allowed {
-         return nil, status.Error(codes.PermissionDenied, "permission denied")
+         return nil, ErrPermissionDenied
     }
 
     // Storage
-    tenant, err := s.storage.CreateTenant(ctx, ...)
+    tenant, err := s.storage.CreateTenant(ctx, &types.Tenant{Name: name})
     if err != nil {
-        return nil, fmt.Errorf("failed to create tenant: %v", err)
+        return nil, fmt.Errorf("failed to create tenant: %w", err)
     }
-    return &v0.CreateTenantResponse{Tenant: tenant}, nil
+    return tenant, nil
+}
+```
+
+#### `handlers.go`
+```go
+func (h *Handler) CreateTenant(ctx context.Context, req *v0.CreateTenantRequest) (*v0.CreateTenantResponse, error) {
+    tenant, err := h.service.CreateTenant(ctx, req.Name)
+    if err != nil {
+        if errors.Is(err, tenant.ErrPermissionDenied) {
+             return nil, status.Error(codes.PermissionDenied, "permission denied")
+        }
+        return nil, status.Errorf(codes.Internal, "failed to create tenant: %v", err)
+    }
+    return &v0.CreateTenantResponse{Tenant: convertToProto(tenant)}, nil
 }
 ```
 
@@ -109,3 +128,13 @@ func (s *Storage) DeleteTenant(ctx context.Context, id string) error {
     return nil
 }
 ```
+
+### Security & Identity
+- **Audit Logging**:
+  - Use `internal/logging/SecurityLogger` to log successful authorization events for sensitive actions (e.g. role changes, deletions).
+
+### Webhooks & Integrations
+- **Package**: `pkg/webhooks` handles external identity provider events.
+- **Kratos**: Handles registration flows.
+- **Hydra**: Handles OAuth2 token enrichment.
+
