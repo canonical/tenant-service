@@ -19,14 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	TenantService_ListTenants_FullMethodName     = "/identity.platform.api.tenant.TenantService/ListTenants"
-	TenantService_InviteMember_FullMethodName    = "/identity.platform.api.tenant.TenantService/InviteMember"
-	TenantService_ListUserTenants_FullMethodName = "/identity.platform.api.tenant.TenantService/ListUserTenants"
-	TenantService_CreateTenant_FullMethodName    = "/identity.platform.api.tenant.TenantService/CreateTenant"
-	TenantService_UpdateTenant_FullMethodName    = "/identity.platform.api.tenant.TenantService/UpdateTenant"
-	TenantService_DeleteTenant_FullMethodName    = "/identity.platform.api.tenant.TenantService/DeleteTenant"
-	TenantService_ProvisionUser_FullMethodName   = "/identity.platform.api.tenant.TenantService/ProvisionUser"
-	TenantService_ActivateTenant_FullMethodName  = "/identity.platform.api.tenant.TenantService/ActivateTenant"
+	TenantService_ListMyTenants_FullMethodName    = "/identity.platform.api.tenant.TenantService/ListMyTenants"
+	TenantService_InviteMember_FullMethodName     = "/identity.platform.api.tenant.TenantService/InviteMember"
+	TenantService_ListTenants_FullMethodName      = "/identity.platform.api.tenant.TenantService/ListTenants"
+	TenantService_ListUserTenants_FullMethodName  = "/identity.platform.api.tenant.TenantService/ListUserTenants"
+	TenantService_ListTenantUsers_FullMethodName  = "/identity.platform.api.tenant.TenantService/ListTenantUsers"
+	TenantService_CreateTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/CreateTenant"
+	TenantService_UpdateTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/UpdateTenant"
+	TenantService_DeleteTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/DeleteTenant"
+	TenantService_ProvisionUser_FullMethodName    = "/identity.platform.api.tenant.TenantService/ProvisionUser"
+	TenantService_ActivateTenant_FullMethodName   = "/identity.platform.api.tenant.TenantService/ActivateTenant"
+	TenantService_DeactivateTenant_FullMethodName = "/identity.platform.api.tenant.TenantService/DeactivateTenant"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -34,15 +37,18 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TenantServiceClient interface {
 	// Public Endpoints
-	ListTenants(ctx context.Context, in *ListTenantsRequest, opts ...grpc.CallOption) (*ListTenantsResponse, error)
+	ListMyTenants(ctx context.Context, in *ListMyTenantsRequest, opts ...grpc.CallOption) (*ListMyTenantsResponse, error)
 	InviteMember(ctx context.Context, in *InviteMemberRequest, opts ...grpc.CallOption) (*InviteMemberResponse, error)
 	// Internal Admin Endpoints
+	ListTenants(ctx context.Context, in *ListTenantsRequest, opts ...grpc.CallOption) (*ListTenantsResponse, error)
 	ListUserTenants(ctx context.Context, in *ListUserTenantsRequest, opts ...grpc.CallOption) (*ListUserTenantsResponse, error)
+	ListTenantUsers(ctx context.Context, in *ListTenantUsersRequest, opts ...grpc.CallOption) (*ListTenantUsersResponse, error)
 	CreateTenant(ctx context.Context, in *CreateTenantRequest, opts ...grpc.CallOption) (*CreateTenantResponse, error)
 	UpdateTenant(ctx context.Context, in *UpdateTenantRequest, opts ...grpc.CallOption) (*UpdateTenantResponse, error)
 	DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*DeleteTenantResponse, error)
 	ProvisionUser(ctx context.Context, in *ProvisionUserRequest, opts ...grpc.CallOption) (*ProvisionUserResponse, error)
 	ActivateTenant(ctx context.Context, in *ActivateTenantRequest, opts ...grpc.CallOption) (*ActivateTenantResponse, error)
+	DeactivateTenant(ctx context.Context, in *DeactivateTenantRequest, opts ...grpc.CallOption) (*DeactivateTenantResponse, error)
 }
 
 type tenantServiceClient struct {
@@ -53,9 +59,9 @@ func NewTenantServiceClient(cc grpc.ClientConnInterface) TenantServiceClient {
 	return &tenantServiceClient{cc}
 }
 
-func (c *tenantServiceClient) ListTenants(ctx context.Context, in *ListTenantsRequest, opts ...grpc.CallOption) (*ListTenantsResponse, error) {
-	out := new(ListTenantsResponse)
-	err := c.cc.Invoke(ctx, TenantService_ListTenants_FullMethodName, in, out, opts...)
+func (c *tenantServiceClient) ListMyTenants(ctx context.Context, in *ListMyTenantsRequest, opts ...grpc.CallOption) (*ListMyTenantsResponse, error) {
+	out := new(ListMyTenantsResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListMyTenants_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +77,27 @@ func (c *tenantServiceClient) InviteMember(ctx context.Context, in *InviteMember
 	return out, nil
 }
 
+func (c *tenantServiceClient) ListTenants(ctx context.Context, in *ListTenantsRequest, opts ...grpc.CallOption) (*ListTenantsResponse, error) {
+	out := new(ListTenantsResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListTenants_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *tenantServiceClient) ListUserTenants(ctx context.Context, in *ListUserTenantsRequest, opts ...grpc.CallOption) (*ListUserTenantsResponse, error) {
 	out := new(ListUserTenantsResponse)
 	err := c.cc.Invoke(ctx, TenantService_ListUserTenants_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ListTenantUsers(ctx context.Context, in *ListTenantUsersRequest, opts ...grpc.CallOption) (*ListTenantUsersResponse, error) {
+	out := new(ListTenantUsersResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListTenantUsers_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -125,20 +149,32 @@ func (c *tenantServiceClient) ActivateTenant(ctx context.Context, in *ActivateTe
 	return out, nil
 }
 
+func (c *tenantServiceClient) DeactivateTenant(ctx context.Context, in *DeactivateTenantRequest, opts ...grpc.CallOption) (*DeactivateTenantResponse, error) {
+	out := new(DeactivateTenantResponse)
+	err := c.cc.Invoke(ctx, TenantService_DeactivateTenant_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility
 type TenantServiceServer interface {
 	// Public Endpoints
-	ListTenants(context.Context, *ListTenantsRequest) (*ListTenantsResponse, error)
+	ListMyTenants(context.Context, *ListMyTenantsRequest) (*ListMyTenantsResponse, error)
 	InviteMember(context.Context, *InviteMemberRequest) (*InviteMemberResponse, error)
 	// Internal Admin Endpoints
+	ListTenants(context.Context, *ListTenantsRequest) (*ListTenantsResponse, error)
 	ListUserTenants(context.Context, *ListUserTenantsRequest) (*ListUserTenantsResponse, error)
+	ListTenantUsers(context.Context, *ListTenantUsersRequest) (*ListTenantUsersResponse, error)
 	CreateTenant(context.Context, *CreateTenantRequest) (*CreateTenantResponse, error)
 	UpdateTenant(context.Context, *UpdateTenantRequest) (*UpdateTenantResponse, error)
 	DeleteTenant(context.Context, *DeleteTenantRequest) (*DeleteTenantResponse, error)
 	ProvisionUser(context.Context, *ProvisionUserRequest) (*ProvisionUserResponse, error)
 	ActivateTenant(context.Context, *ActivateTenantRequest) (*ActivateTenantResponse, error)
+	DeactivateTenant(context.Context, *DeactivateTenantRequest) (*DeactivateTenantResponse, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -146,14 +182,20 @@ type TenantServiceServer interface {
 type UnimplementedTenantServiceServer struct {
 }
 
-func (UnimplementedTenantServiceServer) ListTenants(context.Context, *ListTenantsRequest) (*ListTenantsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListTenants not implemented")
+func (UnimplementedTenantServiceServer) ListMyTenants(context.Context, *ListMyTenantsRequest) (*ListMyTenantsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMyTenants not implemented")
 }
 func (UnimplementedTenantServiceServer) InviteMember(context.Context, *InviteMemberRequest) (*InviteMemberResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InviteMember not implemented")
 }
+func (UnimplementedTenantServiceServer) ListTenants(context.Context, *ListTenantsRequest) (*ListTenantsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTenants not implemented")
+}
 func (UnimplementedTenantServiceServer) ListUserTenants(context.Context, *ListUserTenantsRequest) (*ListUserTenantsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUserTenants not implemented")
+}
+func (UnimplementedTenantServiceServer) ListTenantUsers(context.Context, *ListTenantUsersRequest) (*ListTenantUsersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTenantUsers not implemented")
 }
 func (UnimplementedTenantServiceServer) CreateTenant(context.Context, *CreateTenantRequest) (*CreateTenantResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateTenant not implemented")
@@ -170,6 +212,9 @@ func (UnimplementedTenantServiceServer) ProvisionUser(context.Context, *Provisio
 func (UnimplementedTenantServiceServer) ActivateTenant(context.Context, *ActivateTenantRequest) (*ActivateTenantResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ActivateTenant not implemented")
 }
+func (UnimplementedTenantServiceServer) DeactivateTenant(context.Context, *DeactivateTenantRequest) (*DeactivateTenantResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeactivateTenant not implemented")
+}
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 
 // UnsafeTenantServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -183,20 +228,20 @@ func RegisterTenantServiceServer(s grpc.ServiceRegistrar, srv TenantServiceServe
 	s.RegisterService(&TenantService_ServiceDesc, srv)
 }
 
-func _TenantService_ListTenants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListTenantsRequest)
+func _TenantService_ListMyTenants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMyTenantsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TenantServiceServer).ListTenants(ctx, in)
+		return srv.(TenantServiceServer).ListMyTenants(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TenantService_ListTenants_FullMethodName,
+		FullMethod: TenantService_ListMyTenants_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TenantServiceServer).ListTenants(ctx, req.(*ListTenantsRequest))
+		return srv.(TenantServiceServer).ListMyTenants(ctx, req.(*ListMyTenantsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -219,6 +264,24 @@ func _TenantService_InviteMember_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_ListTenants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTenantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListTenants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListTenants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListTenants(ctx, req.(*ListTenantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _TenantService_ListUserTenants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListUserTenantsRequest)
 	if err := dec(in); err != nil {
@@ -233,6 +296,24 @@ func _TenantService_ListUserTenants_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TenantServiceServer).ListUserTenants(ctx, req.(*ListUserTenantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ListTenantUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTenantUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListTenantUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListTenantUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListTenantUsers(ctx, req.(*ListTenantUsersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -327,6 +408,24 @@ func _TenantService_ActivateTenant_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_DeactivateTenant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeactivateTenantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).DeactivateTenant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_DeactivateTenant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).DeactivateTenant(ctx, req.(*DeactivateTenantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -335,16 +434,24 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*TenantServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ListTenants",
-			Handler:    _TenantService_ListTenants_Handler,
+			MethodName: "ListMyTenants",
+			Handler:    _TenantService_ListMyTenants_Handler,
 		},
 		{
 			MethodName: "InviteMember",
 			Handler:    _TenantService_InviteMember_Handler,
 		},
 		{
+			MethodName: "ListTenants",
+			Handler:    _TenantService_ListTenants_Handler,
+		},
+		{
 			MethodName: "ListUserTenants",
 			Handler:    _TenantService_ListUserTenants_Handler,
+		},
+		{
+			MethodName: "ListTenantUsers",
+			Handler:    _TenantService_ListTenantUsers_Handler,
 		},
 		{
 			MethodName: "CreateTenant",
@@ -365,6 +472,10 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ActivateTenant",
 			Handler:    _TenantService_ActivateTenant_Handler,
+		},
+		{
+			MethodName: "DeactivateTenant",
+			Handler:    _TenantService_DeactivateTenant_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

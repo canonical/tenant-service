@@ -8,7 +8,7 @@ option go_package = "github.com/canonical/tenant-service/api/tenant/v0;tenantv0"
 
 service TenantService {
   // Public Endpoints
-  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse) {
+  rpc ListMyTenants(ListMyTenantsRequest) returns (ListMyTenantsResponse) {
     option (google.api.http) = {
       get: "/me/tenants"
     };
@@ -22,48 +22,73 @@ service TenantService {
   }
 
   // Internal Admin Endpoints
+  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse) {
+    option (google.api.http) = {
+        get: "/tenants"
+    };
+  }
+
   rpc ListUserTenants(ListUserTenantsRequest) returns (ListUserTenantsResponse) {
     option (google.api.http) = {
-        get: "/admin/users/{user_id}/tenants"
+        get: "/users/{user_id}/tenants"
+    };
+  }
+
+  rpc ListTenantUsers(ListTenantUsersRequest) returns (ListTenantUsersResponse) {
+    option (google.api.http) = {
+        get: "/tenants/{tenant_id}/users"
     };
   }
 
   rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse) {
     option (google.api.http) = {
-        post: "/admin/tenants"
+        post: "/tenants"
         body: "*"
     };
   }
 
   rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse) {
     option (google.api.http) = {
-        patch: "/admin/tenants/{tenant_id}"
+        patch: "/tenants/{tenant_id}"
         body: "*"
     };
   }
 
   rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse) {
     option (google.api.http) = {
-        delete: "/admin/tenants/{tenant_id}"
+        delete: "/tenants/{tenant_id}"
     };
   }
 
   rpc ProvisionUser(ProvisionUserRequest) returns (ProvisionUserResponse) {
       option (google.api.http) = {
-          post: "/admin/tenants/{tenant_id}/users"
+          post: "/tenants/{tenant_id}/users"
           body: "*"
       };
   }
 
   rpc ActivateTenant(ActivateTenantRequest) returns (ActivateTenantResponse) {
       option (google.api.http) = {
-          post: "/admin/tenants/{tenant_id}/activate"
+          post: "/tenants/{tenant_id}/activate"
+          body: "*"
+      };
+  }
+
+  rpc DeactivateTenant(DeactivateTenantRequest) returns (DeactivateTenantResponse) {
+      option (google.api.http) = {
+          post: "/tenants/{tenant_id}/deactivate"
           body: "*"
       };
   }
 }
 
 // Messages
+
+message ListMyTenantsRequest {}
+
+message ListMyTenantsResponse {
+    repeated Tenant tenants = 1;
+}
 
 message ListTenantsRequest {}
 
@@ -75,6 +100,7 @@ message Tenant {
     string id = 1;
     string name = 2;
     string created_at = 3;
+    bool enabled = 4;
 }
 
 message InviteMemberRequest {
@@ -85,6 +111,8 @@ message InviteMemberRequest {
 
 message InviteMemberResponse {
     string status = 1;
+    string link = 2;
+    string code = 3;
 }
 
 message ListUserTenantsRequest {
@@ -107,7 +135,7 @@ message CreateTenantResponse {
 message UpdateTenantRequest {
     string tenant_id = 1;
     string name = 2;
-    string owner_id = 3;
+    repeated string owner_ids = 3;
 }
 
 message UpdateTenantResponse {
@@ -140,4 +168,26 @@ message ActivateTenantRequest {
 
 message ActivateTenantResponse {
     string status = 1;
+}
+
+message DeactivateTenantRequest {
+    string tenant_id = 1;
+}
+
+message DeactivateTenantResponse {
+    string status = 1;
+}
+
+message ListTenantUsersRequest {
+    string tenant_id = 1;
+}
+
+message ListTenantUsersResponse {
+    repeated TenantUser users = 1;
+}
+
+message TenantUser {
+    string user_id = 1;
+    string email = 2;
+    string role = 3;
 }

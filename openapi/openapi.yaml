@@ -1,0 +1,375 @@
+components:
+    schemas:
+        TenantServiceActivateTenantBody:
+            properties:
+                plan:
+                    type: string
+                status:
+                    type: string
+            type: object
+        TenantServiceDeactivateTenantBody:
+            type: object
+        TenantServiceInviteMemberBody:
+            properties:
+                email:
+                    type: string
+                role:
+                    title: owner, admin, member
+                    type: string
+            type: object
+        TenantServiceProvisionUserBody:
+            properties:
+                email:
+                    type: string
+                role:
+                    type: string
+            type: object
+        TenantServiceUpdateTenantBody:
+            properties:
+                name:
+                    type: string
+                ownerIds:
+                    items:
+                        type: string
+                    type: array
+            type: object
+        protobufAny:
+            additionalProperties: {}
+            properties:
+                '@type':
+                    type: string
+            type: object
+        rpcStatus:
+            properties:
+                code:
+                    format: int32
+                    type: integer
+                details:
+                    items:
+                        $ref: '#/components/schemas/protobufAny'
+                    type: array
+                message:
+                    type: string
+            type: object
+        tenantActivateTenantResponse:
+            properties:
+                status:
+                    type: string
+            type: object
+        tenantCreateTenantRequest:
+            properties:
+                name:
+                    type: string
+            type: object
+        tenantCreateTenantResponse:
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+            type: object
+        tenantDeactivateTenantResponse:
+            properties:
+                status:
+                    type: string
+            type: object
+        tenantDeleteTenantResponse:
+            properties:
+                status:
+                    type: string
+            type: object
+        tenantInviteMemberResponse:
+            properties:
+                code:
+                    type: string
+                link:
+                    type: string
+                status:
+                    type: string
+            type: object
+        tenantListMyTenantsResponse:
+            properties:
+                tenants:
+                    items:
+                        $ref: '#/components/schemas/tenantTenant'
+                    type: array
+            type: object
+        tenantListTenantUsersResponse:
+            properties:
+                users:
+                    items:
+                        $ref: '#/components/schemas/tenantTenantUser'
+                    type: array
+            type: object
+        tenantListTenantsResponse:
+            properties:
+                tenants:
+                    items:
+                        $ref: '#/components/schemas/tenantTenant'
+                    type: array
+            type: object
+        tenantListUserTenantsResponse:
+            properties:
+                tenants:
+                    items:
+                        $ref: '#/components/schemas/tenantTenant'
+                    type: array
+            type: object
+        tenantProvisionUserResponse:
+            properties:
+                status:
+                    type: string
+            type: object
+        tenantTenant:
+            properties:
+                createdAt:
+                    type: string
+                enabled:
+                    type: boolean
+                id:
+                    type: string
+                name:
+                    type: string
+            type: object
+        tenantTenantUser:
+            properties:
+                email:
+                    type: string
+                role:
+                    type: string
+                userId:
+                    type: string
+            type: object
+        tenantUpdateTenantResponse:
+            properties:
+                tenant:
+                    $ref: '#/components/schemas/tenantTenant'
+            type: object
+info:
+    title: v0/tenant.proto
+    version: version not set
+openapi: 3.0.3
+paths:
+    /me/tenants:
+        get:
+            operationId: TenantService_ListMyTenants
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            summary: Public Endpoints
+            tags:
+                - TenantService
+    /tenants:
+        get:
+            operationId: TenantService_ListTenants
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            summary: Internal Admin Endpoints
+            tags:
+                - TenantService
+        post:
+            operationId: TenantService_CreateTenant
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenantCreateTenantRequest'
+                required: true
+                x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /tenants/{tenantId}:
+        delete:
+            operationId: TenantService_DeleteTenant
+            parameters:
+                - in: path
+                  name: tenantId
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+        patch:
+            operationId: TenantService_UpdateTenant
+            parameters:
+                - in: path
+                  name: tenantId
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TenantServiceUpdateTenantBody'
+                required: true
+                x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /tenants/{tenantId}/activate:
+        post:
+            operationId: TenantService_ActivateTenant
+            parameters:
+                - in: path
+                  name: tenantId
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TenantServiceActivateTenantBody'
+                required: true
+                x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /tenants/{tenantId}/deactivate:
+        post:
+            operationId: TenantService_DeactivateTenant
+            parameters:
+                - in: path
+                  name: tenantId
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TenantServiceDeactivateTenantBody'
+                required: true
+                x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /tenants/{tenantId}/invites:
+        post:
+            operationId: TenantService_InviteMember
+            parameters:
+                - in: path
+                  name: tenantId
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TenantServiceInviteMemberBody'
+                required: true
+                x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /tenants/{tenantId}/users:
+        get:
+            operationId: TenantService_ListTenantUsers
+            parameters:
+                - in: path
+                  name: tenantId
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+        post:
+            operationId: TenantService_ProvisionUser
+            parameters:
+                - in: path
+                  name: tenantId
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TenantServiceProvisionUserBody'
+                required: true
+                x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /users/{userId}/tenants:
+        get:
+            operationId: TenantService_ListUserTenants
+            parameters:
+                - in: path
+                  name: userId
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+tags:
+    - name: TenantService
