@@ -10,10 +10,15 @@ type EnvSpec struct {
 	OtelHTTPEndpoint string `envconfig:"otel_http_endpoint"`
 	TracingEnabled   bool   `envconfig:"tracing_enabled" default:"true"`
 
+	KratosAdminURL string `envconfig:"kratos_admin_url" required:"true"`
+
+	InvitationLifetime string `envconfig:"invitation_lifetime" default:"24h"`
+
 	LogLevel string `envconfig:"log_level" default:"error"`
 	Debug    bool   `envconfig:"debug" default:"false"`
 
-	Port int `envconfig:"port" default:"8080"`
+	Port     int `envconfig:"port" default:"8080"`
+	GRPCPort int `envconfig:"grpc_port" default:"50051"`
 
 	DSN string `envconfig:"DSN" required:"true"`
 

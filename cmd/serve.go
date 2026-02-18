@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,14 +17,19 @@ import (
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
+	"github.com/canonical/tenant-service/internal/identity"
+	"github.com/canonical/tenant-service/internal/kratos"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring/prometheus"
 	"github.com/canonical/tenant-service/internal/openfga"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
+	"github.com/canonical/tenant-service/pkg/tenant"
 	"github.com/canonical/tenant-service/pkg/web"
+	v0 "github.com/canonical/tenant-service/v0"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
 )
 
 var serveCmd = &cobra.Command{
@@ -102,7 +108,47 @@ func serve() error {
 		logger.Info("Using noop authorizer")
 	}
 
+	kratosClient := kratos.NewClient(
+		specs.KratosAdminURL,
+		tracer,
+		monitor,
+		logger,
+	)
+
+	tenantService := tenant.NewService(
+		s,
+		authorizer,
+		kratosClient,
+		specs.InvitationLifetime,
+		tracer,
+		monitor,
+		logger,
+	)
+
+	identityMiddleware := identity.NewMiddleware(tracer, monitor, logger)
+	tenantHandler := tenant.NewHandler(tenantService, tracer, monitor, logger)
+
+	// Start gRPC server
+	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", specs.GRPCPort))
+	if err != nil {
+		logger.Fatalf("failed to listen on grpc port: %v", err)
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(identityMiddleware.GRPCInterceptor),
+	)
+	v0.RegisterTenantServiceServer(grpcServer, tenantHandler)
+
+	go func() {
+		logger.Infof("Starting gRPC server on port %v", specs.GRPCPort)
+		if err := grpcServer.Serve(lis); err != nil {
+			logger.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
 	router := web.NewRouter(
+		tenantHandler,
+		identityMiddleware,
 		s,
 		dbClient,
 		authorizer,
@@ -110,7 +156,7 @@ func serve() error {
 		monitor,
 		logger,
 	)
-	logger.Infof("Starting server on port %v", specs.Port)
+	logger.Infof("Starting HTTP server on port %v", specs.Port)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("0.0.0.0:%v", specs.Port),

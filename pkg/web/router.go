@@ -4,11 +4,13 @@
 package web
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/db"
 	"github.com/canonical/tenant-service/internal/http/types"
+	"github.com/canonical/tenant-service/internal/identity"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/storage"
@@ -16,6 +18,7 @@ import (
 	"github.com/canonical/tenant-service/pkg/metrics"
 	"github.com/canonical/tenant-service/pkg/status"
 	"github.com/canonical/tenant-service/pkg/webhooks"
+	v0 "github.com/canonical/tenant-service/v0"
 	chi "github.com/go-chi/chi/v5"
 	middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -23,6 +26,8 @@ import (
 )
 
 func NewRouter(
+	tenantHandler v0.TenantServiceServer,
+	identityMiddleware *identity.Middleware,
 	s storage.StorageInterface,
 	dbClient db.DBClientInterface,
 	authz authorization.AuthorizerInterface,
@@ -51,18 +56,25 @@ func NewRouter(
 		// Use proto field names (snake_case) in JSON output instead of lowerCamelCase.
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
 			MarshalOptions: protojson.MarshalOptions{
-				UseProtoNames: true,
+				UseProtoNames:   true,
+				EmitUnpopulated: true,
 			},
 		}),
 	)
+	_ = v0.RegisterTenantServiceHandlerServer(context.Background(), gRPCGatewayMux, tenantHandler)
 
 	router.Use(middlewares...)
 
 	metrics.NewAPI(logger).RegisterEndpoints(router)
 	status.NewAPI(tracer, monitor, logger).RegisterEndpoints(router)
-	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger)).RegisterEndpoints(router)
+	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger), logger).RegisterEndpoints(router)
 
-	router.Mount("/", gRPCGatewayMux)
+	// Protected routes
+	authRouter := chi.NewRouter()
+	authRouter.Use(identityMiddleware.HTTPMiddleware)
+	authRouter.Mount("/", gRPCGatewayMux)
+
+	router.Mount("/", authRouter)
 
 	return tracing.NewMiddleware(monitor, logger).OpenTelemetry(router)
 }
