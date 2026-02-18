@@ -13,7 +13,8 @@ import (
 // It is a subset of the internal/storage interface.
 type StorageInterface interface {
 	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
-	AddMember(ctx context.Context, tenantID, userID, role string) error
+	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
+	ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
 }
 
 // AuthorizerInterface defines the authorization operations required by the webhooks package.
