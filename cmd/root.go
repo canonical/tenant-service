@@ -9,11 +9,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	userID       string
+	grpcEndpoint string
+	httpEndpoint string
+)
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "",
-	Short: "Hook Service",
-	Long:  `A service for handling the Token Hydra Hook`,
+	Use:   "app",
+	Short: "Tenant Service",
+	Long:  `Tenant Service CLI for managing tenants and users.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -26,4 +32,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVar(&grpcEndpoint, "grpc-endpoint", "localhost:50051", "gRPC server endpoint")
+	rootCmd.PersistentFlags().StringVar(&httpEndpoint, "http-endpoint", "", "HTTP server endpoint (e.g. http://localhost:8000)")
+	rootCmd.PersistentFlags().StringVar(&userID, "user-id", "", "User ID for impersonation")
 }
