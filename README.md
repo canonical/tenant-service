@@ -15,6 +15,27 @@ This command will:
 2. Build and run the service locally.
 3. Start an OIDC client on `http://localhost:4446` to facilitate login flows.
 
+## Kubernetes Development
+
+To run the full stack in a MicroK8s cluster using Skaffold:
+
+```bash
+make dev-k8s
+```
+
+This command will:
+1. Build the Rockcraft image locally.
+2. Push the image to your configured registry (default `localhost:32000`).
+3. Deploy dependencies (Postgres, OpenFGA) and the service to Kubernetes.
+4. Run the setup jobs (DB migrations, OpenFGA config).
+5. Port-forward the service and dependencies to localhost.
+
+To clean up the Kubernetes resources:
+
+```bash
+make clean-k8s
+```
+
 ## Configuration
 
 The service is configured using environment variables.

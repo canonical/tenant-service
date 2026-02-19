@@ -1,8 +1,8 @@
+CGO_ENABLED?=0
 GOOS?=linux
 GO_BIN?=app
 GO?=go
 GOFLAGS?=-ldflags=-w -ldflags=-s -a -buildvcs
-UI_FOLDER?=
 MICROK8S_REGISTRY_FLAG?=SKAFFOLD_DEFAULT_REPO=localhost:32000
 SKAFFOLD?=skaffold
 CONFIGMAP?=deployments/kubectl/configMap.yaml
@@ -46,6 +46,15 @@ build:
 # Development
 dev:
 	./start.sh
+.PHONY: dev
+
+dev-k8s:
+	$(MICROK8S_REGISTRY_FLAG) $(SKAFFOLD) run --port-forward
+.PHONY: dev-k8s
+
+clean-k8s:
+	$(SKAFFOLD) delete
+.PHONY: clean-k8s
 
 # Database migrations
 db-status:
