@@ -101,6 +101,20 @@ func (a *Authorizer) AssignTenantMember(ctx context.Context, tenantId, userId st
 	return a.client.WriteTuple(ctx, UserTuple(userId), MEMBER_RELATION, TenantTuple(tenantId))
 }
 
+func (a *Authorizer) RemoveTenantOwner(ctx context.Context, tenantId, userId string) error {
+	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.RemoveTenantOwner")
+	defer span.End()
+
+	return a.client.DeleteTuple(ctx, UserTuple(userId), OWNER_RELATION, TenantTuple(tenantId))
+}
+
+func (a *Authorizer) RemoveTenantMember(ctx context.Context, tenantId, userId string) error {
+	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.RemoveTenantMember")
+	defer span.End()
+
+	return a.client.DeleteTuple(ctx, UserTuple(userId), MEMBER_RELATION, TenantTuple(tenantId))
+}
+
 func (a *Authorizer) CheckTenantAccess(ctx context.Context, tenantId, userId, relation string) (bool, error) {
 	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.CheckTenantAccess")
 	defer span.End()

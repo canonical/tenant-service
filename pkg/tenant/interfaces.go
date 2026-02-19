@@ -14,11 +14,10 @@ import (
 type ServiceInterface interface {
 	InviteMember(ctx context.Context, tenantID, email, role string) (string, string, error)
 	CreateTenant(ctx context.Context, name string) (*types.Tenant, error)
-	UpdateTenant(ctx context.Context, id, name string, ownerIDs []string) (*types.Tenant, error)
+	UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) (*types.Tenant, error)
 	DeleteTenant(ctx context.Context, id string) error
 	ProvisionUser(ctx context.Context, tenantID, email, role string) error
-	ActivateTenant(ctx context.Context, tenantID string) error
-	DeactivateTenant(ctx context.Context, tenantID string) error
+	UpdateTenantUser(ctx context.Context, tenantID, userID, role string) (*types.TenantUser, error)
 	ListUserTenants(ctx context.Context, userID string) ([]*types.Tenant, error)
 	ListTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
 	ListTenants(ctx context.Context) ([]*types.Tenant, error)
@@ -28,9 +27,8 @@ type ServiceInterface interface {
 type StorageInterface interface {
 	CreateInvite(ctx context.Context, invite *types.Invite) (*types.Invite, error)
 	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
-	UpdateTenant(ctx context.Context, id, name string, ownerIDs []string) error
+	UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) error
 	DeleteTenant(ctx context.Context, id string) error
-	SetTenantStatus(ctx context.Context, id string, enabled bool) error
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
 	GetTenantByID(ctx context.Context, id string) (*types.Tenant, error)
 	GetInviteByToken(ctx context.Context, token string) (*types.Invite, error)

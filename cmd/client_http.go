@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type httpTenantClient struct {
@@ -135,15 +136,20 @@ func (c *httpTenantClient) UpdateTenant(ctx context.Context, in *v0.UpdateTenant
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	resp, err := c.client.TenantServiceUpdateTenantWithBody(ctx, in.TenantId, "application/json", bytes.NewReader(bodyBytes))
+	// Assuming in.Tenant is not nil. If it is, this will panic or we should check.
+	// The generated client expects tenant.id from the path parameter.
+	if in.Tenant == nil {
+		return nil, fmt.Errorf("tenant is required")
+	}
+	resp, err := c.client.TenantServiceUpdateTenantWithBody(ctx, in.Tenant.Id, "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *httpTenantClient) DeleteTenant(ctx context.Context, in *v0.DeleteTenantRequest, opts ...grpc.CallOption) (*v0.DeleteTenantResponse, error) {
-	out := new(v0.DeleteTenantResponse)
+func (c *httpTenantClient) DeleteTenant(ctx context.Context, in *v0.DeleteTenantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	resp, err := c.client.TenantServiceDeleteTenant(ctx, in.TenantId)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
@@ -158,32 +164,6 @@ func (c *httpTenantClient) ProvisionUser(ctx context.Context, in *v0.ProvisionUs
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 	resp, err := c.client.TenantServiceProvisionUserWithBody(ctx, in.TenantId, "application/json", bytes.NewReader(bodyBytes))
-	if err := c.handleRequest(resp, err, out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *httpTenantClient) ActivateTenant(ctx context.Context, in *v0.ActivateTenantRequest, opts ...grpc.CallOption) (*v0.ActivateTenantResponse, error) {
-	out := new(v0.ActivateTenantResponse)
-	bodyBytes, err := protojson.Marshal(in)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-	resp, err := c.client.TenantServiceActivateTenantWithBody(ctx, in.TenantId, "application/json", bytes.NewReader(bodyBytes))
-	if err := c.handleRequest(resp, err, out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *httpTenantClient) DeactivateTenant(ctx context.Context, in *v0.DeactivateTenantRequest, opts ...grpc.CallOption) (*v0.DeactivateTenantResponse, error) {
-	out := new(v0.DeactivateTenantResponse)
-	bodyBytes, err := protojson.Marshal(in)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-	resp, err := c.client.TenantServiceDeactivateTenantWithBody(ctx, in.TenantId, "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}

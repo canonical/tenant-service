@@ -16,15 +16,6 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
-// TenantServiceActivateTenantBody defines model for TenantServiceActivateTenantBody.
-type TenantServiceActivateTenantBody struct {
-	Plan   *string `json:"plan,omitempty"`
-	Status *string `json:"status,omitempty"`
-}
-
-// TenantServiceDeactivateTenantBody defines model for TenantServiceDeactivateTenantBody.
-type TenantServiceDeactivateTenantBody = map[string]interface{}
-
 // TenantServiceInviteMemberBody defines model for TenantServiceInviteMemberBody.
 type TenantServiceInviteMemberBody struct {
 	Email *string `json:"email,omitempty"`
@@ -39,8 +30,12 @@ type TenantServiceProvisionUserBody struct {
 
 // TenantServiceUpdateTenantBody defines model for TenantServiceUpdateTenantBody.
 type TenantServiceUpdateTenantBody struct {
-	Name     *string   `json:"name,omitempty"`
-	OwnerIds *[]string `json:"ownerIds,omitempty"`
+	Tenant *struct {
+		CreatedAt *string `json:"createdAt,omitempty"`
+		Enabled   *bool   `json:"enabled,omitempty"`
+		Name      *string `json:"name,omitempty"`
+	} `json:"tenant,omitempty"`
+	UpdateMask *string `json:"updateMask,omitempty"`
 }
 
 // ProtobufAny defines model for protobufAny.
@@ -66,12 +61,6 @@ type TenantServiceCreateTenantJSONRequestBody = TenantCreateTenantRequest
 
 // TenantServiceUpdateTenantJSONRequestBody defines body for TenantServiceUpdateTenant for application/json ContentType.
 type TenantServiceUpdateTenantJSONRequestBody = TenantServiceUpdateTenantBody
-
-// TenantServiceActivateTenantJSONRequestBody defines body for TenantServiceActivateTenant for application/json ContentType.
-type TenantServiceActivateTenantJSONRequestBody = TenantServiceActivateTenantBody
-
-// TenantServiceDeactivateTenantJSONRequestBody defines body for TenantServiceDeactivateTenant for application/json ContentType.
-type TenantServiceDeactivateTenantJSONRequestBody = TenantServiceDeactivateTenantBody
 
 // TenantServiceInviteMemberJSONRequestBody defines body for TenantServiceInviteMember for application/json ContentType.
 type TenantServiceInviteMemberJSONRequestBody = TenantServiceInviteMemberBody
@@ -231,23 +220,13 @@ type ClientInterface interface {
 
 	TenantServiceCreateTenant(ctx context.Context, body TenantServiceCreateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// TenantServiceDeleteTenant request
-	TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// TenantServiceUpdateTenantWithBody request with any body
 	TenantServiceUpdateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	TenantServiceUpdateTenant(ctx context.Context, tenantId string, body TenantServiceUpdateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// TenantServiceActivateTenantWithBody request with any body
-	TenantServiceActivateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	TenantServiceActivateTenant(ctx context.Context, tenantId string, body TenantServiceActivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// TenantServiceDeactivateTenantWithBody request with any body
-	TenantServiceDeactivateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	TenantServiceDeactivateTenant(ctx context.Context, tenantId string, body TenantServiceDeactivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// TenantServiceDeleteTenant request
+	TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TenantServiceInviteMemberWithBody request with any body
 	TenantServiceInviteMemberWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -314,18 +293,6 @@ func (c *Client) TenantServiceCreateTenant(ctx context.Context, body TenantServi
 	return c.Client.Do(req)
 }
 
-func (c *Client) TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewTenantServiceDeleteTenantRequest(c.Server, tenantId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) TenantServiceUpdateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTenantServiceUpdateTenantRequestWithBody(c.Server, tenantId, contentType, body)
 	if err != nil {
@@ -350,44 +317,8 @@ func (c *Client) TenantServiceUpdateTenant(ctx context.Context, tenantId string,
 	return c.Client.Do(req)
 }
 
-func (c *Client) TenantServiceActivateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewTenantServiceActivateTenantRequestWithBody(c.Server, tenantId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) TenantServiceActivateTenant(ctx context.Context, tenantId string, body TenantServiceActivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewTenantServiceActivateTenantRequest(c.Server, tenantId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) TenantServiceDeactivateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewTenantServiceDeactivateTenantRequestWithBody(c.Server, tenantId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) TenantServiceDeactivateTenant(ctx context.Context, tenantId string, body TenantServiceDeactivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewTenantServiceDeactivateTenantRequest(c.Server, tenantId, body)
+func (c *Client) TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServiceDeleteTenantRequest(c.Server, tenantId)
 	if err != nil {
 		return nil, err
 	}
@@ -564,6 +495,53 @@ func NewTenantServiceCreateTenantRequestWithBody(server string, contentType stri
 	return req, nil
 }
 
+// NewTenantServiceUpdateTenantRequest calls the generic TenantServiceUpdateTenant builder with application/json body
+func NewTenantServiceUpdateTenantRequest(server string, tenantId string, body TenantServiceUpdateTenantJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTenantServiceUpdateTenantRequestWithBody(server, tenantId, "application/json", bodyReader)
+}
+
+// NewTenantServiceUpdateTenantRequestWithBody generates requests for TenantServiceUpdateTenant with any type of body
+func NewTenantServiceUpdateTenantRequestWithBody(server string, tenantId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant.id", runtime.ParamLocationPath, tenantId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/tenants/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewTenantServiceDeleteTenantRequest generates requests for TenantServiceDeleteTenant
 func NewTenantServiceDeleteTenantRequest(server string, tenantId string) (*http.Request, error) {
 	var err error
@@ -594,147 +572,6 @@ func NewTenantServiceDeleteTenantRequest(server string, tenantId string) (*http.
 	if err != nil {
 		return nil, err
 	}
-
-	return req, nil
-}
-
-// NewTenantServiceUpdateTenantRequest calls the generic TenantServiceUpdateTenant builder with application/json body
-func NewTenantServiceUpdateTenantRequest(server string, tenantId string, body TenantServiceUpdateTenantJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewTenantServiceUpdateTenantRequestWithBody(server, tenantId, "application/json", bodyReader)
-}
-
-// NewTenantServiceUpdateTenantRequestWithBody generates requests for TenantServiceUpdateTenant with any type of body
-func NewTenantServiceUpdateTenantRequestWithBody(server string, tenantId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/tenants/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PATCH", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewTenantServiceActivateTenantRequest calls the generic TenantServiceActivateTenant builder with application/json body
-func NewTenantServiceActivateTenantRequest(server string, tenantId string, body TenantServiceActivateTenantJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewTenantServiceActivateTenantRequestWithBody(server, tenantId, "application/json", bodyReader)
-}
-
-// NewTenantServiceActivateTenantRequestWithBody generates requests for TenantServiceActivateTenant with any type of body
-func NewTenantServiceActivateTenantRequestWithBody(server string, tenantId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/tenants/%s/activate", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewTenantServiceDeactivateTenantRequest calls the generic TenantServiceDeactivateTenant builder with application/json body
-func NewTenantServiceDeactivateTenantRequest(server string, tenantId string, body TenantServiceDeactivateTenantJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewTenantServiceDeactivateTenantRequestWithBody(server, tenantId, "application/json", bodyReader)
-}
-
-// NewTenantServiceDeactivateTenantRequestWithBody generates requests for TenantServiceDeactivateTenant with any type of body
-func NewTenantServiceDeactivateTenantRequestWithBody(server string, tenantId string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/tenants/%s/deactivate", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -955,23 +792,13 @@ type ClientWithResponsesInterface interface {
 
 	TenantServiceCreateTenantWithResponse(ctx context.Context, body TenantServiceCreateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceCreateTenantResponse, error)
 
-	// TenantServiceDeleteTenantWithResponse request
-	TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error)
-
 	// TenantServiceUpdateTenantWithBodyWithResponse request with any body
 	TenantServiceUpdateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantResponse, error)
 
 	TenantServiceUpdateTenantWithResponse(ctx context.Context, tenantId string, body TenantServiceUpdateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantResponse, error)
 
-	// TenantServiceActivateTenantWithBodyWithResponse request with any body
-	TenantServiceActivateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceActivateTenantResponse, error)
-
-	TenantServiceActivateTenantWithResponse(ctx context.Context, tenantId string, body TenantServiceActivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceActivateTenantResponse, error)
-
-	// TenantServiceDeactivateTenantWithBodyWithResponse request with any body
-	TenantServiceDeactivateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceDeactivateTenantResponse, error)
-
-	TenantServiceDeactivateTenantWithResponse(ctx context.Context, tenantId string, body TenantServiceDeactivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceDeactivateTenantResponse, error)
+	// TenantServiceDeleteTenantWithResponse request
+	TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error)
 
 	// TenantServiceInviteMemberWithBodyWithResponse request with any body
 	TenantServiceInviteMemberWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceInviteMemberResponse, error)
@@ -1056,28 +883,6 @@ func (r TenantServiceCreateTenantResponse) StatusCode() int {
 	return 0
 }
 
-type TenantServiceDeleteTenantResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
-}
-
-// Status returns HTTPResponse.Status
-func (r TenantServiceDeleteTenantResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r TenantServiceDeleteTenantResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type TenantServiceUpdateTenantResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1100,14 +905,14 @@ func (r TenantServiceUpdateTenantResponse) StatusCode() int {
 	return 0
 }
 
-type TenantServiceActivateTenantResponse struct {
+type TenantServiceDeleteTenantResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSONDefault  *RpcStatus
 }
 
 // Status returns HTTPResponse.Status
-func (r TenantServiceActivateTenantResponse) Status() string {
+func (r TenantServiceDeleteTenantResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -1115,29 +920,7 @@ func (r TenantServiceActivateTenantResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r TenantServiceActivateTenantResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type TenantServiceDeactivateTenantResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
-}
-
-// Status returns HTTPResponse.Status
-func (r TenantServiceDeactivateTenantResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r TenantServiceDeactivateTenantResponse) StatusCode() int {
+func (r TenantServiceDeleteTenantResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1267,15 +1050,6 @@ func (c *ClientWithResponses) TenantServiceCreateTenantWithResponse(ctx context.
 	return ParseTenantServiceCreateTenantResponse(rsp)
 }
 
-// TenantServiceDeleteTenantWithResponse request returning *TenantServiceDeleteTenantResponse
-func (c *ClientWithResponses) TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error) {
-	rsp, err := c.TenantServiceDeleteTenant(ctx, tenantId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseTenantServiceDeleteTenantResponse(rsp)
-}
-
 // TenantServiceUpdateTenantWithBodyWithResponse request with arbitrary body returning *TenantServiceUpdateTenantResponse
 func (c *ClientWithResponses) TenantServiceUpdateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantResponse, error) {
 	rsp, err := c.TenantServiceUpdateTenantWithBody(ctx, tenantId, contentType, body, reqEditors...)
@@ -1293,38 +1067,13 @@ func (c *ClientWithResponses) TenantServiceUpdateTenantWithResponse(ctx context.
 	return ParseTenantServiceUpdateTenantResponse(rsp)
 }
 
-// TenantServiceActivateTenantWithBodyWithResponse request with arbitrary body returning *TenantServiceActivateTenantResponse
-func (c *ClientWithResponses) TenantServiceActivateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceActivateTenantResponse, error) {
-	rsp, err := c.TenantServiceActivateTenantWithBody(ctx, tenantId, contentType, body, reqEditors...)
+// TenantServiceDeleteTenantWithResponse request returning *TenantServiceDeleteTenantResponse
+func (c *ClientWithResponses) TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error) {
+	rsp, err := c.TenantServiceDeleteTenant(ctx, tenantId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseTenantServiceActivateTenantResponse(rsp)
-}
-
-func (c *ClientWithResponses) TenantServiceActivateTenantWithResponse(ctx context.Context, tenantId string, body TenantServiceActivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceActivateTenantResponse, error) {
-	rsp, err := c.TenantServiceActivateTenant(ctx, tenantId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseTenantServiceActivateTenantResponse(rsp)
-}
-
-// TenantServiceDeactivateTenantWithBodyWithResponse request with arbitrary body returning *TenantServiceDeactivateTenantResponse
-func (c *ClientWithResponses) TenantServiceDeactivateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceDeactivateTenantResponse, error) {
-	rsp, err := c.TenantServiceDeactivateTenantWithBody(ctx, tenantId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseTenantServiceDeactivateTenantResponse(rsp)
-}
-
-func (c *ClientWithResponses) TenantServiceDeactivateTenantWithResponse(ctx context.Context, tenantId string, body TenantServiceDeactivateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceDeactivateTenantResponse, error) {
-	rsp, err := c.TenantServiceDeactivateTenant(ctx, tenantId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseTenantServiceDeactivateTenantResponse(rsp)
+	return ParseTenantServiceDeleteTenantResponse(rsp)
 }
 
 // TenantServiceInviteMemberWithBodyWithResponse request with arbitrary body returning *TenantServiceInviteMemberResponse
@@ -1457,32 +1206,6 @@ func ParseTenantServiceCreateTenantResponse(rsp *http.Response) (*TenantServiceC
 	return response, nil
 }
 
-// ParseTenantServiceDeleteTenantResponse parses an HTTP response from a TenantServiceDeleteTenantWithResponse call
-func ParseTenantServiceDeleteTenantResponse(rsp *http.Response) (*TenantServiceDeleteTenantResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &TenantServiceDeleteTenantResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSONDefault = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseTenantServiceUpdateTenantResponse parses an HTTP response from a TenantServiceUpdateTenantWithResponse call
 func ParseTenantServiceUpdateTenantResponse(rsp *http.Response) (*TenantServiceUpdateTenantResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1509,41 +1232,15 @@ func ParseTenantServiceUpdateTenantResponse(rsp *http.Response) (*TenantServiceU
 	return response, nil
 }
 
-// ParseTenantServiceActivateTenantResponse parses an HTTP response from a TenantServiceActivateTenantWithResponse call
-func ParseTenantServiceActivateTenantResponse(rsp *http.Response) (*TenantServiceActivateTenantResponse, error) {
+// ParseTenantServiceDeleteTenantResponse parses an HTTP response from a TenantServiceDeleteTenantWithResponse call
+func ParseTenantServiceDeleteTenantResponse(rsp *http.Response) (*TenantServiceDeleteTenantResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &TenantServiceActivateTenantResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSONDefault = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseTenantServiceDeactivateTenantResponse parses an HTTP response from a TenantServiceDeactivateTenantWithResponse call
-func ParseTenantServiceDeactivateTenantResponse(rsp *http.Response) (*TenantServiceDeactivateTenantResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &TenantServiceDeactivateTenantResponse{
+	response := &TenantServiceDeleteTenantResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

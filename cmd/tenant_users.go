@@ -106,9 +106,37 @@ var provisionUserCmd = &cobra.Command{
 	},
 }
 
+var updateUserCmd = &cobra.Command{
+	Use:   "update [tenant-id] [user-id] [role]",
+	Short: "Update user role",
+	Args:  cobra.ExactArgs(3),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		conn, client, err := getClient()
+		if err != nil {
+			return err
+		}
+		defer conn()
+
+		ctx := getAuthenticatedContext(context.Background())
+		resp, err := client.UpdateTenantUser(ctx, &v0.UpdateTenantUserRequest{
+			TenantId: args[0],
+			UserId:   args[1],
+			Role:     args[2],
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update user: %w", err)
+		}
+
+		fmt.Printf("User updated: %s\n", resp.User.Email)
+		fmt.Printf("New Role: %s\n", resp.User.Role)
+		return nil
+	},
+}
+
 func init() {
 	tenantCmd.AddCommand(usersCmd)
 	usersCmd.AddCommand(listUsersCmd)
 	usersCmd.AddCommand(inviteUserCmd)
 	usersCmd.AddCommand(provisionUserCmd)
+	usersCmd.AddCommand(updateUserCmd)
 }

@@ -184,6 +184,38 @@
         ]
       }
     },
+    "/tenants/{tenant.id}": {
+      "patch": {
+        "operationId": "TenantService_UpdateTenant",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant.id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TenantServiceUpdateTenantBody"
+            }
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
     "/tenants/{tenantId}": {
       "delete": {
         "operationId": "TenantService_DeleteTenant",
@@ -206,9 +238,11 @@
         "tags": [
           "TenantService"
         ]
-      },
+      }
+    },
+    "/tenants/{tenantId}/users/{userId}": {
       "patch": {
-        "operationId": "TenantService_UpdateTenant",
+        "operationId": "TenantService_UpdateTenantUser",
         "responses": {
           "default": {
             "description": "An unexpected error response.",
@@ -225,33 +259,7 @@
             "type": "string"
           },
           {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/TenantServiceUpdateTenantBody"
-            }
-          }
-        ],
-        "tags": [
-          "TenantService"
-        ]
-      }
-    },
-    "/tenants/{tenantId}/activate": {
-      "post": {
-        "operationId": "TenantService_ActivateTenant",
-        "responses": {
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "tenantId",
+            "name": "userId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -261,39 +269,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/TenantServiceActivateTenantBody"
-            }
-          }
-        ],
-        "tags": [
-          "TenantService"
-        ]
-      }
-    },
-    "/tenants/{tenantId}/deactivate": {
-      "post": {
-        "operationId": "TenantService_DeactivateTenant",
-        "responses": {
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "tenantId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/TenantServiceDeactivateTenantBody"
+              "$ref": "#/definitions/TenantServiceUpdateTenantUserBody"
             }
           }
         ],
@@ -304,20 +280,6 @@
     }
   },
   "definitions": {
-    "TenantServiceActivateTenantBody": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "type": "string"
-        },
-        "plan": {
-          "type": "string"
-        }
-      }
-    },
-    "TenantServiceDeactivateTenantBody": {
-      "type": "object"
-    },
     "TenantServiceInviteMemberBody": {
       "type": "object",
       "properties": {
@@ -344,14 +306,30 @@
     "TenantServiceUpdateTenantBody": {
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "ownerIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        "tenant": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
           }
+        },
+        "updateMask": {
+          "type": "string"
+        }
+      }
+    },
+    "TenantServiceUpdateTenantUserBody": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
         }
       }
     },
@@ -383,14 +361,6 @@
         }
       }
     },
-    "tenantActivateTenantResponse": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "type": "string"
-        }
-      }
-    },
     "tenantCreateTenantRequest": {
       "type": "object",
       "properties": {
@@ -402,27 +372,8 @@
     "tenantCreateTenantResponse": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        }
-      }
-    },
-    "tenantDeactivateTenantResponse": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "type": "string"
-        }
-      }
-    },
-    "tenantDeleteTenantResponse": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "type": "string"
+        "tenant": {
+          "$ref": "#/definitions/tenantTenant"
         }
       }
     },
@@ -532,6 +483,14 @@
       "properties": {
         "tenant": {
           "$ref": "#/definitions/tenantTenant"
+        }
+      }
+    },
+    "tenantUpdateTenantUserResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/tenantTenantUser"
         }
       }
     }

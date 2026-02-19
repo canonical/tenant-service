@@ -5,8 +5,10 @@ package tenant
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
@@ -49,14 +51,20 @@ func (s *Service) ListTenantsByUserID(ctx context.Context, userID string) ([]*ty
 	ctx, span := s.tracer.Start(ctx, "tenant.Service.ListTenantsByUserID")
 	defer span.End()
 
-	return s.storage.ListTenantsByUserID(ctx, userID)
+	tenants, err := s.storage.ListTenantsByUserID(ctx, userID)
+	return tenants, err
 }
 
 func (s *Service) ListTenants(ctx context.Context) ([]*types.Tenant, error) {
 	ctx, span := s.tracer.Start(ctx, "tenant.Service.ListTenants")
 	defer span.End()
 
-	return s.storage.ListTenants(ctx)
+	tenants, err := s.storage.ListTenants(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return tenants, nil
 }
 
 func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string) (string, string, error) {
@@ -130,27 +138,17 @@ func (s *Service) CreateTenant(ctx context.Context, name string) (*types.Tenant,
 	return created, nil
 }
 
-func (s *Service) UpdateTenant(ctx context.Context, id, name string, ownerIDs []string) (*types.Tenant, error) {
+func (s *Service) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) (*types.Tenant, error) {
 	ctx, span := s.tracer.Start(ctx, "admin.UpdateTenant")
 	defer span.End()
 
-	if err := s.storage.UpdateTenant(ctx, id, name, ownerIDs); err != nil {
+	if err := s.storage.UpdateTenant(ctx, tenant, paths); err != nil {
 		return nil, fmt.Errorf("failed to update tenant: %w", err)
 	}
 
-	updated, err := s.storage.GetTenantByID(ctx, id)
+	updated, err := s.storage.GetTenantByID(ctx, tenant.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get updated tenant: %w", err)
-	}
-
-	if len(ownerIDs) > 0 {
-		// Attempt to sync FGA - naive approach: add new owners.
-		for _, ownerID := range ownerIDs {
-			if err := s.authz.AssignTenantOwner(ctx, id, ownerID); err != nil {
-				s.logger.Errorf("failed to assign owner in FGA: %v", err)
-				// Don't fail the request, just log
-			}
-		}
 	}
 
 	return updated, nil
@@ -212,28 +210,6 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	return nil
 }
 
-func (s *Service) ActivateTenant(ctx context.Context, tenantID string) error {
-	ctx, span := s.tracer.Start(ctx, "admin.ActivateTenant")
-	defer span.End()
-
-	if err := s.storage.SetTenantStatus(ctx, tenantID, true); err != nil {
-		return fmt.Errorf("failed to activate tenant: %w", err)
-	}
-
-	return nil
-}
-
-func (s *Service) DeactivateTenant(ctx context.Context, tenantID string) error {
-	ctx, span := s.tracer.Start(ctx, "admin.DeactivateTenant")
-	defer span.End()
-
-	if err := s.storage.SetTenantStatus(ctx, tenantID, false); err != nil {
-		return fmt.Errorf("failed to deactivate tenant: %w", err)
-	}
-
-	return nil
-}
-
 func (s *Service) ListUserTenants(ctx context.Context, userID string) ([]*types.Tenant, error) {
 	ctx, span := s.tracer.Start(ctx, "admin.ListUserTenants")
 	defer span.End()
@@ -281,4 +257,107 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string) ([]*type
 	}
 
 	return users, nil
+}
+
+func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role string) (*types.TenantUser, error) {
+	ctx, span := s.tracer.Start(ctx, "admin.UpdateTenantUser")
+	defer span.End()
+
+	// 1. Get current member to check if exists and current role
+	members, err := s.storage.ListMembersByTenantID(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check current membership: %w", err)
+	}
+
+	var currentMember *types.Membership
+	for _, m := range members {
+		if m.KratosIdentityID == userID {
+			currentMember = m
+			break
+		}
+	}
+	if currentMember == nil {
+		return nil, fmt.Errorf("user %s not found in tenant %s", userID, tenantID)
+	}
+
+	if currentMember.Role == role {
+		return &types.TenantUser{
+			UserID: userID,
+			Role:   role,
+			// Email is fetched separately if needed or just return partial
+		}, nil
+	}
+
+	// 2. AuthZ Update
+	// Remove old role relation first to avoid transient permission issues?
+	// Or add new first?
+	// If demoting owner -> member: Add member, remove owner.
+	// If promoting member -> owner: Add owner, remove member (optional but clean).
+
+	// Add new role
+	switch role {
+	case "owner":
+		if err := s.authz.AssignTenantOwner(ctx, tenantID, userID); err != nil {
+			return nil, fmt.Errorf("failed to assign owner role: %w", err)
+		}
+	case "member", "admin":
+		if err := s.authz.AssignTenantMember(ctx, tenantID, userID); err != nil {
+			return nil, fmt.Errorf("failed to assign member role: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("invalid role: %s", role)
+	}
+
+	// Remove old role
+	switch currentMember.Role {
+	case "owner":
+		if err := s.authz.RemoveTenantOwner(ctx, tenantID, userID); err != nil {
+			s.logger.Errorf("failed to remove old owner relation: %v", err)
+			// Continue, as new role is assigned.
+		}
+	case "member", "admin":
+		if role == "owner" {
+			// If promoting to owner, we can remove the member relation to be clean
+			if err := s.authz.RemoveTenantMember(ctx, tenantID, userID); err != nil {
+				s.logger.Errorf("failed to remove old member relation: %v", err)
+			}
+		}
+	}
+
+	// 3. Storage Update
+	if err := s.storage.UpdateMember(ctx, tenantID, userID, role); err != nil {
+		return nil, err
+	}
+
+	// 4. Return updated user
+	identity, err := s.kratos.GetIdentity(ctx, userID)
+	email := ""
+	if err == nil {
+		if traits, ok := identity.Traits.(map[string]interface{}); ok {
+			if e, ok := traits["email"].(string); ok {
+				email = e
+			}
+		}
+	}
+
+	return &types.TenantUser{
+		UserID: userID,
+		Email:  email,
+		Role:   role,
+	}, nil
+}
+
+func encodePageToken(offset uint64) string {
+	return base64.URLEncoding.EncodeToString([]byte(strconv.FormatUint(offset, 10)))
+}
+
+func decodePageToken(token string) (uint64, error) {
+	if token == "" {
+		return 0, nil
+	}
+	data, err := base64.URLEncoding.DecodeString(token)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(string(data), 10, 64)
 }

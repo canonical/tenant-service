@@ -220,6 +220,34 @@ func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) 
 	return id.String(), nil
 }
 
+func (s *Storage) UpdateMember(ctx context.Context, tenantID, userID, role string) error {
+	ctx, span := s.tracer.Start(ctx, "storage.UpdateMember")
+	defer span.End()
+
+	res, err := s.db.Statement(ctx).
+		Update("memberships").
+		Set("role", role).
+		Where(sq.Eq{
+			"tenant_id":          tenantID,
+			"kratos_identity_id": userID,
+		}).
+		ExecContext(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to update member: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("member not found")
+	}
+
+	return nil
+}
+
 func (s *Storage) GetInviteByToken(ctx context.Context, token string) (*types.Invite, error) {
 	ctx, span := s.tracer.Start(ctx, "storage.GetInviteByToken")
 	defer span.End()
@@ -268,53 +296,41 @@ func (s *Storage) CreateInvite(ctx context.Context, invite *types.Invite) (*type
 	return invite, nil
 }
 
-func (s *Storage) UpdateTenant(ctx context.Context, id string, name string, ownerIDs []string) error {
+// UpdateTenant updates fields specified in paths.
+// If paths is empty or nil, no update is performed except if we decide default behavior is full update.
+// Here we follow typical PATCH semantics: update only what's in paths.
+// If paths contains "name", update name.
+// If paths contains "enabled", update enabled status.
+func (s *Storage) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) error {
 	ctx, span := s.tracer.Start(ctx, "storage.UpdateTenant")
 	defer span.End()
 
-	// Update name if provided
-	if name != "" {
-		_, err := s.db.Statement(ctx).
-			Update("tenants").
-			Set("name", name).
-			Where(sq.Eq{"id": id}).
-			ExecContext(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to update tenant name: %w", err)
+	if len(paths) == 0 {
+		return nil
+	}
+
+	updateMap := make(map[string]interface{})
+	for _, p := range paths {
+		switch p {
+		case "name":
+			updateMap["name"] = tenant.Name
+		case "enabled":
+			updateMap["enabled"] = tenant.Enabled
 		}
 	}
 
-	// Update owners if provided
-	if len(ownerIDs) > 0 {
-		// Delete existing owners
-		// We use a transaction implicitly via the context if middleware set it up.
-		// If not, these are separate statements which is risky but acceptable per instructions.
-		_, err := s.db.Statement(ctx).
-			Delete("memberships").
-			Where(sq.Eq{"tenant_id": id}).
-			Where(sq.Eq{"role": "owner"}).
-			ExecContext(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to remove existing owners: %w", err)
-		}
+	if len(updateMap) == 0 {
+		return nil
+	}
 
-		// Insert new owners
-		stmt := s.db.Statement(ctx).
-			Insert("memberships").
-			Columns("id", "tenant_id", "kratos_identity_id", "role")
+	query := s.db.Statement(ctx).
+		Update("tenants").
+		SetMap(updateMap).
+		Where(sq.Eq{"id": tenant.ID})
 
-		for _, ownerID := range ownerIDs {
-			memID, _ := uuid.NewV7()
-			stmt = stmt.Values(memID.String(), id, ownerID, "owner")
-		}
-
-		_, err = stmt.ExecContext(ctx)
-		if err != nil {
-			if IsDuplicateKeyError(err) {
-				return ErrDuplicateKey
-			}
-			return fmt.Errorf("failed to add new owners: %w", err)
-		}
+	_, err := query.ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update tenant: %w", err)
 	}
 
 	return nil
@@ -331,22 +347,6 @@ func (s *Storage) DeleteTenant(ctx context.Context, id string) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to delete tenant: %w", err)
-	}
-	return nil
-}
-
-func (s *Storage) SetTenantStatus(ctx context.Context, id string, enabled bool) error {
-	ctx, span := s.tracer.Start(ctx, "storage.SetTenantStatus")
-	defer span.End()
-
-	_, err := s.db.Statement(ctx).
-		Update("tenants").
-		Set("enabled", enabled).
-		Where(sq.Eq{"id": id}).
-		ExecContext(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to set tenant status: %w", err)
 	}
 	return nil
 }

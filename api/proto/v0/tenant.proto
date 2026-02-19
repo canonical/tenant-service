@@ -3,6 +3,8 @@ syntax = "proto3";
 package identity.platform.api.tenant;
 
 import "google/api/annotations.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/empty.proto";
 
 option go_package = "github.com/canonical/tenant-service/api/tenant/v0;tenantv0";
 
@@ -49,12 +51,12 @@ service TenantService {
 
   rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse) {
     option (google.api.http) = {
-        patch: "/tenants/{tenant_id}"
+        patch: "/tenants/{tenant.id}"
         body: "*"
     };
   }
 
-  rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse) {
+  rpc DeleteTenant(DeleteTenantRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
         delete: "/tenants/{tenant_id}"
     };
@@ -67,22 +69,25 @@ service TenantService {
       };
   }
 
-  rpc ActivateTenant(ActivateTenantRequest) returns (ActivateTenantResponse) {
-      option (google.api.http) = {
-          post: "/tenants/{tenant_id}/activate"
-          body: "*"
-      };
-  }
-
-  rpc DeactivateTenant(DeactivateTenantRequest) returns (DeactivateTenantResponse) {
-      option (google.api.http) = {
-          post: "/tenants/{tenant_id}/deactivate"
-          body: "*"
-      };
+  rpc UpdateTenantUser(UpdateTenantUserRequest) returns (UpdateTenantUserResponse) {
+    option (google.api.http) = {
+        patch: "/tenants/{tenant_id}/users/{user_id}"
+        body: "*"
+    };
   }
 }
 
 // Messages
+
+message UpdateTenantUserRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string role = 3;
+}
+
+message UpdateTenantUserResponse {
+  TenantUser user = 1;
+}
 
 message ListMyTenantsRequest {}
 
@@ -128,14 +133,12 @@ message CreateTenantRequest {
 }
 
 message CreateTenantResponse {
-    string id = 1;
-    string name = 2;
+    Tenant tenant = 1;
 }
 
 message UpdateTenantRequest {
-    string tenant_id = 1;
-    string name = 2;
-    repeated string owner_ids = 3;
+    Tenant tenant = 1;
+    google.protobuf.FieldMask update_mask = 2;
 }
 
 message UpdateTenantResponse {
@@ -146,10 +149,6 @@ message DeleteTenantRequest {
     string tenant_id = 1;
 }
 
-message DeleteTenantResponse {
-    string status = 1;
-}
-
 message ProvisionUserRequest {
     string tenant_id = 1;
     string email = 2;
@@ -157,24 +156,6 @@ message ProvisionUserRequest {
 }
 
 message ProvisionUserResponse {
-    string status = 1;
-}
-
-message ActivateTenantRequest {
-    string tenant_id = 1;
-    string status = 2;
-    string plan = 3;
-}
-
-message ActivateTenantResponse {
-    string status = 1;
-}
-
-message DeactivateTenantRequest {
-    string tenant_id = 1;
-}
-
-message DeactivateTenantResponse {
     string status = 1;
 }
 

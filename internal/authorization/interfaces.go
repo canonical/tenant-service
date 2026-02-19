@@ -20,6 +20,8 @@ type AuthorizerInterface interface {
 
 	AssignTenantOwner(context.Context, string, string) error
 	AssignTenantMember(context.Context, string, string) error
+	RemoveTenantOwner(context.Context, string, string) error
+	RemoveTenantMember(context.Context, string, string) error
 	// AssignPrivilegedAdmin assigns a user as a privileged admin in the authorization system.
 	// This user will have admin access to all tenants linked to that privileged group.
 	AssignPrivilegedAdmin(context.Context, string, string) error

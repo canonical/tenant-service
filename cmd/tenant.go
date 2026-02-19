@@ -11,6 +11,7 @@ import (
 
 	v0 "github.com/canonical/tenant-service/v0"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 var tenantCmd = &cobra.Command{
@@ -37,7 +38,7 @@ var createTenantCmd = &cobra.Command{
 			return fmt.Errorf("failed to create tenant: %w", err)
 		}
 
-		fmt.Printf("Tenant created: %s (ID: %s)\n", resp.Name, resp.Id)
+		fmt.Printf("Tenant created: %s (ID: %s)\n", resp.Tenant.Name, resp.Tenant.Id)
 		return nil
 	},
 }
@@ -104,8 +105,12 @@ var activateTenantCmd = &cobra.Command{
 		defer conn()
 
 		ctx := getAuthenticatedContext(context.Background())
-		_, err = client.ActivateTenant(ctx, &v0.ActivateTenantRequest{
-			TenantId: args[0],
+		_, err = client.UpdateTenant(ctx, &v0.UpdateTenantRequest{
+			Tenant: &v0.Tenant{
+				Id:      args[0],
+				Enabled: true,
+			},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
 		})
 		if err != nil {
 			return fmt.Errorf("failed to activate tenant: %w", err)
@@ -128,8 +133,12 @@ var deactivateTenantCmd = &cobra.Command{
 		defer conn()
 
 		ctx := getAuthenticatedContext(context.Background())
-		_, err = client.DeactivateTenant(ctx, &v0.DeactivateTenantRequest{
-			TenantId: args[0],
+		_, err = client.UpdateTenant(ctx, &v0.UpdateTenantRequest{
+			Tenant: &v0.Tenant{
+				Id:      args[0],
+				Enabled: false,
+			},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
 		})
 		if err != nil {
 			return fmt.Errorf("failed to deactivate tenant: %w", err)
@@ -140,11 +149,9 @@ var deactivateTenantCmd = &cobra.Command{
 	},
 }
 
-var owners []string
-
 var updateTenantCmd = &cobra.Command{
 	Use:   "update [id] [name]",
-	Short: "Update a tenant name and optionally its owners",
+	Short: "Update a tenant name",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conn, client, err := getClient()
@@ -155,9 +162,11 @@ var updateTenantCmd = &cobra.Command{
 
 		ctx := getAuthenticatedContext(context.Background())
 		_, err = client.UpdateTenant(ctx, &v0.UpdateTenantRequest{
-			TenantId: args[0],
-			Name:     args[1],
-			OwnerIds: owners,
+			Tenant: &v0.Tenant{
+				Id:   args[0],
+				Name: args[1],
+			},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 		})
 		if err != nil {
 			return fmt.Errorf("failed to update tenant: %w", err)
@@ -177,5 +186,5 @@ func init() {
 	tenantCmd.AddCommand(deactivateTenantCmd)
 	tenantCmd.AddCommand(updateTenantCmd)
 
-	updateTenantCmd.Flags().StringSliceVar(&owners, "owners", []string{}, "Comma-separated list of owner IDs")
+	// Removed owners flag as it's not supported in simple name/enable update
 }

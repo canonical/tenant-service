@@ -9,9 +9,11 @@ import (
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/tracing"
+	"github.com/canonical/tenant-service/internal/types"
 	v0 "github.com/canonical/tenant-service/v0"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type Handler struct {
@@ -132,8 +134,12 @@ func (h *Handler) CreateTenant(ctx context.Context, req *v0.CreateTenantRequest)
 	}
 
 	return &v0.CreateTenantResponse{
-		Id:   tenant.ID,
-		Name: tenant.Name,
+		Tenant: &v0.Tenant{
+			Id:        tenant.ID,
+			Name:      tenant.Name,
+			CreatedAt: tenant.CreatedAt.String(),
+			Enabled:   tenant.Enabled,
+		},
 	}, nil
 }
 
@@ -141,7 +147,23 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 	ctx, span := h.tracer.Start(ctx, "tenant.Handler.UpdateTenant")
 	defer span.End()
 
-	tenant, err := h.service.UpdateTenant(ctx, req.TenantId, req.Name, req.OwnerIds)
+	if req.Tenant == nil {
+		return nil, status.Error(codes.InvalidArgument, "tenant body is required")
+	}
+
+	// If update_mask is provided, use it. Otherwise, assume full update (or at least name and enabled).
+	var paths []string
+	if req.UpdateMask != nil {
+		paths = req.UpdateMask.Paths
+	}
+
+	updateData := &types.Tenant{
+		ID:      req.Tenant.Id, // From URL usually
+		Name:    req.Tenant.Name,
+		Enabled: req.Tenant.Enabled,
+	}
+
+	tenant, err := h.service.UpdateTenant(ctx, updateData, paths)
 	if err != nil {
 		h.logger.Errorf("failed to update tenant: %v", err)
 		return nil, status.Errorf(codes.Internal, "failed to update tenant: %v", err)
@@ -157,7 +179,7 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 	}, nil
 }
 
-func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest) (*v0.DeleteTenantResponse, error) {
+func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest) (*emptypb.Empty, error) {
 	ctx, span := h.tracer.Start(ctx, "tenant.Handler.DeleteTenant")
 	defer span.End()
 
@@ -166,9 +188,7 @@ func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest)
 		return nil, status.Errorf(codes.Internal, "failed to delete tenant: %v", err)
 	}
 
-	return &v0.DeleteTenantResponse{
-		Status: "deleted",
-	}, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserRequest) (*v0.ProvisionUserResponse, error) {
@@ -185,31 +205,26 @@ func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserReques
 	}, nil
 }
 
-func (h *Handler) ActivateTenant(ctx context.Context, req *v0.ActivateTenantRequest) (*v0.ActivateTenantResponse, error) {
-	ctx, span := h.tracer.Start(ctx, "tenant.Handler.ActivateTenant")
+func (h *Handler) UpdateTenantUser(ctx context.Context, req *v0.UpdateTenantUserRequest) (*v0.UpdateTenantUserResponse, error) {
+	ctx, span := h.tracer.Start(ctx, "tenant.Handler.UpdateTenantUser")
 	defer span.End()
 
-	if err := h.service.ActivateTenant(ctx, req.TenantId); err != nil {
-		h.logger.Errorf("failed to activate tenant: %v", err)
-		return nil, status.Errorf(codes.Internal, "failed to activate tenant: %v", err)
+	if req.TenantId == "" || req.UserId == "" || req.Role == "" {
+		return nil, status.Error(codes.InvalidArgument, "tenant_id, user_id, and role are required")
 	}
 
-	return &v0.ActivateTenantResponse{
-		Status: "activated",
-	}, nil
-}
-
-func (h *Handler) DeactivateTenant(ctx context.Context, req *v0.DeactivateTenantRequest) (*v0.DeactivateTenantResponse, error) {
-	ctx, span := h.tracer.Start(ctx, "tenant.Handler.DeactivateTenant")
-	defer span.End()
-
-	if err := h.service.DeactivateTenant(ctx, req.TenantId); err != nil {
-		h.logger.Errorf("failed to deactivate tenant: %v", err)
-		return nil, status.Errorf(codes.Internal, "failed to deactivate tenant: %v", err)
+	user, err := h.service.UpdateTenantUser(ctx, req.TenantId, req.UserId, req.Role)
+	if err != nil {
+		h.logger.Errorf("failed to update tenant user: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to update tenant user: %v", err)
 	}
 
-	return &v0.DeactivateTenantResponse{
-		Status: "deactivated",
+	return &v0.UpdateTenantUserResponse{
+		User: &v0.TenantUser{
+			UserId: user.UserID,
+			Role:   user.Role,
+			Email:  user.Email,
+		},
 	}, nil
 }
 
