@@ -61,9 +61,8 @@ require (
 	github.com/cristalhq/jwt/v4 v4.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgraph-io/ristretto v1.0.0 // indirect
-	github.com/docker/cli v28.0.1+incompatible // indirect
-	github.com/docker/docker v28.0.1+incompatible // indirect
-	github.com/docker/go-connections v0.6.0 // indirect
+	github.com/docker/cli v28.5.1+incompatible // indirect
+	github.com/docker/docker v28.5.1+incompatible // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
@@ -115,7 +114,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -162,7 +160,6 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nyaruka/phonenumbers v1.2.2 // indirect
-	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/openfga/api/proto v0.0.0-20240905181937-3583905f61a6 // indirect
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/ory/fosite v0.49.0 // indirect
@@ -238,7 +235,6 @@ require (
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
