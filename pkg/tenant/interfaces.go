@@ -25,13 +25,11 @@ type ServiceInterface interface {
 }
 
 type StorageInterface interface {
-	CreateInvite(ctx context.Context, invite *types.Invite) (*types.Invite, error)
 	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
 	UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) error
 	DeleteTenant(ctx context.Context, id string) error
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
 	GetTenantByID(ctx context.Context, id string) (*types.Tenant, error)
-	GetInviteByToken(ctx context.Context, token string) (*types.Invite, error)
 	ListTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
 	ListTenants(ctx context.Context) ([]*types.Tenant, error)
 	ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)

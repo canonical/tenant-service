@@ -22,15 +22,6 @@ type Membership struct {
 	CreatedAt        time.Time `db:"created_at"`
 }
 
-type Invite struct {
-	ID        string    `db:"id"`
-	Token     string    `db:"token"`
-	TenantID  string    `db:"tenant_id"`
-	Email     string    `db:"email"`
-	Role      string    `db:"role"`
-	CreatedAt time.Time `db:"created_at"`
-}
-
 type TenantUser struct {
 	UserID string
 	Email  string

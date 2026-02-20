@@ -248,54 +248,6 @@ func (s *Storage) UpdateMember(ctx context.Context, tenantID, userID, role strin
 	return nil
 }
 
-func (s *Storage) GetInviteByToken(ctx context.Context, token string) (*types.Invite, error) {
-	ctx, span := s.tracer.Start(ctx, "storage.GetInviteByToken")
-	defer span.End()
-
-	var i types.Invite
-	err := s.db.Statement(ctx).
-		Select("token", "tenant_id", "email", "role", "created_at").
-		From("invites").
-		Where(sq.Eq{"token": token}).
-		QueryRowContext(ctx).
-		Scan(&i.Token, &i.TenantID, &i.Email, &i.Role, &i.CreatedAt)
-
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to get invite: %w", err)
-	}
-
-	return &i, nil
-}
-
-func (s *Storage) CreateInvite(ctx context.Context, invite *types.Invite) (*types.Invite, error) {
-	ctx, span := s.tracer.Start(ctx, "storage.CreateInvite")
-	defer span.End()
-
-	id, err := uuid.NewV7()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate invite ID: %w", err)
-	}
-
-	// Use a new struct or update the existing one?
-	// To be safe and return the full state as stored:
-	invite.ID = id.String()
-
-	_, err = s.db.Statement(ctx).
-		Insert("invites").
-		Columns("id", "token", "tenant_id", "email", "role").
-		Values(invite.ID, invite.Token, invite.TenantID, invite.Email, invite.Role).
-		ExecContext(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create invite: %w", err)
-	}
-
-	return invite, nil
-}
-
 // UpdateTenant updates fields specified in paths.
 // If paths is empty or nil, no update is performed except if we decide default behavior is full update.
 // Here we follow typical PATCH semantics: update only what's in paths.

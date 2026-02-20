@@ -19,7 +19,5 @@ type StorageInterface interface {
 	DeleteTenant(ctx context.Context, id string) error
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
 	UpdateMember(ctx context.Context, tenantID, userID, role string) error
-	GetInviteByToken(ctx context.Context, token string) (*types.Invite, error)
-	CreateInvite(ctx context.Context, invite *types.Invite) (*types.Invite, error)
 	ListMembersByTenantID(ctx context.Context, tenantID string) ([]*types.Membership, error)
 }
