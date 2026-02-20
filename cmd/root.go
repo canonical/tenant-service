@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	userID       string
+	authToken    string
 	grpcEndpoint string
 	httpEndpoint string
 )
@@ -34,5 +34,5 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&grpcEndpoint, "grpc-endpoint", "localhost:50051", "gRPC server endpoint")
 	rootCmd.PersistentFlags().StringVar(&httpEndpoint, "http-endpoint", "", "HTTP server endpoint (e.g. http://localhost:8000)")
-	rootCmd.PersistentFlags().StringVar(&userID, "user-id", "", "User ID for impersonation")
+	rootCmd.PersistentFlags().StringVar(&authToken, "token", "", "Authorization token (e.g. Bearer <token>)")
 }

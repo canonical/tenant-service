@@ -11,19 +11,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
-	"github.com/canonical/tenant-service/internal/identity"
 	"github.com/canonical/tenant-service/internal/kratos"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring/prometheus"
 	"github.com/canonical/tenant-service/internal/openfga"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
+	"github.com/canonical/tenant-service/pkg/authentication"
 	"github.com/canonical/tenant-service/pkg/tenant"
 	"github.com/canonical/tenant-service/pkg/web"
 	v0 "github.com/canonical/tenant-service/v0"
@@ -108,6 +109,39 @@ func serve() error {
 		logger.Info("Using noop authorizer")
 	}
 
+	var jwtVerifier authentication.TokenVerifierInterface
+	if specs.AuthenticationEnabled {
+		// Parse allowed subjects from comma-separated string
+		var allowedSubjects []string
+		if specs.AuthenticationAllowedSubjects != "" {
+			subjects := strings.Split(specs.AuthenticationAllowedSubjects, ",")
+			for _, s := range subjects {
+				trimmed := strings.TrimSpace(s)
+				if trimmed != "" {
+					allowedSubjects = append(allowedSubjects, trimmed)
+				}
+			}
+		}
+
+		var err error
+		jwtVerifier, err = authentication.NewJWTAuthenticator(
+			context.Background(),
+			specs.AuthenticationIssuer,
+			specs.AuthenticationJwksURL,
+			allowedSubjects,
+			specs.AuthenticationRequiredScope,
+			tracer,
+			monitor,
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to setup JWT authenticator: %v", err)
+		}
+	} else {
+		logger.Info("JWT authentication is disabled")
+		jwtVerifier = authentication.NewNoopVerifier()
+	}
+
 	kratosClient := kratos.NewClient(
 		specs.KratosAdminURL,
 		tracer,
@@ -125,7 +159,7 @@ func serve() error {
 		logger,
 	)
 
-	identityMiddleware := identity.NewMiddleware(tracer, monitor, logger)
+	authMiddleware := authentication.NewMiddleware(jwtVerifier, tracer, monitor, logger)
 	tenantHandler := tenant.NewHandler(tenantService, tracer, monitor, logger)
 
 	// Start gRPC server
@@ -135,7 +169,7 @@ func serve() error {
 	}
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(identityMiddleware.GRPCInterceptor),
+		grpc.UnaryInterceptor(authMiddleware.GRPCInterceptor),
 	)
 	v0.RegisterTenantServiceServer(grpcServer, tenantHandler)
 
@@ -148,7 +182,7 @@ func serve() error {
 
 	router := web.NewRouter(
 		tenantHandler,
-		identityMiddleware,
+		authMiddleware,
 		s,
 		dbClient,
 		authorizer,
