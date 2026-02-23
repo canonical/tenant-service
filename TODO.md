@@ -11,4 +11,6 @@
 - [] Fix Span Status in service methods (record errors on span)
 - [] Add OpenTelemetry gRPC Interceptors in `cmd/serve.go`
 - [] Implement Business Metrics (e.g. `tenant_created_total`) in service layer
+- [] Implement browser-based E2E tests for Hydra/Kratos hooks
+
 
