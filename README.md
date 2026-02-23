@@ -130,3 +130,45 @@ Allows users to switch between tenants they belong to.
 3. Log in again with the same user.
 4. Select a *different* tenant from the selection screen.
 5. The new token will reflect the switched tenant.
+
+## E2E Tests
+
+The E2E tests are located in `tests/e2e` and designed to run in isolation with full authentication enabled.
+
+The tests cover both HTTP/REST and gRPC interfaces:
+- **HTTP tests** (`e2e_test.go`): Test the REST API via the gRPC-gateway
+- **gRPC tests** (`grpc_test.go`): Test the native gRPC interface directly
+
+To run the E2E tests:
+
+```bash
+cd tests/e2e
+go mod tidy
+go test -v .
+```
+
+This will:
+1. Spin up the full Docker Compose stack (Postgres, OpenFGA, Kratos, Hydra).
+2. Build the `tenant-service` binary from the source.
+3. Create an OAuth2 client in Hydra for authentication.
+4. Run lifecycle tests with JWT authentication enabled.
+
+### Running Against Existing Deployment
+
+If you already have a running deployment (e.g., via `make dev`), you can run tests without setting up the environment:
+
+**Option A: Using a JWT Token**
+```bash
+E2E_USE_EXISTING_DEPLOYMENT=true \
+HTTP_BASE_URL=http://localhost:8000 \
+JWT_TOKEN=<your-jwt-token> \
+make test-e2e
+```
+
+**Option B: Using Client Credentials (exchanges for token automatically)**
+```bash
+E2E_USE_EXISTING_DEPLOYMENT=true \
+CLIENT_ID=<client-id> \
+CLIENT_SECRET=<client-secret> \
+make test-e2e
+```
