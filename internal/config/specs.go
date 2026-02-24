@@ -33,4 +33,10 @@ type EnvSpec struct {
 	OpenfgaApiToken      string `envconfig:"openfga_api_token"`
 	OpenfgaStoreId       string `envconfig:"openfga_store_id"`
 	OpenfgaModelId       string `envconfig:"openfga_authorization_model_id" default:""`
+
+	AuthenticationEnabled         bool   `envconfig:"authentication_enabled" default:"true"`
+	AuthenticationIssuer          string `envconfig:"authentication_issuer"`
+	AuthenticationJwksURL         string `envconfig:"authentication_jwks_url"`
+	AuthenticationAllowedSubjects string `envconfig:"authentication_allowed_subjects"`
+	AuthenticationRequiredScope   string `envconfig:"authentication_required_scope"`
 }

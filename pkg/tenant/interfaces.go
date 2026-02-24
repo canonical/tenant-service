@@ -34,14 +34,17 @@ type StorageInterface interface {
 	ListTenants(ctx context.Context) ([]*types.Tenant, error)
 	ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
 	ListMembersByTenantID(ctx context.Context, tenantID string) ([]*types.Membership, error)
+	UpdateMember(ctx context.Context, tenantID, userID, role string) error
 }
 
 type AuthzInterface interface {
 	Check(ctx context.Context, user, relation, object string, tuples ...openfga.Tuple) (bool, error)
 	AssignTenantOwner(ctx context.Context, tenantID, userID string) error
 	AssignTenantMember(ctx context.Context, tenantID, userID string) error
+	RemoveTenantOwner(ctx context.Context, tenantID, userID string) error
+	RemoveTenantMember(ctx context.Context, tenantID, userID string) error
 	DeleteTenant(ctx context.Context, tenantID string) error
-} // Fixed signature to match implementation
+}
 
 type KratosClientInterface interface {
 	GetIdentityIDByEmail(ctx context.Context, email string) (string, error)

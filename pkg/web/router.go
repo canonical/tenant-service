@@ -10,11 +10,11 @@ import (
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/db"
 	"github.com/canonical/tenant-service/internal/http/types"
-	"github.com/canonical/tenant-service/internal/identity"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
+	"github.com/canonical/tenant-service/pkg/authentication"
 	"github.com/canonical/tenant-service/pkg/metrics"
 	"github.com/canonical/tenant-service/pkg/status"
 	"github.com/canonical/tenant-service/pkg/webhooks"
@@ -27,7 +27,7 @@ import (
 
 func NewRouter(
 	tenantHandler v0.TenantServiceServer,
-	identityMiddleware *identity.Middleware,
+	authMiddleware *authentication.Middleware,
 	s storage.StorageInterface,
 	dbClient db.DBClientInterface,
 	authz authorization.AuthorizerInterface,
@@ -71,7 +71,7 @@ func NewRouter(
 
 	// Protected routes
 	authRouter := chi.NewRouter()
-	authRouter.Use(identityMiddleware.HTTPMiddleware)
+	authRouter.Use(authMiddleware.Authenticate())
 	authRouter.Mount("/", gRPCGatewayMux)
 
 	router.Mount("/", authRouter)

@@ -34,9 +34,13 @@ func newHTTPTenantClient(endpoint string) v0.TenantServiceClient {
 	endpoint = strings.TrimSuffix(endpoint, "/")
 
 	opts := []httpclient.ClientOption{}
-	if userID != "" {
+	if authToken != "" {
 		opts = append(opts, httpclient.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
-			req.Header.Set("X-Kratos-Authenticated-Identity-Id", userID)
+			token := authToken
+			if !strings.HasPrefix(token, "Bearer ") {
+				token = "Bearer " + token
+			}
+			req.Header.Set("Authorization", token)
 			return nil
 		}))
 	}
@@ -177,4 +181,8 @@ func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenan
 		return nil, err
 	}
 	return out, nil
+}
+
+func (c *httpTenantClient) UpdateTenantUser(ctx context.Context, in *v0.UpdateTenantUserRequest, opts ...grpc.CallOption) (*v0.UpdateTenantUserResponse, error) {
+	return nil, fmt.Errorf("method UpdateTenantUser not implemented in HTTP client")
 }

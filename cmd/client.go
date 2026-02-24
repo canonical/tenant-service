@@ -30,11 +30,16 @@ func getClient() (func() error, v0.TenantServiceClient, error) {
 }
 
 func getAuthenticatedContext(ctx context.Context) context.Context {
-	if userID != "" {
-		md := metadata.New(map[string]string{
-			"X-Kratos-Authenticated-Identity-Id": userID,
-		})
-		return metadata.NewOutgoingContext(ctx, md)
+	if authToken != "" {
+		token := authToken
+		// Ensure Bearer prefix is present if it looks like a raw JWT (alphanumeric, dots, dashes)
+		// But simpler to just prepend "Bearer " if not present.
+		if len(token) > 0 { // Just simplistic check for now
+			md := metadata.New(map[string]string{
+				"authorization": "Bearer " + token,
+			})
+			return metadata.NewOutgoingContext(ctx, md)
+		}
 	}
 	return ctx
 }

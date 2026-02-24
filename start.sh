@@ -36,20 +36,19 @@ CLIENT_RESULT=$(docker exec "$HYDRA_CONTAINER_ID" \
     --scope openid,profile,offline_access,email \
     --redirect-uri http://127.0.0.1:4446/callback)
 
-CLIENT_ID=$(echo "$CLIENT_RESULT" | cut -d '"' -f4)
-CLIENT_SECRET=$(echo "$CLIENT_RESULT" | cut -d '"' -f12)
+CLIENT_ID=$(echo "$CLIENT_RESULT" | yq -p json '.client_id // .[0].client_id')
+CLIENT_SECRET=$(echo "$CLIENT_RESULT" | yq -p json '.client_secret // .[0].client_secret')
 
 # Create a client credentials client for JWT authentication
 AUTH_CLIENT_RESULT=$(docker exec "$HYDRA_CONTAINER_ID" \
   hydra create client \
-    --endpoint http://127.0.0.1:4445 \
-    --name "Hook Service Auth Client" \
-    --grant-type client_credentials \
-    --format json
-)
+  --endpoint http://127.0.0.1:4445 \
+  --name "Tenant Service Auth Client" \
+  --grant-type client_credentials \
+  --format json)
 
-AUTH_CLIENT_ID=$(echo "$AUTH_CLIENT_RESULT" | cut -d '"' -f4)
-AUTH_CLIENT_SECRET=$(echo "$AUTH_CLIENT_RESULT" | cut -d '"' -f12)
+AUTH_CLIENT_ID=$(echo "$AUTH_CLIENT_RESULT" | yq -p json '.client_id // .[0].client_id')
+AUTH_CLIENT_SECRET=$(echo "$AUTH_CLIENT_RESULT" | yq -p json '.client_secret // .[0].client_secret')
 
 echo "Waiting for build to complete..."
 wait $BUILD_PID
@@ -70,6 +69,11 @@ export PORT="8000"
 export TRACING_ENABLED="false"
 export LOG_LEVEL="debug"
 export KRATOS_ADMIN_URL="http://127.0.0.1:4434"
+export AUTHENTICATION_ISSUER="http://localhost:4444"
+export AUTHENTICATION_JWKS_URL="http://localhost:4444/.well-known/jwks.json"
+export AUTHENTICATION_ENABLED="true"
+export AUTHENTICATION_ALLOWED_SUBJECTS="$AUTH_CLIENT_ID"
+export AUTHENTICATION_REQUIRED_SCOPE="tenant-service"
 export OPENFGA_API_SCHEME="http"
 export OPENFGA_API_HOST="127.0.0.1:8080"
 export OPENFGA_API_TOKEN="42"
@@ -80,6 +84,14 @@ export DSN="postgres://tenants:tenants@127.0.0.1:5432/tenants"
 
 echo "Running database migrations..."
 ./app migrate --dsn $DSN up
+
+# Generate JWT token for convenience
+# The app token command prints just the access token to stdout
+AUTH_JWT=$(./app token \
+  --client-id "$AUTH_CLIENT_ID" \
+  --client-secret "$AUTH_CLIENT_SECRET" \
+  --issuer-url "$AUTHENTICATION_ISSUER" \
+  --scopes "$AUTHENTICATION_REQUIRED_SCOPE" || echo "Failed to generate token")
 
 echo
 echo "==============================================="

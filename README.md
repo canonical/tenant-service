@@ -62,6 +62,31 @@ The service is configured using environment variables.
 | `OPENFGA_API_TOKEN` | OpenFGA API Token | | No |
 | `OPENFGA_STORE_ID` | OpenFGA Store ID | | No |
 | `OPENFGA_AUTHORIZATION_MODEL_ID` | OpenFGA Model ID | | No |
+| `AUTHENTICATION_ENABLED` | Enable JWT Authentication | `true` | No |
+| `AUTHENTICATION_ISSUER` | OIDC Issuer URL | | No |
+| `AUTHENTICATION_JWKS_URL` | Manual JWKS URL (optional) | | No |
+| `AUTHENTICATION_ALLOWED_SUBJECTS` | Comma-separated allowed subjects | | No |
+| `AUTHENTICATION_REQUIRED_SCOPE` | Required scope claim | | No |
+
+## Authentication
+
+The service supports JWT-based authentication using OIDC. By default, it is enabled.
+
+### Generating Tokens for Development
+
+To generate a token for local development using the Client Credentials flow:
+
+```bash
+# Using explicit token URL
+./app token --client-id <id> --client-secret <secret> --token-url <url>
+
+# Using OIDC discovery (issuer URL)
+./app token --client-id <id> --client-secret <secret> --issuer-url <url>
+```
+To use the CLI with authentication:
+```bash
+./app tenant list --token <jwt-token>
+```
 
 ## Workflows
 

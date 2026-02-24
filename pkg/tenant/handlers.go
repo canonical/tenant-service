@@ -10,6 +10,7 @@ import (
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
+	"github.com/canonical/tenant-service/pkg/authentication"
 	v0 "github.com/canonical/tenant-service/v0"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -64,13 +65,9 @@ func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsReques
 	defer span.End()
 
 	// Extract user_id from context
-	val := ctx.Value("user_id")
-	if val == nil {
-		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
-	}
-	userID, ok := val.(string)
+	userID, ok := authentication.GetUserID(ctx)
 	if !ok {
-		return nil, status.Error(codes.Internal, "invalid user_id in context")
+		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 	}
 
 	tenants, err := h.service.ListTenantsByUserID(ctx, userID)

@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const APP_ID = "identity_platform.hook_service"
+const APP_ID = "identity_platform.tenant_service"
 
 var _ SecurityLoggerInterface = (*SecurityLogger)(nil)
 
