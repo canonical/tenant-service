@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+data:
+  init-database.sql: |
+    CREATE USER kratos WITH PASSWORD 'kratos';
+    CREATE USER openfga WITH PASSWORD 'openfga';
+    CREATE USER tenants WITH PASSWORD 'tenants';
+
+    CREATE DATABASE kratos;
+    GRANT ALL PRIVILEGES ON DATABASE kratos TO kratos;
+    ALTER DATABASE kratos OWNER TO kratos;
+
+    CREATE DATABASE openfga;
+    GRANT ALL PRIVILEGES ON DATABASE openfga TO openfga;
+    ALTER DATABASE openfga OWNER TO openfga;
+
+    CREATE DATABASE tenants;
+    GRANT ALL PRIVILEGES ON DATABASE tenants TO tenants;
+    ALTER DATABASE tenants OWNER TO tenants;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_USER
+          value: "hydra"
+        - name: POSTGRES_PASSWORD
+          value: "hydra"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d/init-database.sql
+          subPath: init-database.sql
+      volumes:
+      - name: init-script
+        configMap:
+          name: postgres-init-script
+          items:
+          - key: init-database.sql
+            path: init-database.sql

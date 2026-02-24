@@ -1,0 +1,498 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "v0/tenant.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "TenantService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v0/me/tenants": {
+      "get": {
+        "summary": "Public Endpoints",
+        "operationId": "TenantService_ListMyTenants",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/tenants/{tenantId}/invites": {
+      "post": {
+        "operationId": "TenantService_InviteMember",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TenantServiceInviteMemberBody"
+            }
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/tenants": {
+      "get": {
+        "summary": "Internal Admin Endpoints",
+        "operationId": "TenantService_ListTenants",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "TenantService"
+        ]
+      },
+      "post": {
+        "operationId": "TenantService_CreateTenant",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/tenantCreateTenantRequest"
+            }
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/users/{userId}/tenants": {
+      "get": {
+        "operationId": "TenantService_ListUserTenants",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/tenants/{tenantId}/users": {
+      "get": {
+        "operationId": "TenantService_ListTenantUsers",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      },
+      "post": {
+        "operationId": "TenantService_ProvisionUser",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TenantServiceProvisionUserBody"
+            }
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/tenants/{tenant.id}": {
+      "patch": {
+        "operationId": "TenantService_UpdateTenant",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant.id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TenantServiceUpdateTenantBody"
+            }
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/tenants/{tenantId}": {
+      "delete": {
+        "operationId": "TenantService_DeleteTenant",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/tenants/{tenantId}/users/{userId}": {
+      "patch": {
+        "operationId": "TenantService_UpdateTenantUser",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TenantServiceUpdateTenantUserBody"
+            }
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "TenantServiceInviteMemberBody": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "title": "owner, admin, member"
+        }
+      }
+    },
+    "TenantServiceProvisionUserBody": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "TenantServiceUpdateTenantBody": {
+      "type": "object",
+      "properties": {
+        "tenant": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "updateMask": {
+          "type": "string"
+        }
+      }
+    },
+    "TenantServiceUpdateTenantUserBody": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "tenantCreateTenantRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "tenantCreateTenantResponse": {
+      "type": "object",
+      "properties": {
+        "tenant": {
+          "$ref": "#/definitions/tenantTenant"
+        }
+      }
+    },
+    "tenantInviteMemberResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "link": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        }
+      }
+    },
+    "tenantListMyTenantsResponse": {
+      "type": "object",
+      "properties": {
+        "tenants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/tenantTenant"
+          }
+        }
+      }
+    },
+    "tenantListTenantUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/tenantTenantUser"
+          }
+        }
+      }
+    },
+    "tenantListTenantsResponse": {
+      "type": "object",
+      "properties": {
+        "tenants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/tenantTenant"
+          }
+        }
+      }
+    },
+    "tenantListUserTenantsResponse": {
+      "type": "object",
+      "properties": {
+        "tenants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/tenantTenant"
+          }
+        }
+      }
+    },
+    "tenantProvisionUserResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "tenantTenant": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tenantTenantUser": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "tenantUpdateTenantResponse": {
+      "type": "object",
+      "properties": {
+        "tenant": {
+          "$ref": "#/definitions/tenantTenant"
+        }
+      }
+    },
+    "tenantUpdateTenantUserResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/tenantTenantUser"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-service
+  labels:
+    app: tenant-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tenant-service
+  template:
+    metadata:
+      labels:
+        app: tenant-service
+    spec:
+      containers:
+      - name: tenant-service
+        image: localhost:32000/tenant-service
+        command: ["/usr/bin/tenant-service", "serve"]
+        env:
+        - name: PORT
+          value: "8080"
+        - name: GRPC_PORT
+          value: "50051"
+        - name: LOG_LEVEL
+          value: "debug"
+        - name: DSN
+          value: "postgres://postgres:password@postgresql:5432/tenant?sslmode=disable"
+        - name: KRATOS_ADMIN_URL
+          value: "http://kratos-mock:4434" # Mock or point to non-existent service
+        - name: AUTHORIZATION_ENABLED
+          value: "true"
+        - name: OPENFGA_API_SCHEME
+          value: "http"
+        - name: OPENFGA_API_HOST
+          value: "openfga:8080"
+        - name: OPENFGA_API_TOKEN
+          value: "42"
+        # The following env vars will be populated from the ConfigMap created by fga-setup job
+        envFrom:
+        - configMapRef:
+            name: tenant-service-fga-config
+            optional: true # Allow pod creation, app will wait/fail/restart until config is ready
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 50051
+          name: grpc
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenant-service
+spec:
+  selector:
+    app: tenant-service
+  ports:
+  - port: 8080
+    name: http
+    targetPort: 8080
+  - port: 50051
+    name: grpc
+    targetPort: 50051

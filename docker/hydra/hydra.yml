@@ -1,0 +1,55 @@
+serve:
+  cookies:
+    same_site_mode: Lax
+  admin:
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*"
+  public:
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*"
+
+log:
+  leak_sensitive_values: true
+  level: debug
+
+oauth2:
+  expose_internal_errors: true
+  device_authorization:
+    # configure how often a non-interactive device should poll the device token endpoint, default 5s
+    token_polling_interval: 5s
+  token_hook:
+    url: http://host.docker.internal:8000/webhooks/token
+    auth:
+      type: api_key
+      config:
+        name: Authorization
+        value: secret_api_key
+        in: header
+  # Allow groups to be a top-level claim in access tokens instead of nested under ext
+  allowed_top_level_claims:
+    - groups
+  mirror_top_level_claims: false
+
+strategies:
+  access_token: jwt
+  jwt:
+    scope_claim: list
+  scope: exact
+
+urls:
+  self:
+    issuer: http://localhost:4444
+    public: http://localhost:4444
+  consent: http://localhost/ui/consent
+  login: http://localhost/ui/login
+  error: http://localhost/ui/oidc_error
+  device_verification: http://localhost/ui/device_code
+  post_device_done: http://localhost/ui/device_complete
+
+secrets:
+  system:
+    - youReallyNeedToChangeThis

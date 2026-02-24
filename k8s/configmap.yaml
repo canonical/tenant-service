@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-service-fga-config
+  namespace: default
+data:
+  # Initial placeholder values; will be updated by fga-setup job
+  OPENFGA_STORE_ID: ""
+  OPENFGA_MODEL_ID: ""

@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-setup
+spec:
+  activeDeadlineSeconds: 100
+  template:
+    spec:
+      containers:
+      - name: create-db
+        image: postgres:15
+        command:
+        - /bin/bash
+        - -c
+        - |
+          until psql postgresql://postgres:password@postgresql:5432/tenant?sslmode=disable -c '\q'; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+
+          if ! psql postgresql://postgres:password@postgresql:5432/tenant?sslmode=disable -tc "SELECT 1 FROM pg_database WHERE datname = 'openfga'" | grep -q 1; then
+            echo "Creating database openfga..."
+            psql postgresql://postgres:password@postgresql:5432/tenant?sslmode=disable -c "CREATE DATABASE openfga;"
+          else
+            echo "Database openfga already exists."
+          fi
+      restartPolicy: OnFailure

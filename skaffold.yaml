@@ -1,0 +1,72 @@
+apiVersion: skaffold/v4beta8
+kind: Config
+metadata:
+  name: tenant-service-env
+build:
+  tagPolicy:
+    gitCommit:
+      variant: AbbrevCommitSha
+  local:
+    push: true
+    tryImportMissing: false
+  artifacts:
+    - image: localhost:32000/tenant-service
+      custom:
+        buildCommand: ./build.sh
+        dependencies:
+          paths:
+            - rockcraft.yaml
+            - go.mod
+            - go.sum
+            - "**.go"
+manifests:
+  rawYaml:
+    - k8s/configmap.yaml
+    - k8s/db-setup.yaml
+
+    - k8s/openfga.yaml
+    - k8s/fga-setup.yaml
+    - k8s/tenant-service.yaml
+
+deploy:
+  helm:
+    releases:
+    - name: postgresql
+      createNamespace: true
+      namespace: default
+      remoteChart: oci://registry-1.docker.io/bitnamicharts/postgresql
+      setValues:
+        auth.username: "tenant"
+        auth.password: "tenant"
+        auth.postgresPassword: "password"
+        auth.database: "tenant"
+        fullnameOverride: "postgresql"
+        primary.persistence.enabled: "true"
+        primary.persistence.size: "1Gi"
+        primary.networkPolicy.enabled: "false"
+  kubectl:
+    defaultNamespace: default
+    flags:
+      disableValidation: true
+
+portForward:
+  - resourceType: service
+    resourceName: postgresql
+    port: 5432
+    localPort: 5432
+  - resourceType: service
+    resourceName: openfga
+    port: 8080
+    localPort: 8080
+  - resourceType: service
+    resourceName: openfga
+    port: 8081
+    localPort: 8081
+  - resourceType: service
+    resourceName: tenant-service
+    port: 8080
+    localPort: 9090 # Avoid port 8080 collision
+  - resourceType: service
+    resourceName: tenant-service
+    port: 50051
+    localPort: 50051
