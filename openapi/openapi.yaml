@@ -139,7 +139,7 @@ info:
     version: version not set
 openapi: 3.0.3
 paths:
-    /me/tenants:
+    /api/v0/me/tenants:
         get:
             operationId: TenantService_ListMyTenants
             responses:
@@ -152,7 +152,7 @@ paths:
             summary: Public Endpoints
             tags:
                 - TenantService
-    /tenants:
+    /api/v0/tenants:
         get:
             operationId: TenantService_ListTenants
             responses:
@@ -183,7 +183,7 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /tenants/{tenant.id}:
+    /api/v0/tenants/{tenant.id}:
         patch:
             operationId: TenantService_UpdateTenant
             parameters:
@@ -208,7 +208,7 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /tenants/{tenantId}:
+    /api/v0/tenants/{tenantId}:
         delete:
             operationId: TenantService_DeleteTenant
             parameters:
@@ -226,7 +226,7 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /tenants/{tenantId}/invites:
+    /api/v0/tenants/{tenantId}/invites:
         post:
             operationId: TenantService_InviteMember
             parameters:
@@ -251,7 +251,7 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /tenants/{tenantId}/users:
+    /api/v0/tenants/{tenantId}/users:
         get:
             operationId: TenantService_ListTenantUsers
             parameters:
@@ -293,7 +293,7 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /tenants/{tenantId}/users/{userId}:
+    /api/v0/tenants/{tenantId}/users/{userId}:
         patch:
             operationId: TenantService_UpdateTenantUser
             parameters:
@@ -323,7 +323,7 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /users/{userId}/tenants:
+    /api/v0/users/{userId}/tenants:
         get:
             operationId: TenantService_ListUserTenants
             parameters:

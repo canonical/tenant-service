@@ -16,7 +16,7 @@
     "application/json"
   ],
   "paths": {
-    "/me/tenants": {
+    "/api/v0/me/tenants": {
       "get": {
         "summary": "Public Endpoints",
         "operationId": "TenantService_ListMyTenants",
@@ -33,7 +33,7 @@
         ]
       }
     },
-    "/tenants/{tenantId}/invites": {
+    "/api/v0/tenants/{tenantId}/invites": {
       "post": {
         "operationId": "TenantService_InviteMember",
         "responses": {
@@ -65,7 +65,7 @@
         ]
       }
     },
-    "/tenants": {
+    "/api/v0/tenants": {
       "get": {
         "summary": "Internal Admin Endpoints",
         "operationId": "TenantService_ListTenants",
@@ -106,7 +106,7 @@
         ]
       }
     },
-    "/users/{userId}/tenants": {
+    "/api/v0/users/{userId}/tenants": {
       "get": {
         "operationId": "TenantService_ListUserTenants",
         "responses": {
@@ -130,7 +130,7 @@
         ]
       }
     },
-    "/tenants/{tenantId}/users": {
+    "/api/v0/tenants/{tenantId}/users": {
       "get": {
         "operationId": "TenantService_ListTenantUsers",
         "responses": {
@@ -184,7 +184,7 @@
         ]
       }
     },
-    "/tenants/{tenant.id}": {
+    "/api/v0/tenants/{tenant.id}": {
       "patch": {
         "operationId": "TenantService_UpdateTenant",
         "responses": {
@@ -216,7 +216,7 @@
         ]
       }
     },
-    "/tenants/{tenantId}": {
+    "/api/v0/tenants/{tenantId}": {
       "delete": {
         "operationId": "TenantService_DeleteTenant",
         "responses": {
@@ -240,7 +240,7 @@
         ]
       }
     },
-    "/tenants/{tenantId}/users/{userId}": {
+    "/api/v0/tenants/{tenantId}/users/{userId}": {
       "patch": {
         "operationId": "TenantService_UpdateTenantUser",
         "responses": {

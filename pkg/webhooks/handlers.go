@@ -25,8 +25,8 @@ func NewAPI(service *Service, logger logging.LoggerInterface) *API {
 }
 
 func (a *API) RegisterEndpoints(mux *chi.Mux) {
-	mux.Post("/webhooks/registration", a.registration)
-	mux.Post("/webhooks/token", a.tokenHook)
+	mux.Post("/api/v0/webhooks/registration", a.registration)
+	mux.Post("/api/v0/webhooks/token", a.tokenHook)
 }
 
 func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {

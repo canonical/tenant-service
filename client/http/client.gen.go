@@ -38,6 +38,11 @@ type TenantServiceUpdateTenantBody struct {
 	UpdateMask *string `json:"updateMask,omitempty"`
 }
 
+// TenantServiceUpdateTenantUserBody defines model for TenantServiceUpdateTenantUserBody.
+type TenantServiceUpdateTenantUserBody struct {
+	Role *string `json:"role,omitempty"`
+}
+
 // ProtobufAny defines model for protobufAny.
 type ProtobufAny struct {
 	Type                 *string                `json:"@type,omitempty"`
@@ -67,6 +72,9 @@ type TenantServiceInviteMemberJSONRequestBody = TenantServiceInviteMemberBody
 
 // TenantServiceProvisionUserJSONRequestBody defines body for TenantServiceProvisionUser for application/json ContentType.
 type TenantServiceProvisionUserJSONRequestBody = TenantServiceProvisionUserBody
+
+// TenantServiceUpdateTenantUserJSONRequestBody defines body for TenantServiceUpdateTenantUser for application/json ContentType.
+type TenantServiceUpdateTenantUserJSONRequestBody = TenantServiceUpdateTenantUserBody
 
 // Getter for additional properties for ProtobufAny. Returns the specified
 // element and whether it was found
@@ -241,6 +249,11 @@ type ClientInterface interface {
 
 	TenantServiceProvisionUser(ctx context.Context, tenantId string, body TenantServiceProvisionUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// TenantServiceUpdateTenantUserWithBody request with any body
+	TenantServiceUpdateTenantUserWithBody(ctx context.Context, tenantId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	TenantServiceUpdateTenantUser(ctx context.Context, tenantId string, userId string, body TenantServiceUpdateTenantUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// TenantServiceListUserTenants request
 	TenantServiceListUserTenants(ctx context.Context, userId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
@@ -389,6 +402,30 @@ func (c *Client) TenantServiceProvisionUser(ctx context.Context, tenantId string
 	return c.Client.Do(req)
 }
 
+func (c *Client) TenantServiceUpdateTenantUserWithBody(ctx context.Context, tenantId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServiceUpdateTenantUserRequestWithBody(c.Server, tenantId, userId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TenantServiceUpdateTenantUser(ctx context.Context, tenantId string, userId string, body TenantServiceUpdateTenantUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServiceUpdateTenantUserRequest(c.Server, tenantId, userId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) TenantServiceListUserTenants(ctx context.Context, userId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTenantServiceListUserTenantsRequest(c.Server, userId)
 	if err != nil {
@@ -410,7 +447,7 @@ func NewTenantServiceListMyTenantsRequest(server string) (*http.Request, error) 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/me/tenants")
+	operationPath := fmt.Sprintf("/api/v0/me/tenants")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -437,7 +474,7 @@ func NewTenantServiceListTenantsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/tenants")
+	operationPath := fmt.Sprintf("/api/v0/tenants")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -475,7 +512,7 @@ func NewTenantServiceCreateTenantRequestWithBody(server string, contentType stri
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/tenants")
+	operationPath := fmt.Sprintf("/api/v0/tenants")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -522,7 +559,7 @@ func NewTenantServiceUpdateTenantRequestWithBody(server string, tenantId string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/tenants/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -558,7 +595,7 @@ func NewTenantServiceDeleteTenantRequest(server string, tenantId string) (*http.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/tenants/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -603,7 +640,7 @@ func NewTenantServiceInviteMemberRequestWithBody(server string, tenantId string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/tenants/%s/invites", pathParam0)
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s/invites", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -639,7 +676,7 @@ func NewTenantServiceListTenantUsersRequest(server string, tenantId string) (*ht
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/tenants/%s/users", pathParam0)
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s/users", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -684,7 +721,7 @@ func NewTenantServiceProvisionUserRequestWithBody(server string, tenantId string
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/tenants/%s/users", pathParam0)
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s/users", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -695,6 +732,60 @@ func NewTenantServiceProvisionUserRequestWithBody(server string, tenantId string
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewTenantServiceUpdateTenantUserRequest calls the generic TenantServiceUpdateTenantUser builder with application/json body
+func NewTenantServiceUpdateTenantUserRequest(server string, tenantId string, userId string, body TenantServiceUpdateTenantUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTenantServiceUpdateTenantUserRequestWithBody(server, tenantId, userId, "application/json", bodyReader)
+}
+
+// NewTenantServiceUpdateTenantUserRequestWithBody generates requests for TenantServiceUpdateTenantUser with any type of body
+func NewTenantServiceUpdateTenantUserRequestWithBody(server string, tenantId string, userId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "userId", runtime.ParamLocationPath, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s/users/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -720,7 +811,7 @@ func NewTenantServiceListUserTenantsRequest(server string, userId string) (*http
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/users/%s/tenants", pathParam0)
+	operationPath := fmt.Sprintf("/api/v0/users/%s/tenants", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -812,6 +903,11 @@ type ClientWithResponsesInterface interface {
 	TenantServiceProvisionUserWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceProvisionUserResponse, error)
 
 	TenantServiceProvisionUserWithResponse(ctx context.Context, tenantId string, body TenantServiceProvisionUserJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceProvisionUserResponse, error)
+
+	// TenantServiceUpdateTenantUserWithBodyWithResponse request with any body
+	TenantServiceUpdateTenantUserWithBodyWithResponse(ctx context.Context, tenantId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantUserResponse, error)
+
+	TenantServiceUpdateTenantUserWithResponse(ctx context.Context, tenantId string, userId string, body TenantServiceUpdateTenantUserJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantUserResponse, error)
 
 	// TenantServiceListUserTenantsWithResponse request
 	TenantServiceListUserTenantsWithResponse(ctx context.Context, userId string, reqEditors ...RequestEditorFn) (*TenantServiceListUserTenantsResponse, error)
@@ -993,6 +1089,28 @@ func (r TenantServiceProvisionUserResponse) StatusCode() int {
 	return 0
 }
 
+type TenantServiceUpdateTenantUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSONDefault  *RpcStatus
+}
+
+// Status returns HTTPResponse.Status
+func (r TenantServiceUpdateTenantUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TenantServiceUpdateTenantUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type TenantServiceListUserTenantsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1117,6 +1235,23 @@ func (c *ClientWithResponses) TenantServiceProvisionUserWithResponse(ctx context
 		return nil, err
 	}
 	return ParseTenantServiceProvisionUserResponse(rsp)
+}
+
+// TenantServiceUpdateTenantUserWithBodyWithResponse request with arbitrary body returning *TenantServiceUpdateTenantUserResponse
+func (c *ClientWithResponses) TenantServiceUpdateTenantUserWithBodyWithResponse(ctx context.Context, tenantId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantUserResponse, error) {
+	rsp, err := c.TenantServiceUpdateTenantUserWithBody(ctx, tenantId, userId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTenantServiceUpdateTenantUserResponse(rsp)
+}
+
+func (c *ClientWithResponses) TenantServiceUpdateTenantUserWithResponse(ctx context.Context, tenantId string, userId string, body TenantServiceUpdateTenantUserJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantUserResponse, error) {
+	rsp, err := c.TenantServiceUpdateTenantUser(ctx, tenantId, userId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTenantServiceUpdateTenantUserResponse(rsp)
 }
 
 // TenantServiceListUserTenantsWithResponse request returning *TenantServiceListUserTenantsResponse
@@ -1319,6 +1454,32 @@ func ParseTenantServiceProvisionUserResponse(rsp *http.Response) (*TenantService
 	}
 
 	response := &TenantServiceProvisionUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest RpcStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTenantServiceUpdateTenantUserResponse parses an HTTP response from a TenantServiceUpdateTenantUserWithResponse call
+func ParseTenantServiceUpdateTenantUserResponse(rsp *http.Response) (*TenantServiceUpdateTenantUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TenantServiceUpdateTenantUserResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

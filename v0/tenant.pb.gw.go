@@ -399,7 +399,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListMyTenants", runtime.WithHTTPPathPattern("/me/tenants"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListMyTenants", runtime.WithHTTPPathPattern("/api/v0/me/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -419,7 +419,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/InviteMember", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/invites"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/InviteMember", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/invites"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -439,7 +439,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenants", runtime.WithHTTPPathPattern("/tenants"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenants", runtime.WithHTTPPathPattern("/api/v0/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -459,7 +459,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListUserTenants", runtime.WithHTTPPathPattern("/users/{user_id}/tenants"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListUserTenants", runtime.WithHTTPPathPattern("/api/v0/users/{user_id}/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -479,7 +479,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenantUsers", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenantUsers", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -499,7 +499,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/CreateTenant", runtime.WithHTTPPathPattern("/tenants"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/CreateTenant", runtime.WithHTTPPathPattern("/api/v0/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -519,7 +519,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenant", runtime.WithHTTPPathPattern("/tenants/{tenant.id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenant", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant.id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -539,7 +539,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/DeleteTenant", runtime.WithHTTPPathPattern("/tenants/{tenant_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/DeleteTenant", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -559,7 +559,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ProvisionUser", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ProvisionUser", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -579,7 +579,7 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenantUser", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenantUser", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -637,7 +637,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListMyTenants", runtime.WithHTTPPathPattern("/me/tenants"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListMyTenants", runtime.WithHTTPPathPattern("/api/v0/me/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -654,7 +654,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/InviteMember", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/invites"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/InviteMember", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/invites"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -671,7 +671,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenants", runtime.WithHTTPPathPattern("/tenants"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenants", runtime.WithHTTPPathPattern("/api/v0/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -688,7 +688,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListUserTenants", runtime.WithHTTPPathPattern("/users/{user_id}/tenants"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListUserTenants", runtime.WithHTTPPathPattern("/api/v0/users/{user_id}/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -705,7 +705,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenantUsers", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ListTenantUsers", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -722,7 +722,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/CreateTenant", runtime.WithHTTPPathPattern("/tenants"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/CreateTenant", runtime.WithHTTPPathPattern("/api/v0/tenants"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -739,7 +739,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenant", runtime.WithHTTPPathPattern("/tenants/{tenant.id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenant", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant.id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -756,7 +756,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/DeleteTenant", runtime.WithHTTPPathPattern("/tenants/{tenant_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/DeleteTenant", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -773,7 +773,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ProvisionUser", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/ProvisionUser", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -790,7 +790,7 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenantUser", runtime.WithHTTPPathPattern("/tenants/{tenant_id}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/UpdateTenantUser", runtime.WithHTTPPathPattern("/api/v0/tenants/{tenant_id}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -807,16 +807,16 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 }
 
 var (
-	pattern_TenantService_ListMyTenants_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"me", "tenants"}, ""))
-	pattern_TenantService_InviteMember_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"tenants", "tenant_id", "invites"}, ""))
-	pattern_TenantService_ListTenants_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"tenants"}, ""))
-	pattern_TenantService_ListUserTenants_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"users", "user_id", "tenants"}, ""))
-	pattern_TenantService_ListTenantUsers_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"tenants", "tenant_id", "users"}, ""))
-	pattern_TenantService_CreateTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"tenants"}, ""))
-	pattern_TenantService_UpdateTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"tenants", "tenant.id"}, ""))
-	pattern_TenantService_DeleteTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"tenants", "tenant_id"}, ""))
-	pattern_TenantService_ProvisionUser_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"tenants", "tenant_id", "users"}, ""))
-	pattern_TenantService_UpdateTenantUser_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"tenants", "tenant_id", "users", "user_id"}, ""))
+	pattern_TenantService_ListMyTenants_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v0", "me", "tenants"}, ""))
+	pattern_TenantService_InviteMember_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "invites"}, ""))
+	pattern_TenantService_ListTenants_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v0", "tenants"}, ""))
+	pattern_TenantService_ListUserTenants_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "users", "user_id", "tenants"}, ""))
+	pattern_TenantService_ListTenantUsers_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "users"}, ""))
+	pattern_TenantService_CreateTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v0", "tenants"}, ""))
+	pattern_TenantService_UpdateTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v0", "tenants", "tenant.id"}, ""))
+	pattern_TenantService_DeleteTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v0", "tenants", "tenant_id"}, ""))
+	pattern_TenantService_ProvisionUser_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "users"}, ""))
+	pattern_TenantService_UpdateTenantUser_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v0", "tenants", "tenant_id", "users", "user_id"}, ""))
 )
 
 var (
