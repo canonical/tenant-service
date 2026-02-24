@@ -13,11 +13,11 @@ import (
 )
 
 type API struct {
-	service *Service
+	service ServiceInterface
 	logger  logging.LoggerInterface
 }
 
-func NewAPI(service *Service, logger logging.LoggerInterface) *API {
+func NewAPI(service ServiceInterface, logger logging.LoggerInterface) *API {
 	return &API{
 		service: service,
 		logger:  logger,
