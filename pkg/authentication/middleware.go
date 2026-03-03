@@ -6,6 +6,7 @@ package authentication
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -13,6 +14,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	otelcodes "go.opentelemetry.io/otel/codes"
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
@@ -35,6 +38,9 @@ func (m *Middleware) Authenticate() func(http.Handler) http.Handler {
 
 			token, found := m.getBearerToken(r.Header)
 			if !found {
+				err := errors.New("missing authorization header")
+				span.RecordError(err)
+				span.SetStatus(otelcodes.Error, err.Error())
 				m.unauthorizedResponse(w, "missing authorization header")
 				return
 			}
@@ -42,6 +48,8 @@ func (m *Middleware) Authenticate() func(http.Handler) http.Handler {
 			userID, err := m.verifier.VerifyToken(ctx, token)
 			if err != nil {
 				m.logger.Debugf("JWT verification failed: %v", err)
+				span.RecordError(err)
+				span.SetStatus(otelcodes.Error, err.Error())
 				m.unauthorizedResponse(w, "invalid token")
 				return
 			}
@@ -60,16 +68,25 @@ func (m *Middleware) GRPCInterceptor(ctx context.Context, req interface{}, info 
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
+		err := errors.New("metadata is not provided")
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
 		return nil, status.Error(codes.Unauthenticated, "metadata is not provided")
 	}
 
 	values := md.Get("authorization")
 	if len(values) == 0 {
+		err := errors.New("authorization token is not provided")
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
 		return nil, status.Error(codes.Unauthenticated, "authorization token is not provided")
 	}
 
 	authHeader := values[0]
 	if !strings.HasPrefix(authHeader, "Bearer ") {
+		err := errors.New("authorization token is not a bearer token")
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
 		return nil, status.Error(codes.Unauthenticated, "authorization token is not a bearer token")
 	}
 
@@ -77,11 +94,18 @@ func (m *Middleware) GRPCInterceptor(ctx context.Context, req interface{}, info 
 	userID, err := m.verifier.VerifyToken(ctx, token)
 	if err != nil {
 		m.logger.Debugf("gRPC JWT verification failed: %v", err)
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
 		return nil, status.Error(codes.Unauthenticated, "invalid token")
 	}
 
 	ctx = WithUserID(ctx, userID)
-	return handler(ctx, req)
+	resp, err := handler(ctx, req)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
+	}
+	return resp, err
 }
 
 func (m *Middleware) getBearerToken(headers http.Header) (string, bool) {

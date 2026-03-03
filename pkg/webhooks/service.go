@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel/codes"
+
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/tracing"
@@ -45,7 +47,10 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 	s.logger.Debugf("Handling registration for identity %s with email %s", identityID, email)
 
 	if identityID == "" {
-		return fmt.Errorf("identity ID is empty")
+		err := fmt.Errorf("identity ID is empty")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
 
 	// 1. Create a tenant named '{Email}'s Org'
@@ -61,18 +66,24 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 
 	newTenant, err := s.storage.CreateTenant(ctx, tenant)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to create tenant: %w", err)
 	}
 
 	// 2. Add the user as 'owner'
 	_, err = s.storage.AddMember(ctx, newTenant.ID, identityID, "owner")
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to add member: %w", err)
 	}
 
 	// 3. Call OpenFGA to write the tuple
 	err = s.authz.AssignTenantOwner(ctx, newTenant.ID, identityID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to assign tenant owner in authz: %w", err)
 	}
 
@@ -92,7 +103,10 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 	}
 
 	if userID == "" {
-		return nil, fmt.Errorf("could not identify user from request")
+		err := fmt.Errorf("could not identify user from request")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	s.logger.Debugf("Handling token hook for user %s", userID)
@@ -100,6 +114,8 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 	// Fetch Tenants
 	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, userID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to list tenants: %w", err)
 	}
 

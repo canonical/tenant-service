@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"go.opentelemetry.io/otel/codes"
+
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/storage"
@@ -52,6 +54,10 @@ func (s *Service) ListTenantsByUserID(ctx context.Context, userID string) ([]*ty
 	defer span.End()
 
 	tenants, err := s.storage.ListTenantsByUserID(ctx, userID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
 	return tenants, err
 }
 
@@ -61,6 +67,8 @@ func (s *Service) ListTenants(ctx context.Context) ([]*types.Tenant, error) {
 
 	tenants, err := s.storage.ListTenants(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -75,6 +83,8 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 	identityID, err := s.kratos.GetIdentityIDByEmail(ctx, email)
 	if err != nil {
 		s.logger.Errorf("Failed to check identity existence: %v", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "", "", fmt.Errorf("failed to check identity")
 	}
 
@@ -83,6 +93,8 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 		identityID, err = s.kratos.CreateIdentity(ctx, email)
 		if err != nil {
 			s.logger.Errorf("Failed to create identity: %v", err)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return "", "", fmt.Errorf("failed to provision user")
 		}
 	}
@@ -91,6 +103,8 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 	if _, err := s.storage.AddMember(ctx, tenantID, identityID, role); err != nil {
 		if !errors.Is(err, storage.ErrDuplicateKey) {
 			s.logger.Errorf("Failed to add member to storage: %v", err)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return "", "", fmt.Errorf("failed to add member")
 		}
 		// If duplicate (already a member), we proceed to send recovery link as a re-invite.
@@ -107,6 +121,8 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 
 	if err != nil {
 		s.logger.Errorf("Failed to assign role in authz: %v", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "", "", fmt.Errorf("failed to assign permissions")
 	}
 
@@ -115,6 +131,8 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 	link, code, err := s.kratos.CreateRecoveryLink(ctx, identityID, s.invitationLifetime)
 	if err != nil {
 		s.logger.Errorf("Failed to create recovery link: %v", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "", "", fmt.Errorf("failed to generate invitation link")
 	}
 
@@ -133,6 +151,8 @@ func (s *Service) CreateTenant(ctx context.Context, name string) (*types.Tenant,
 
 	created, err := s.storage.CreateTenant(ctx, t)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to create tenant: %w", err)
 	}
 
@@ -144,11 +164,15 @@ func (s *Service) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths 
 	defer span.End()
 
 	if err := s.storage.UpdateTenant(ctx, tenant, paths); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to update tenant: %w", err)
 	}
 
 	updated, err := s.storage.GetTenantByID(ctx, tenant.ID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get updated tenant: %w", err)
 	}
 
@@ -160,6 +184,8 @@ func (s *Service) DeleteTenant(ctx context.Context, id string) error {
 	defer span.End()
 
 	if err := s.storage.DeleteTenant(ctx, id); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to delete tenant from storage: %w", err)
 	}
 
@@ -178,17 +204,23 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	// 1. Find or Create Identity
 	identityID, err := s.kratos.GetIdentityIDByEmail(ctx, email)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 	if identityID == "" {
 		identityID, err = s.kratos.CreateIdentity(ctx, email)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("failed to create identity: %w", err)
 		}
 	}
 
 	// 2. Add to Storage
 	if _, err := s.storage.AddMember(ctx, tenantID, identityID, role); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to add member to storage: %w", err)
 	}
 
@@ -201,10 +233,15 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 		// Proto has owner, admin, member.
 		authzErr = s.authz.AssignTenantMember(ctx, tenantID, identityID)
 	default:
-		return fmt.Errorf("unknown role: %s", role)
+		err := fmt.Errorf("unknown role: %s", role)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
 	}
 
 	if authzErr != nil {
+		span.RecordError(authzErr)
+		span.SetStatus(codes.Error, authzErr.Error())
 		return fmt.Errorf("failed to assign role in authz: %w", authzErr)
 	}
 
@@ -218,6 +255,8 @@ func (s *Service) ListUserTenants(ctx context.Context, userID string) ([]*types.
 
 	tenants, err := s.storage.ListTenantsByUserID(ctx, userID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to list tenants for user: %w", err)
 	}
 
@@ -230,6 +269,8 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string) ([]*type
 
 	members, err := s.storage.ListMembersByTenantID(ctx, tenantID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to list members: %w", err)
 	}
 
@@ -268,6 +309,8 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 	// 1. Get current member to check if exists and current role
 	members, err := s.storage.ListMembersByTenantID(ctx, tenantID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to check current membership: %w", err)
 	}
 
@@ -279,7 +322,10 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 		}
 	}
 	if currentMember == nil {
-		return nil, fmt.Errorf("user %s not found in tenant %s", userID, tenantID)
+		err := fmt.Errorf("user %s not found in tenant %s", userID, tenantID)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	if currentMember.Role == role {
@@ -300,14 +346,21 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 	switch role {
 	case "owner":
 		if err := s.authz.AssignTenantOwner(ctx, tenantID, userID); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("failed to assign owner role: %w", err)
 		}
 	case "member", "admin":
 		if err := s.authz.AssignTenantMember(ctx, tenantID, userID); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("failed to assign member role: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("invalid role: %s", role)
+		err := fmt.Errorf("invalid role: %s", role)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	// Remove old role
@@ -328,6 +381,8 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 
 	// 3. Storage Update
 	if err := s.storage.UpdateMember(ctx, tenantID, userID, role); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
