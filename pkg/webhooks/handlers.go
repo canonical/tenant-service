@@ -32,21 +32,21 @@ func (a *API) RegisterEndpoints(mux *chi.Mux) {
 func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {
 	req := new(oauth2.TokenHookRequest)
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		a.logger.Errorf("tokenHook: invalid request body: %v", err)
+		a.logger.Errorw("token hook: invalid request body", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	resp, err := a.service.HandleTokenHook(r.Context(), req)
 	if err != nil {
-		a.logger.Errorf("tokenHook: service error: %v", err)
+		a.logger.Errorw("token hook: service error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		a.logger.Errorf("tokenHook: response encoding error: %v", err)
+		a.logger.Errorw("token hook: response encoding error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -54,15 +54,19 @@ func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {
 func (a *API) registration(w http.ResponseWriter, r *http.Request) {
 	var identity KratosIdentity
 	if err := json.NewDecoder(r.Body).Decode(&identity); err != nil {
-		a.logger.Errorf("registration: invalid request body: %v", err)
+		a.logger.Errorw("registration: invalid request body", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	a.logger.Debugf("Received registration webhook for identity: %v", identity)
+	a.logger.Debugw("received registration webhook", "identity_id", identity.ID, "email", identity.Email)
 
 	if err := a.service.HandleRegistration(r.Context(), identity.ID, identity.Email); err != nil {
-		a.logger.Errorf("registration: service error: %v", err)
+		a.logger.Errorw("registration: service error",
+			"identity_id", identity.ID,
+			"email", identity.Email,
+			"error", err,
+		)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

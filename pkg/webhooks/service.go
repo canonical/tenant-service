@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
@@ -40,11 +41,19 @@ func NewService(
 	}
 }
 
+// recordError records an error on the span and emits a structured error log.
+// The "error" key is always appended to keysAndValues automatically.
+func (s *Service) recordError(span trace.Span, msg string, err error, keysAndValues ...interface{}) {
+	span.RecordError(err)
+	span.SetStatus(codes.Error, err.Error())
+	s.logger.Errorw(msg, append(keysAndValues, "error", err)...)
+}
+
 func (s *Service) HandleRegistration(ctx context.Context, identityID, email string) error {
 	ctx, span := s.tracer.Start(ctx, "webhooks.Service.HandleRegistration")
 	defer span.End()
 
-	s.logger.Debugf("Handling registration for identity %s with email %s", identityID, email)
+	s.logger.Debugw("handling registration webhook", "identity_id", identityID, "email", email)
 
 	if identityID == "" {
 		err := fmt.Errorf("identity ID is empty")
@@ -66,28 +75,39 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 
 	newTenant, err := s.storage.CreateTenant(ctx, tenant)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		s.recordError(span, "failed to create tenant on registration", err,
+			"identity_id", identityID,
+			"email", email,
+		)
 		return fmt.Errorf("failed to create tenant: %w", err)
 	}
 
 	// 2. Add the user as 'owner'
 	_, err = s.storage.AddMember(ctx, newTenant.ID, identityID, "owner")
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		s.recordError(span, "failed to add owner member on registration", err,
+			"tenant_id", newTenant.ID,
+			"identity_id", identityID,
+		)
 		return fmt.Errorf("failed to add member: %w", err)
 	}
 
 	// 3. Call OpenFGA to write the tuple
 	err = s.authz.AssignTenantOwner(ctx, newTenant.ID, identityID)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		s.recordError(span, "failed to assign tenant owner in authz on registration", err,
+			"tenant_id", newTenant.ID,
+			"identity_id", identityID,
+		)
 		return fmt.Errorf("failed to assign tenant owner in authz: %w", err)
 	}
 
-	s.logger.Infof("Successfully provisioned tenant %s for user %s", newTenant.ID, identityID)
+	s.logger.Infow("tenant provisioned on registration",
+		"tenant_id", newTenant.ID,
+		"identity_id", identityID,
+		"email", email,
+	)
+	s.logger.Security().AdminAction(identityID, "self_registration", "webhooks.Service.HandleRegistration", newTenant.ID)
 	return nil
 }
 
@@ -97,25 +117,22 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 
 	// Determine User ID
 	var userID string
-	s.logger.Debugf("Received token hook request: %+v", req)
 	if req.Session != nil && req.Session.Subject != "" {
 		userID = req.Session.Subject
 	}
 
+	s.logger.Debugw("handling token hook", "user_id", userID)
+
 	if userID == "" {
 		err := fmt.Errorf("could not identify user from request")
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		s.recordError(span, "token hook request missing user subject", err)
 		return nil, err
 	}
-
-	s.logger.Debugf("Handling token hook for user %s", userID)
 
 	// Fetch Tenants
 	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, userID)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		s.recordError(span, "failed to list tenants for token hook", err, "user_id", userID)
 		return nil, fmt.Errorf("failed to list tenants: %w", err)
 	}
 
@@ -124,6 +141,8 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 	for _, t := range tenants {
 		tenantList = append(tenantList, t.ID)
 	}
+
+	s.logger.Debugw("token hook tenants resolved", "user_id", userID, "tenant_count", len(tenantList))
 
 	resp := TokenHookResponse{
 		Session: struct {
