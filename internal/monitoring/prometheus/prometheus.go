@@ -15,6 +15,7 @@ type Monitor struct {
 
 	responseTime           *prometheus.HistogramVec
 	dependencyAvailability *prometheus.GaugeVec
+	operationsTotal        *prometheus.CounterVec
 
 	logger logging.LoggerInterface
 }
@@ -39,6 +40,16 @@ func (m *Monitor) SetDependencyAvailability(tags map[string]string, value float6
 	}
 
 	m.dependencyAvailability.With(tags).Set(value)
+
+	return nil
+}
+
+func (m *Monitor) IncrementCounter(tags map[string]string) error {
+	if m.operationsTotal == nil {
+		return fmt.Errorf("metric not instantiated")
+	}
+
+	m.operationsTotal.With(tags).Inc()
 
 	return nil
 }
@@ -106,6 +117,39 @@ func (m *Monitor) registerGauges() {
 		}
 	}
 }
+
+func (m *Monitor) registerCounters() {
+	counters := make([]*prometheus.CounterVec, 0)
+
+	labels := map[string]string{
+		"service": m.service,
+	}
+
+	m.operationsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:        "business_operations_total",
+			Help:        "Total number of business operations, partitioned by operation type and role.",
+			ConstLabels: labels,
+		},
+		[]string{"operation", "role"},
+	)
+
+	counters = append(counters, m.operationsTotal)
+
+	for _, counter := range counters {
+		err := prometheus.Register(counter)
+
+		switch err.(type) {
+		case nil:
+			continue
+		case prometheus.AlreadyRegisteredError:
+			m.logger.Debugf("metric %v already registered", counter)
+		default:
+			m.logger.Errorf("metric %v could not be registered", counter)
+		}
+	}
+}
+
 func NewMonitor(service string, logger logging.LoggerInterface) *Monitor {
 	m := new(Monitor)
 
@@ -114,6 +158,7 @@ func NewMonitor(service string, logger logging.LoggerInterface) *Monitor {
 
 	m.registerHistograms()
 	m.registerGauges()
+	m.registerCounters()
 
 	return m
 }

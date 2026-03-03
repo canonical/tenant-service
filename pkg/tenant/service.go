@@ -93,7 +93,7 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 			s.logger.Errorf("Failed to add member to storage: %v", err)
 			return "", "", fmt.Errorf("failed to add member")
 		}
-		// If duplicate (already a member), we proceed to send recovery link as a password reset/re-invite mechanism.
+		// If duplicate (already a member), we proceed to send recovery link as a re-invite.
 	}
 
 	// 3. Assign Role in OpenFGA (Authorization)
@@ -118,6 +118,7 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 		return "", "", fmt.Errorf("failed to generate invitation link")
 	}
 
+	s.incrementCounter("invitation_sent", role)
 	return link, code, nil
 }
 
@@ -207,6 +208,7 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 		return fmt.Errorf("failed to assign role in authz: %w", authzErr)
 	}
 
+	s.incrementCounter("user_provisioned", role)
 	return nil
 }
 
@@ -345,6 +347,12 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 		Email:  email,
 		Role:   role,
 	}, nil
+}
+
+func (s *Service) incrementCounter(operation, role string) {
+	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation, "role": role}); err != nil {
+		s.logger.Warnf("failed to increment counter %s: %v", operation, err)
+	}
 }
 
 func encodePageToken(offset uint64) string {
