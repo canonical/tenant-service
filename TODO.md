@@ -19,6 +19,20 @@ The `Authorizer` and OpenFGA model are wired up but never consulted in the servi
 - [ ] `CreateTenant`: decide and enforce who is allowed to create tenants (admin-only vs. self-service)
 - [ ] Add `SecurityLogger` audit calls for all state-changing operations (currently wired but unused)
 
+### Token hook — inject single `tenant_id` instead of a list
+
+The current `HandleTokenHook` queries all active tenants for the user and injects them as a
+`tenants: [...]` list. The correct behaviour is to read the `tenant_id` that was selected during
+login from the session (set at the Hydra consent step in Flow 2), validate that the user is still
+an active member of that tenant, and inject a single `tenant_id` claim.
+
+- [ ] Read `tenant_id` from `req.Session.Extra["tenant_id"]` in `pkg/webhooks/service.go`
+- [ ] Replace the `ListActiveTenantsByUserID` call with a single membership existence check
+      (`GetMembership(ctx, tenantID, userID)` — requires the storage method from the login hook work)
+- [ ] Change claim key from `tenants` (array) to `tenant_id` (string) in both `IDToken` and `AccessToken`
+- [ ] Return `403 Forbidden` if the user is not an active member of the requested tenant
+- [ ] Add unit tests
+
 ### [#15](https://github.com/canonical/tenant-service/issues/15) — Implement Kratos login hook
 
 Implement the `POST /api/v0/webhooks/login` endpoint so that Kratos can validate during login
