@@ -14,6 +14,12 @@ type LoggerInterface interface {
 	Warn(...interface{})
 	Debug(...interface{})
 	Fatal(...interface{})
+	// Errorw, Infow, Warnw, Debugw emit structured key-value log entries using
+	// zap SugaredLogger's "w"-suffix convention: Errorw(msg, key, val, ...).
+	Errorw(string, ...interface{})
+	Infow(string, ...interface{})
+	Warnw(string, ...interface{})
+	Debugw(string, ...interface{})
 	Security() SecurityLoggerInterface
 }
 

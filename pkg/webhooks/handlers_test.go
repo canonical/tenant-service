@@ -63,11 +63,9 @@ func TestAPI_TokenHook(t *testing.T) {
 			},
 		},
 		{
-			name:        "invalid request body",
-			requestBody: "not-json",
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
-			},
+			name:           "invalid request body",
+			requestBody:    "not-json",
+			setupMocks:     func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
@@ -77,7 +75,6 @@ func TestAPI_TokenHook(t *testing.T) {
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().HandleTokenHook(gomock.Any(), gomock.Any()).Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
@@ -90,6 +87,7 @@ func TestAPI_TokenHook(t *testing.T) {
 
 			mockService := NewMockServiceInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 
 			api := NewAPI(mockService, mockLogger)
 
@@ -142,17 +140,14 @@ func TestAPI_Registration(t *testing.T) {
 				Email: "user@example.com",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any())
 				mockSvc.EXPECT().HandleRegistration(gomock.Any(), "identity-123", "user@example.com").Return(nil)
 			},
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name:        "invalid request body",
-			requestBody: "not-json",
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
-			},
+			name:           "invalid request body",
+			requestBody:    "not-json",
+			setupMocks:     func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
@@ -162,9 +157,7 @@ func TestAPI_Registration(t *testing.T) {
 				Email: "error@example.com",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any())
 				mockSvc.EXPECT().HandleRegistration(gomock.Any(), "identity-456", "error@example.com").Return(errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
@@ -177,6 +170,7 @@ func TestAPI_Registration(t *testing.T) {
 
 			mockService := NewMockServiceInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 
 			api := NewAPI(mockService, mockLogger)
 
