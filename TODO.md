@@ -99,6 +99,9 @@ Kratos recovery link so the provisioned user receives an invitation email. This 
 - [ ] Add OpenTelemetry gRPC unary interceptor in `cmd/serve.go`
 - [ ] [#10](https://github.com/canonical/tenant-service/issues/10) Implement business metrics
       (e.g. `tenant_created_total`, `invite_sent_total`) in the service layer using `MonitorInterface`
+- [ ] Enhance structured logging with `tenant_id` context — add `tenant_id` to log fields in
+      service methods so per-tenant activity is observable via logs rather than Prometheus
+      (Prometheus `tenant_id` label is intentionally omitted due to unbounded cardinality)
 
 ### Technical debt
 

@@ -7,4 +7,5 @@ type MonitorInterface interface {
 	GetService() string
 	SetResponseTimeMetric(map[string]string, float64) error
 	SetDependencyAvailability(map[string]string, float64) error
+	IncrementCounter(map[string]string) error
 }

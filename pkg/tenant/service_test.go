@@ -169,7 +169,7 @@ func TestService_InviteMember(t *testing.T) {
 	testCases := []struct {
 		name         string
 		role         string
-		setupMocks   func(*MockStorageInterface, *MockAuthzInterface, *MockKratosClientInterface, *MockLoggerInterface)
+		setupMocks   func(*MockStorageInterface, *MockAuthzInterface, *MockKratosClientInterface, *MockLoggerInterface, *MockMonitorInterface)
 		expectedLink string
 		expectedCode string
 		expectedErr  bool
@@ -177,13 +177,14 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "success - new user as member",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", nil)
 				mockLogger.EXPECT().Infof(gomock.Any(), gomock.Any())
 				mockKratos.EXPECT().CreateIdentity(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(nil)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return(recoveryLink, recoveryCode, nil)
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "invitation_sent", "role": "member"}).Return(nil)
 			},
 			expectedLink: recoveryLink,
 			expectedCode: recoveryCode,
@@ -192,11 +193,12 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "success - existing user as owner",
 			role: "owner",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "owner").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenantID, identityID).Return(nil)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return(recoveryLink, recoveryCode, nil)
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "invitation_sent", "role": "owner"}).Return(nil)
 			},
 			expectedLink: recoveryLink,
 			expectedCode: recoveryCode,
@@ -205,11 +207,12 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "success - duplicate key treated as reinvite",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("", storage.ErrDuplicateKey)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(nil)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return(recoveryLink, recoveryCode, nil)
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "invitation_sent", "role": "member"}).Return(nil)
 			},
 			expectedLink: recoveryLink,
 			expectedCode: recoveryCode,
@@ -218,7 +221,7 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "error - failed to check identity",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", errors.New("kratos error"))
 				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
@@ -227,7 +230,7 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "error - failed to create identity",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", nil)
 				mockLogger.EXPECT().Infof(gomock.Any(), gomock.Any())
 				mockKratos.EXPECT().CreateIdentity(gomock.Any(), email).Return("", errors.New("kratos error"))
@@ -238,7 +241,7 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "error - failed to add member",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("", errors.New("storage error"))
 				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
@@ -248,7 +251,7 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "error - failed to assign authz",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(errors.New("authz error"))
@@ -259,7 +262,7 @@ func TestService_InviteMember(t *testing.T) {
 		{
 			name: "error - failed to create recovery link",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(nil)
@@ -285,7 +288,7 @@ func TestService_InviteMember(t *testing.T) {
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.InviteMember").Return(context.Background(), trace.SpanFromContext(context.Background()))
-			tc.setupMocks(mockStorage, mockAuthz, mockKratos, mockLogger)
+			tc.setupMocks(mockStorage, mockAuthz, mockKratos, mockLogger, mockMonitor)
 
 			link, code, err := s.InviteMember(context.Background(), tenantID, email, tc.role)
 
@@ -519,44 +522,47 @@ func TestService_ProvisionUser(t *testing.T) {
 	testCases := []struct {
 		name        string
 		role        string
-		setupMocks  func(*MockStorageInterface, *MockAuthzInterface, *MockKratosClientInterface)
+		setupMocks  func(*MockStorageInterface, *MockAuthzInterface, *MockKratosClientInterface, *MockMonitorInterface)
 		expectedErr bool
 	}{
 		{
 			name: "success - new user as member",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", nil)
 				mockKratos.EXPECT().CreateIdentity(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(nil)
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "user_provisioned", "role": "member"}).Return(nil)
 			},
 			expectedErr: false,
 		},
 		{
 			name: "success - existing user as owner",
 			role: "owner",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "owner").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenantID, identityID).Return(nil)
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "user_provisioned", "role": "owner"}).Return(nil)
 			},
 			expectedErr: false,
 		},
 		{
 			name: "success - admin role",
 			role: "admin",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "admin").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(nil)
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "user_provisioned", "role": "admin"}).Return(nil)
 			},
 			expectedErr: false,
 		},
 		{
 			name: "error - kratos error",
 			role: "member",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", errors.New("kratos error"))
 			},
 			expectedErr: true,
@@ -564,7 +570,7 @@ func TestService_ProvisionUser(t *testing.T) {
 		{
 			name: "error - unknown role",
 			role: "superadmin",
-			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "superadmin").Return("member-id", nil)
 			},
@@ -587,7 +593,7 @@ func TestService_ProvisionUser(t *testing.T) {
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.ProvisionUser").Return(context.Background(), trace.SpanFromContext(context.Background()))
-			tc.setupMocks(mockStorage, mockAuthz, mockKratos)
+			tc.setupMocks(mockStorage, mockAuthz, mockKratos, mockMonitor)
 
 			err := s.ProvisionUser(context.Background(), tenantID, email, tc.role)
 
