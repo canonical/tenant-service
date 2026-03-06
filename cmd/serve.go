@@ -30,6 +30,7 @@ import (
 	v0 "github.com/canonical/tenant-service/v0"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -169,6 +170,7 @@ func serve() error {
 	}
 
 	grpcServer := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(authMiddleware.GRPCInterceptor),
 	)
 	v0.RegisterTenantServiceServer(grpcServer, tenantHandler)

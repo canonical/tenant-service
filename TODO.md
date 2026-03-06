@@ -94,9 +94,9 @@ Kratos recovery link so the provisioned user receives an invitation email. This 
 
 ### Observability
 
-- [ ] Fix span status in service methods — call `span.RecordError(err)` and
+- [x] Fix span status in service methods — call `span.RecordError(err)` and
       `span.SetStatus(codes.Error, ...)` on all error paths (currently spans never record errors)
-- [ ] Add OpenTelemetry gRPC unary interceptor in `cmd/serve.go`
+- [x] Add OpenTelemetry gRPC unary interceptor in `cmd/serve.go`
 - [ ] [#10](https://github.com/canonical/tenant-service/issues/10) Implement business metrics
       (e.g. `tenant_created_total`, `invite_sent_total`) in the service layer using `MonitorInterface`
 - [ ] Enhance structured logging with `tenant_id` context — add `tenant_id` to log fields in
