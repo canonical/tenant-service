@@ -49,6 +49,12 @@ func (h *Handler) InviteMember(ctx context.Context, req *v0.InviteMemberRequest)
 
 	link, code, err := h.service.InviteMember(ctx, req.TenantId, req.Email, req.Role)
 	if err != nil {
+		h.logger.Errorw("failed to invite member",
+			"tenant_id", req.TenantId,
+			"email", req.Email,
+			"role", req.Role,
+			"error", err,
+		)
 		// In a real app, you might map specific error types to gRPC codes here
 		return nil, status.Errorf(codes.Internal, "failed to invite member: %v", err)
 	}
@@ -72,7 +78,7 @@ func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsReques
 
 	tenants, err := h.service.ListTenantsByUserID(ctx, userID)
 	if err != nil {
-		h.logger.Errorf("failed to list tenants: %v", err)
+		h.logger.Errorw("failed to list tenants", "user_id", userID, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list tenants: %v", err)
 	}
 
@@ -97,7 +103,7 @@ func (h *Handler) ListTenants(ctx context.Context, req *v0.ListTenantsRequest) (
 
 	tenants, err := h.service.ListTenants(ctx)
 	if err != nil {
-		h.logger.Errorf("failed to list all tenants: %v", err)
+		h.logger.Errorw("failed to list all tenants", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list all tenants: %v", err)
 	}
 
@@ -126,7 +132,7 @@ func (h *Handler) CreateTenant(ctx context.Context, req *v0.CreateTenantRequest)
 
 	tenant, err := h.service.CreateTenant(ctx, req.Name)
 	if err != nil {
-		h.logger.Errorf("failed to create tenant: %v", err)
+		h.logger.Errorw("failed to create tenant", "name", req.Name, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to create tenant: %v", err)
 	}
 
@@ -162,7 +168,7 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 
 	tenant, err := h.service.UpdateTenant(ctx, updateData, paths)
 	if err != nil {
-		h.logger.Errorf("failed to update tenant: %v", err)
+		h.logger.Errorw("failed to update tenant", "tenant_id", req.Tenant.Id, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to update tenant: %v", err)
 	}
 
@@ -181,7 +187,7 @@ func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest)
 	defer span.End()
 
 	if err := h.service.DeleteTenant(ctx, req.TenantId); err != nil {
-		h.logger.Errorf("failed to delete tenant: %v", err)
+		h.logger.Errorw("failed to delete tenant", "tenant_id", req.TenantId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to delete tenant: %v", err)
 	}
 
@@ -193,7 +199,12 @@ func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserReques
 	defer span.End()
 
 	if err := h.service.ProvisionUser(ctx, req.TenantId, req.Email, req.Role); err != nil {
-		h.logger.Errorf("failed to provision user: %v", err)
+		h.logger.Errorw("failed to provision user",
+			"tenant_id", req.TenantId,
+			"email", req.Email,
+			"role", req.Role,
+			"error", err,
+		)
 		return nil, status.Errorf(codes.Internal, "failed to provision user: %v", err)
 	}
 
@@ -212,7 +223,12 @@ func (h *Handler) UpdateTenantUser(ctx context.Context, req *v0.UpdateTenantUser
 
 	user, err := h.service.UpdateTenantUser(ctx, req.TenantId, req.UserId, req.Role)
 	if err != nil {
-		h.logger.Errorf("failed to update tenant user: %v", err)
+		h.logger.Errorw("failed to update tenant user",
+			"tenant_id", req.TenantId,
+			"user_id", req.UserId,
+			"role", req.Role,
+			"error", err,
+		)
 		return nil, status.Errorf(codes.Internal, "failed to update tenant user: %v", err)
 	}
 
@@ -231,7 +247,7 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 
 	tenants, err := h.service.ListUserTenants(ctx, req.UserId)
 	if err != nil {
-		h.logger.Errorf("failed to list user tenants: %v", err)
+		h.logger.Errorw("failed to list user tenants", "user_id", req.UserId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list user tenants: %v", err)
 	}
 
@@ -256,7 +272,7 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 
 	users, err := h.service.ListTenantUsers(ctx, req.TenantId)
 	if err != nil {
-		h.logger.Errorf("failed to list tenant users: %v", err)
+		h.logger.Errorw("failed to list tenant users", "tenant_id", req.TenantId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list tenant users: %v", err)
 	}
 

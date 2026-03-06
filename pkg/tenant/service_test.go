@@ -20,6 +20,19 @@ import (
 //go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_monitor.go -source=../../internal/monitoring/interfaces.go
 //go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_tracing.go -source=../../internal/tracing/interfaces.go
 
+// setupLoggerMock configures a MockLoggerInterface with AnyTimes() stubs for all
+// structured logging methods (w-suffix) and for the security logger.
+func setupLoggerMock(ctrl *gomock.Controller, mockLogger *MockLoggerInterface) *MockSecurityLoggerInterface {
+	mockSecurityLogger := NewMockSecurityLoggerInterface(ctrl)
+	mockLogger.EXPECT().Debugw(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Infow(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Errorw(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warnw(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Security().Return(mockSecurityLogger).AnyTimes()
+	mockSecurityLogger.EXPECT().AdminAction(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	return mockSecurityLogger
+}
+
 func TestService_ListTenantsByUserID(t *testing.T) {
 	userID := "user-123"
 	expectedTenants := []*types.Tenant{
@@ -70,6 +83,7 @@ func TestService_ListTenantsByUserID(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -135,6 +149,7 @@ func TestService_ListTenants(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -179,7 +194,6 @@ func TestService_InviteMember(t *testing.T) {
 			role: "member",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", nil)
-				mockLogger.EXPECT().Infof(gomock.Any(), gomock.Any())
 				mockKratos.EXPECT().CreateIdentity(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(nil)
@@ -223,7 +237,6 @@ func TestService_InviteMember(t *testing.T) {
 			role: "member",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", errors.New("kratos error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -232,9 +245,7 @@ func TestService_InviteMember(t *testing.T) {
 			role: "member",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", nil)
-				mockLogger.EXPECT().Infof(gomock.Any(), gomock.Any())
 				mockKratos.EXPECT().CreateIdentity(gomock.Any(), email).Return("", errors.New("kratos error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -244,7 +255,6 @@ func TestService_InviteMember(t *testing.T) {
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("", errors.New("storage error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -255,7 +265,6 @@ func TestService_InviteMember(t *testing.T) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(errors.New("authz error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -267,7 +276,6 @@ func TestService_InviteMember(t *testing.T) {
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenantID, identityID, "member").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantMember(gomock.Any(), tenantID, identityID).Return(nil)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return("", "", errors.New("kratos error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -283,6 +291,7 @@ func TestService_InviteMember(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -355,6 +364,7 @@ func TestService_CreateTenant(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -425,6 +435,7 @@ func TestService_UpdateTenant(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -478,7 +489,6 @@ func TestService_DeleteTenant(t *testing.T) {
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().DeleteTenant(gomock.Any(), tenantID).Return(nil)
 				mockAuthz.EXPECT().DeleteTenant(gomock.Any(), tenantID).Return(errors.New("authz error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: false,
 		},
@@ -494,6 +504,7 @@ func TestService_DeleteTenant(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -588,6 +599,7 @@ func TestService_ProvisionUser(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -646,6 +658,7 @@ func TestService_ListUserTenants(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -705,7 +718,6 @@ func TestService_ListTenantUsers(t *testing.T) {
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID).Return(members, nil)
 				mockKratos.EXPECT().GetIdentity(gomock.Any(), identityID1).Return(nil, errors.New("kratos error"))
-				mockLogger.EXPECT().Warn(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
 				mockKratos.EXPECT().GetIdentity(gomock.Any(), identityID2).Return(identity2, nil)
 			},
 			expectedErr: false,
@@ -729,6 +741,7 @@ func TestService_ListTenantUsers(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
@@ -815,6 +828,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			mockKratos := NewMockKratosClientInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
