@@ -5,10 +5,8 @@ package tenant
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -59,32 +57,32 @@ func (s *Service) recordError(span trace.Span, msg string, err error, keysAndVal
 	s.logger.Errorw(msg, append(keysAndValues, "error", err)...)
 }
 
-func (s *Service) ListTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error) {
+func (s *Service) ListTenantsByUserID(ctx context.Context, userID string, opts types.ListOptions) ([]*types.Tenant, string, error) {
 	ctx, span := s.tracer.Start(ctx, "tenant.Service.ListTenantsByUserID")
 	defer span.End()
 
 	s.logger.Debugw("listing tenants for user", "user_id", userID)
 
-	tenants, err := s.storage.ListTenantsByUserID(ctx, userID)
+	tenants, nextPageToken, err := s.storage.ListTenantsByUserID(ctx, userID, opts)
 	if err != nil {
 		s.recordError(span, "failed to list tenants for user", err, "user_id", userID)
 	}
-	return tenants, err
+	return tenants, nextPageToken, err
 }
 
-func (s *Service) ListTenants(ctx context.Context) ([]*types.Tenant, error) {
+func (s *Service) ListTenants(ctx context.Context, opts types.ListOptions) ([]*types.Tenant, string, error) {
 	ctx, span := s.tracer.Start(ctx, "tenant.Service.ListTenants")
 	defer span.End()
 
 	s.logger.Debugw("listing all tenants")
 
-	tenants, err := s.storage.ListTenants(ctx)
+	tenants, nextPageToken, err := s.storage.ListTenants(ctx, opts)
 	if err != nil {
 		s.recordError(span, "failed to list tenants", err)
-		return nil, err
+		return nil, "", err
 	}
 
-	return tenants, nil
+	return tenants, nextPageToken, nil
 }
 
 func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string) (string, string, error) {
@@ -326,31 +324,31 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	return nil
 }
 
-func (s *Service) ListUserTenants(ctx context.Context, userID string) ([]*types.Tenant, error) {
+func (s *Service) ListUserTenants(ctx context.Context, userID string, opts types.ListOptions) ([]*types.Tenant, string, error) {
 	ctx, span := s.tracer.Start(ctx, "admin.ListUserTenants")
 	defer span.End()
 
 	s.logger.Debugw("listing tenants for user (admin)", "user_id", userID)
 
-	tenants, err := s.storage.ListTenantsByUserID(ctx, userID)
+	tenants, nextPageToken, err := s.storage.ListTenantsByUserID(ctx, userID, opts)
 	if err != nil {
 		s.recordError(span, "failed to list tenants for user", err, "user_id", userID)
-		return nil, fmt.Errorf("failed to list tenants for user: %w", err)
+		return nil, "", fmt.Errorf("failed to list tenants for user: %w", err)
 	}
 
-	return tenants, nil
+	return tenants, nextPageToken, nil
 }
 
-func (s *Service) ListTenantUsers(ctx context.Context, tenantID string) ([]*types.TenantUser, error) {
+func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, opts types.ListOptions) ([]*types.TenantUser, string, error) {
 	ctx, span := s.tracer.Start(ctx, "admin.ListTenantUsers")
 	defer span.End()
 
 	s.logger.Debugw("listing members for tenant", "tenant_id", tenantID)
 
-	members, err := s.storage.ListMembersByTenantID(ctx, tenantID)
+	members, nextPageToken, err := s.storage.ListMembersByTenantID(ctx, tenantID, opts)
 	if err != nil {
 		s.recordError(span, "failed to list members", err, "tenant_id", tenantID)
-		return nil, fmt.Errorf("failed to list members: %w", err)
+		return nil, "", fmt.Errorf("failed to list members: %w", err)
 	}
 
 	var users []*types.TenantUser
@@ -382,7 +380,7 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string) ([]*type
 		})
 	}
 
-	return users, nil
+	return users, nextPageToken, nil
 }
 
 func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role string) (*types.TenantUser, error) {
@@ -398,7 +396,7 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 	)
 
 	// 1. Get current member to check if exists and current role
-	members, err := s.storage.ListMembersByTenantID(ctx, tenantID)
+	members, _, err := s.storage.ListMembersByTenantID(ctx, tenantID, types.ListOptions{})
 	if err != nil {
 		s.recordError(span, "failed to check current membership", err,
 			"tenant_id", tenantID,
@@ -529,19 +527,4 @@ func (s *Service) incrementCounter(operation, role string) {
 	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation, "role": role}); err != nil {
 		s.logger.Warnf("failed to increment counter %s: %v", operation, err)
 	}
-}
-
-func encodePageToken(offset uint64) string {
-	return base64.URLEncoding.EncodeToString([]byte(strconv.FormatUint(offset, 10)))
-}
-
-func decodePageToken(token string) (uint64, error) {
-	if token == "" {
-		return 0, nil
-	}
-	data, err := base64.URLEncoding.DecodeString(token)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseUint(string(data), 10, 64)
 }
