@@ -89,6 +89,7 @@ func TestHandler_InviteMember(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -153,7 +154,6 @@ func TestHandler_ListMyTenants(t *testing.T) {
 			ctx:  authentication.WithUserID(context.Background(), "user-123"),
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123").Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
@@ -168,6 +168,7 @@ func TestHandler_ListMyTenants(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -220,7 +221,6 @@ func TestHandler_ListTenants(t *testing.T) {
 			name: "service error",
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().ListTenants(gomock.Any()).Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr: true,
 		},
@@ -234,6 +234,7 @@ func TestHandler_ListTenants(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -291,7 +292,6 @@ func TestHandler_CreateTenant(t *testing.T) {
 			request: &v0.CreateTenantRequest{Name: "Test Tenant"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().CreateTenant(gomock.Any(), "Test Tenant").Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
@@ -306,6 +306,7 @@ func TestHandler_CreateTenant(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -372,7 +373,6 @@ func TestHandler_UpdateTenant(t *testing.T) {
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().UpdateTenant(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
@@ -387,6 +387,7 @@ func TestHandler_UpdateTenant(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -437,7 +438,6 @@ func TestHandler_DeleteTenant(t *testing.T) {
 			request: &v0.DeleteTenantRequest{TenantId: "tenant-123"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().DeleteTenant(gomock.Any(), "tenant-123").Return(errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr: true,
 		},
@@ -451,6 +451,7 @@ func TestHandler_DeleteTenant(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -501,7 +502,6 @@ func TestHandler_ProvisionUser(t *testing.T) {
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "tenant-123", "user@example.com", "member").
 					Return(errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr: true,
 		},
@@ -515,6 +515,7 @@ func TestHandler_ProvisionUser(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -583,7 +584,6 @@ func TestHandler_UpdateTenantUser(t *testing.T) {
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().UpdateTenantUser(gomock.Any(), "tenant-123", "user-123", "owner").
 					Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
@@ -598,6 +598,7 @@ func TestHandler_UpdateTenantUser(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -653,7 +654,6 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			request: &v0.ListUserTenantsRequest{UserId: "user-123"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "user-123").Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr: true,
 		},
@@ -667,6 +667,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
@@ -717,7 +718,6 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			request: &v0.ListTenantUsersRequest{TenantId: "tenant-123"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "tenant-123").Return(nil, errors.New("service error"))
-				mockLogger.EXPECT().Errorf(gomock.Any(), gomock.Any())
 			},
 			wantErr: true,
 		},
@@ -731,6 +731,7 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			mockSvc := NewMockServiceInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)

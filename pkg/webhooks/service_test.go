@@ -19,6 +19,19 @@ import (
 //go:generate mockgen -build_flags=--mod=mod -package webhooks -destination ./mock_monitor.go -source=../../internal/monitoring/interfaces.go
 //go:generate mockgen -build_flags=--mod=mod -package webhooks -destination ./mock_tracing.go -source=../../internal/tracing/interfaces.go
 
+// setupLoggerMock configures a MockLoggerInterface with AnyTimes() stubs for all
+// structured logging methods (w-suffix) and for the security logger.
+func setupLoggerMock(ctrl *gomock.Controller, mockLogger *MockLoggerInterface) *MockSecurityLoggerInterface {
+	mockSecurityLogger := NewMockSecurityLoggerInterface(ctrl)
+	mockLogger.EXPECT().Debugw(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Infow(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Errorw(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Warnw(gomock.Any(), gomock.Any()).AnyTimes()
+	mockLogger.EXPECT().Security().Return(mockSecurityLogger).AnyTimes()
+	mockSecurityLogger.EXPECT().AdminAction(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	return mockSecurityLogger
+}
+
 func TestService_HandleRegistration(t *testing.T) {
 	identityID := "identity-123"
 	email := "user@example.com"
@@ -36,7 +49,6 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthorizerInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any(), gomock.Any())
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, t *types.Tenant) (*types.Tenant, error) {
 						if t.Name != "user@example.com's Org" {
@@ -49,7 +61,6 @@ func TestService_HandleRegistration(t *testing.T) {
 					})
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID, "owner").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenant.ID, identityID).Return(nil)
-				mockLogger.EXPECT().Infof(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			expectedErr: false,
 		},
@@ -58,7 +69,6 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      "",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthorizerInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any(), gomock.Any())
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, t *types.Tenant) (*types.Tenant, error) {
 						if t.Name != "" {
@@ -68,7 +78,6 @@ func TestService_HandleRegistration(t *testing.T) {
 					})
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID, "owner").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenant.ID, identityID).Return(nil)
-				mockLogger.EXPECT().Infof(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			expectedErr: false,
 		},
@@ -77,7 +86,6 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: "",
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthorizerInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -86,7 +94,6 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthorizerInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any(), gomock.Any())
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).Return(nil, errors.New("storage error"))
 			},
 			expectedErr: true,
@@ -96,7 +103,6 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthorizerInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any(), gomock.Any())
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).Return(tenant, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID, "owner").Return("", errors.New("storage error"))
 			},
@@ -107,7 +113,6 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthorizerInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any(), gomock.Any())
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).Return(tenant, nil)
 				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID, "owner").Return("member-id", nil)
 				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenant.ID, identityID).Return(errors.New("authz error"))
@@ -125,6 +130,7 @@ func TestService_HandleRegistration(t *testing.T) {
 			mockAuthz := NewMockAuthorizerInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockTracer, mockMonitor, mockLogger)
@@ -166,7 +172,6 @@ func TestService_HandleTokenHook(t *testing.T) {
 				Session: oauth2.NewSession(userID),
 			},
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any()).Times(2)
 				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), userID).Return(tenants, nil)
 			},
 			expectedErr: false,
@@ -192,7 +197,6 @@ func TestService_HandleTokenHook(t *testing.T) {
 				Session: oauth2.NewSession(userID),
 			},
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any()).Times(2)
 				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), userID).Return([]*types.Tenant{}, nil)
 			},
 			expectedErr: false,
@@ -212,7 +216,6 @@ func TestService_HandleTokenHook(t *testing.T) {
 				Session: oauth2.NewSession(""),
 			},
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -220,7 +223,6 @@ func TestService_HandleTokenHook(t *testing.T) {
 			name:    "error - nil session",
 			request: &oauth2.TokenHookRequest{},
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any())
 			},
 			expectedErr: true,
 		},
@@ -230,7 +232,6 @@ func TestService_HandleTokenHook(t *testing.T) {
 				Session: oauth2.NewSession(userID),
 			},
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
-				mockLogger.EXPECT().Debugf(gomock.Any(), gomock.Any()).Times(2)
 				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), userID).Return(nil, errors.New("storage error"))
 			},
 			expectedErr: true,
@@ -246,6 +247,7 @@ func TestService_HandleTokenHook(t *testing.T) {
 			mockAuthz := NewMockAuthorizerInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
 			s := NewService(mockStorage, mockAuthz, mockTracer, mockMonitor, mockLogger)
