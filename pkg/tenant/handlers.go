@@ -76,7 +76,8 @@ func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsReques
 		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 	}
 
-	tenants, err := h.service.ListTenantsByUserID(ctx, userID)
+	opts := types.ListOptions{PageToken: req.PageToken, PageSize: req.PageSize}
+	tenants, nextPageToken, err := h.service.ListTenantsByUserID(ctx, userID, opts)
 	if err != nil {
 		h.logger.Errorw("failed to list tenants", "user_id", userID, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list tenants: %v", err)
@@ -93,7 +94,8 @@ func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsReques
 	}
 
 	return &v0.ListMyTenantsResponse{
-		Tenants: pbTenants,
+		Tenants:       pbTenants,
+		NextPageToken: nextPageToken,
 	}, nil
 }
 
@@ -101,7 +103,8 @@ func (h *Handler) ListTenants(ctx context.Context, req *v0.ListTenantsRequest) (
 	ctx, span := h.tracer.Start(ctx, "tenant.Handler.ListTenants")
 	defer span.End()
 
-	tenants, err := h.service.ListTenants(ctx)
+	opts := types.ListOptions{PageToken: req.PageToken, PageSize: req.PageSize}
+	tenants, nextPageToken, err := h.service.ListTenants(ctx, opts)
 	if err != nil {
 		h.logger.Errorw("failed to list all tenants", "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list all tenants: %v", err)
@@ -118,7 +121,8 @@ func (h *Handler) ListTenants(ctx context.Context, req *v0.ListTenantsRequest) (
 	}
 
 	return &v0.ListTenantsResponse{
-		Tenants: pbTenants,
+		Tenants:       pbTenants,
+		NextPageToken: nextPageToken,
 	}, nil
 }
 
@@ -245,7 +249,8 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 	ctx, span := h.tracer.Start(ctx, "tenant.Handler.ListUserTenants")
 	defer span.End()
 
-	tenants, err := h.service.ListUserTenants(ctx, req.UserId)
+	opts := types.ListOptions{PageToken: req.PageToken, PageSize: req.PageSize}
+	tenants, nextPageToken, err := h.service.ListUserTenants(ctx, req.UserId, opts)
 	if err != nil {
 		h.logger.Errorw("failed to list user tenants", "user_id", req.UserId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list user tenants: %v", err)
@@ -262,7 +267,8 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 	}
 
 	return &v0.ListUserTenantsResponse{
-		Tenants: pbTenants,
+		Tenants:       pbTenants,
+		NextPageToken: nextPageToken,
 	}, nil
 }
 
@@ -270,7 +276,8 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 	ctx, span := h.tracer.Start(ctx, "tenant.Handler.ListTenantUsers")
 	defer span.End()
 
-	users, err := h.service.ListTenantUsers(ctx, req.TenantId)
+	opts := types.ListOptions{PageToken: req.PageToken, PageSize: req.PageSize}
+	users, nextPageToken, err := h.service.ListTenantUsers(ctx, req.TenantId, opts)
 	if err != nil {
 		h.logger.Errorw("failed to list tenant users", "tenant_id", req.TenantId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list tenant users: %v", err)
@@ -286,6 +293,7 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 	}
 
 	return &v0.ListTenantUsersResponse{
-		Users: pbUsers,
+		Users:         pbUsers,
+		NextPageToken: nextPageToken,
 	}, nil
 }

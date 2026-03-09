@@ -138,7 +138,7 @@ func TestHandler_ListMyTenants(t *testing.T) {
 			name: "success",
 			ctx:  authentication.WithUserID(context.Background(), "user-123"),
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123").Return(tenants, nil)
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123", gomock.Any()).Return(tenants, "", nil)
 			},
 			wantErr: false,
 		},
@@ -153,7 +153,7 @@ func TestHandler_ListMyTenants(t *testing.T) {
 			name: "service error",
 			ctx:  authentication.WithUserID(context.Background(), "user-123"),
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123").Return(nil, errors.New("service error"))
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123", gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
@@ -213,14 +213,14 @@ func TestHandler_ListTenants(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenants(gomock.Any()).Return(tenants, nil)
+				mockSvc.EXPECT().ListTenants(gomock.Any(), gomock.Any()).Return(tenants, "", nil)
 			},
 			wantErr: false,
 		},
 		{
 			name: "service error",
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenants(gomock.Any()).Return(nil, errors.New("service error"))
+				mockSvc.EXPECT().ListTenants(gomock.Any(), gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr: true,
 		},
@@ -645,7 +645,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			name:    "success",
 			request: &v0.ListUserTenantsRequest{UserId: "user-123"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "user-123").Return(tenants, nil)
+				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "user-123", gomock.Any()).Return(tenants, "", nil)
 			},
 			wantErr: false,
 		},
@@ -653,7 +653,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			name:    "service error",
 			request: &v0.ListUserTenantsRequest{UserId: "user-123"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "user-123").Return(nil, errors.New("service error"))
+				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "user-123", gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr: true,
 		},
@@ -709,7 +709,7 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			name:    "success",
 			request: &v0.ListTenantUsersRequest{TenantId: "tenant-123"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "tenant-123").Return(users, nil)
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "tenant-123", gomock.Any()).Return(users, "", nil)
 			},
 			wantErr: false,
 		},
@@ -717,7 +717,7 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			name:    "service error",
 			request: &v0.ListTenantUsersRequest{TenantId: "tenant-123"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "tenant-123").Return(nil, errors.New("service error"))
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "tenant-123", gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr: true,
 		},
