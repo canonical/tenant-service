@@ -77,10 +77,120 @@ Kratos recovery link so the provisioned user receives an invitation email. This 
 
 ### [#12](https://github.com/canonical/tenant-service/issues/12) — Add pagination
 
-- [ ] Add `page_token` + `page_size` fields to `ListTenants`, `ListTenantUsers`,
+- [x] Add `page_token` + `page_size` fields to `ListTenants`, `ListTenantUsers`,
       `ListMyTenants`, `ListUserTenants` request protos
-- [ ] Implement cursor-based pagination in `internal/storage/storage.go` using UUIDv7 ordering
-- [ ] Document max page size
+- [x] Implement cursor-based pagination in `internal/storage/storage.go` using UUIDv7 ordering
+- [x] Document max page size (100, enforced via `types.ListOptions.ResolvePageSize()`)
+
+#### Follow-up: pagination × OpenFGA authorization
+
+Currently `ListMyTenants` and `ListTenantsByUserID` enforce visibility via a DB `JOIN memberships`
+(the membership table mirrors OpenFGA tuples), so no per-row OpenFGA check is required.
+`ListTenants` and `ListTenantUsers` need only a single gate `Check` at entry (not per-row).
+
+When more sophisticated per-row authz is required (e.g. attribute-based visibility, or decoupling
+the membership table from OpenFGA as the source of truth), the OpenFGA docs ("Search with
+Permissions") and Zanzibar paper give clear guidance on the trade-offs. There are three patterns;
+the right choice depends on how many objects the user can access and the total object count.
+
+---
+
+**Option A — Search then BatchCheck (recommended for paginated APIs)**
+
+Paginate the DB normally, then call `/batch-check` on the returned page to filter out any rows
+the caller is not permitted to see. Repeat if needed.
+
+```
+// 1. Fetch a page from DB (cursor-based, as today).
+tenants, nextToken, err := storage.ListTenants(ctx, opts)
+
+// 2. BatchCheck every tenant ID against the caller.
+checks := make([]openfga.CheckRequest, len(tenants))
+for i, t := range tenants {
+    checks[i] = openfga.CheckRequest{User: caller, Relation: "can_view", Object: "tenant:" + t.ID}
+}
+results, err := authz.BatchCheck(ctx, checks) // internal/authorization
+
+// 3. Filter denied rows.
+allowed := tenants[:0]
+for i, r := range results {
+    if r.Allowed { allowed = append(allowed, tenants[i]) }
+}
+```
+
+- Correct page sizes and cursor integrity: paging happens entirely in the DB layer.
+- BatchCheck batches N checks in a single gRPC call to OpenFGA — much lower latency than N
+  individual Check calls. The OpenFGA server also runs checks concurrently internally.
+- Scales to arbitrarily large data sets because only one page's worth of IDs is sent per request.
+- Con: If many rows on a given page are denied (sparse permissions), the effective page may be
+  smaller than requested. Callers should treat a non-empty `next_page_token` as the signal to
+  continue, not the page length.
+- **This is the pattern OpenFGA explicitly recommends for paginated listing** (see "Search with
+  Permissions — Option 1", and the BatchCheck "When to use" guidance).
+
+---
+
+**Option B — ListObjects-first (only for small, non-paginated sets)**
+
+Call `ListObjects` once to get all permitted IDs, then restrict the DB query with
+`WHERE id = ANY($ids)`.
+
+```
+ids, err := authz.ListObjects(ctx, caller, "can_view", "tenant")
+tenants, nextToken, err := storage.ListTenants(ctx, types.ListOptions{
+    PageToken:  opts.PageToken,
+    PageSize:   opts.PageSize,
+    AllowedIDs: ids, // new field — generates WHERE id = ANY($1)
+})
+```
+
+- Exact, deterministic page sizes.
+- **Con — not suitable for paginated APIs at scale:** `ListObjects` returns *all* authorized IDs
+  in a single (deadline-bounded, default 3 s) call with a default cap of 1000 results. You must
+  receive the complete list before you can begin sorting/filtering in the DB. This breaks
+  pagination UX and wastes memory.
+- The OpenFGA docs state explicitly: "As the number of objects increases, this solution becomes
+  impractical because you would need to paginate over multiple pages [of ListObjects] to get the
+  entire list before being able to search and sort. A partial list is not enough because you won't
+  be able to sort using it." (Search with Permissions — Option 3, scenario C/D)
+- Only appropriate when: total objects the user can access is low (~≤1000) **and** the use-case
+  does not require server-side sort/filter on metadata (names, dates, etc.).
+- If used, cache the `ListObjects` result with a short TTL (keyed on `(userID, relation, type)`)
+  to amortise cost across pages of the same listing session.
+
+---
+
+**Option C — Local index from changes endpoint (for Google Drive–scale scenarios)**
+
+Consume the `GET /changes` (ReadChanges) endpoint to build a local authorisation index, intersect
+that with DB results, and call `/check` for borderline cases only. Described in OpenFGA "Search
+with Permissions — Option 2". Not appropriate for this service at current scale.
+
+---
+
+**Recommendation:** implement **Option A (BatchCheck)**. It composes cleanly with the existing
+cursor-based pagination, scales without bounds, and is the officially recommended pattern.
+
+BatchCheck is available in the OpenFGA Go SDK (`>=v0.8.0` server-side).
+Always pass `authorizationModelId` in BatchCheck calls (avoids an extra DB round-trip on the
+OpenFGA side — documented in "Best Practices of Managing Tuples and Invoking APIs").
+
+**Consistency note (from Zanzibar paper / OpenFGA consistency docs):**
+Zanzibar introduced *zookies* — opaque consistency tokens returned by writes and supplied to
+subsequent reads to guarantee "new-enemy" safety (a permission grant is never missed). OpenFGA
+does not yet implement zookies. In the interim, use `HIGHER_CONSISTENCY` mode on the BatchCheck
+call for `ListTenantUsers` (role visibility after an `UpdateTenantUser`). A practical heuristic:
+if `updated_at` on the tenant/membership row is within the OpenFGA cache TTL window, use
+`HIGHER_CONSISTENCY`; otherwise `MINIMIZE_LATENCY` is safe and cheap.
+
+- [ ] Add `BatchCheck(ctx, []CheckRequest) ([]CheckResult, error)` to `AuthorizerInterface`
+      and implement it in `internal/authorization/authorization.go` using the OpenFGA SDK
+- [ ] In service `ListTenants` / `ListTenantUsers`: after fetching each page from storage, call
+      `authz.BatchCheck` and filter the results before returning
+- [ ] Always pass `authorizationModelId` to all OpenFGA API calls
+- [ ] Use `HIGHER_CONSISTENCY` when `membership.updated_at` is within the cache TTL window
+- [ ] Consider removing the `JOIN memberships` authz shortcut from `listTenantsByUserID`
+      once OpenFGA is the sole source of truth for membership
 
 ### [#14](https://github.com/canonical/tenant-service/issues/14) — Handle client users
 

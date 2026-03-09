@@ -89,16 +89,24 @@ message UpdateTenantUserResponse {
   TenantUser user = 1;
 }
 
-message ListMyTenantsRequest {}
+message ListMyTenantsRequest {
+    string page_token = 1;
+    int32 page_size = 2;
+}
 
 message ListMyTenantsResponse {
     repeated Tenant tenants = 1;
+    string next_page_token = 2;
 }
 
-message ListTenantsRequest {}
+message ListTenantsRequest {
+    string page_token = 1;
+    int32 page_size = 2;
+}
 
 message ListTenantsResponse {
     repeated Tenant tenants = 1;
+    string next_page_token = 2;
 }
 
 message Tenant {
@@ -122,10 +130,13 @@ message InviteMemberResponse {
 
 message ListUserTenantsRequest {
     string user_id = 1;
+    string page_token = 2;
+    int32 page_size = 3;
 }
 
 message ListUserTenantsResponse {
     repeated Tenant tenants = 1;
+    string next_page_token = 2;
 }
 
 message CreateTenantRequest {
@@ -161,10 +172,13 @@ message ProvisionUserResponse {
 
 message ListTenantUsersRequest {
     string tenant_id = 1;
+    string page_token = 2;
+    int32 page_size = 3;
 }
 
 message ListTenantUsersResponse {
     repeated TenantUser users = 1;
+    string next_page_token = 2;
 }
 
 message TenantUser {

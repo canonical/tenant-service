@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+const (
+	defaultPageSize int32 = 100
+	maxPageSize     int32 = 100
+)
+
 type Tenant struct {
 	ID        string    `db:"id"`
 	Name      string    `db:"name"`
@@ -26,4 +31,20 @@ type TenantUser struct {
 	UserID string
 	Email  string
 	Role   string
+}
+
+// ListOptions holds pagination parameters for List* operations.
+// TODO: add Enabled *bool and Role string filter fields once issue #12 follow-up work is done
+// (migrating showDisabled from ListActiveTenantsByUserID requires changes across pkg/webhooks).
+type ListOptions struct {
+	PageToken string
+	PageSize  int32
+}
+
+// ResolvePageSize returns the effective page size, clamped between 1 and maxPageSize.
+func (o ListOptions) ResolvePageSize() uint64 {
+	if o.PageSize <= 0 || o.PageSize > maxPageSize {
+		return uint64(defaultPageSize)
+	}
+	return uint64(o.PageSize)
 }
