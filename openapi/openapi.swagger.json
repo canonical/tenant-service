@@ -48,7 +48,7 @@
         ]
       }
     },
-    "/api/v0/tenants/{tenantId}/invites": {
+    "/api/v0/tenants/{tenant_id}/invites": {
       "post": {
         "operationId": "TenantService_InviteMember",
         "responses": {
@@ -61,7 +61,7 @@
         },
         "parameters": [
           {
-            "name": "tenantId",
+            "name": "tenant_id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -136,7 +136,7 @@
         ]
       }
     },
-    "/api/v0/users/{userId}/tenants": {
+    "/api/v0/users/{user_id}/tenants": {
       "get": {
         "operationId": "TenantService_ListUserTenants",
         "responses": {
@@ -149,7 +149,7 @@
         },
         "parameters": [
           {
-            "name": "userId",
+            "name": "user_id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -173,7 +173,7 @@
         ]
       }
     },
-    "/api/v0/tenants/{tenantId}/users": {
+    "/api/v0/tenants/{tenant_id}/users": {
       "get": {
         "operationId": "TenantService_ListTenantUsers",
         "responses": {
@@ -186,7 +186,7 @@
         },
         "parameters": [
           {
-            "name": "tenantId",
+            "name": "tenant_id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -221,7 +221,7 @@
         },
         "parameters": [
           {
-            "name": "tenantId",
+            "name": "tenant_id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -272,7 +272,7 @@
         ]
       }
     },
-    "/api/v0/tenants/{tenantId}": {
+    "/api/v0/tenants/{tenant_id}": {
       "delete": {
         "operationId": "TenantService_DeleteTenant",
         "responses": {
@@ -285,7 +285,7 @@
         },
         "parameters": [
           {
-            "name": "tenantId",
+            "name": "tenant_id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -296,7 +296,7 @@
         ]
       }
     },
-    "/api/v0/tenants/{tenantId}/users/{userId}": {
+    "/api/v0/tenants/{tenant_id}/users/{user_id}": {
       "patch": {
         "operationId": "TenantService_UpdateTenantUser",
         "responses": {
@@ -309,13 +309,13 @@
         },
         "parameters": [
           {
-            "name": "tenantId",
+            "name": "tenant_id",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
-            "name": "userId",
+            "name": "user_id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -367,7 +367,7 @@
             "name": {
               "type": "string"
             },
-            "createdAt": {
+            "created_at": {
               "type": "string"
             },
             "enabled": {
@@ -375,7 +375,7 @@
             }
           }
         },
-        "updateMask": {
+        "update_mask": {
           "type": "string"
         }
       }
@@ -523,7 +523,7 @@
         "name": {
           "type": "string"
         },
-        "createdAt": {
+        "created_at": {
           "type": "string"
         },
         "enabled": {
@@ -534,7 +534,7 @@
     "tenantTenantUser": {
       "type": "object",
       "properties": {
-        "userId": {
+        "user_id": {
           "type": "string"
         },
         "email": {

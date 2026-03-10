@@ -421,7 +421,11 @@ func encodePageToken(id string) string {
 func decodePageToken(token string) (string, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
-		return "", err
+		return "", ErrInvalidPageToken
 	}
-	return string(raw), nil
+	parsed, err := uuid.Parse(string(raw))
+	if err != nil {
+		return "", ErrInvalidPageToken
+	}
+	return parsed.String(), nil
 }

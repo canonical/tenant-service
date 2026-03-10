@@ -5,7 +5,6 @@ components:
                 email:
                     type: string
                 role:
-                    title: owner, admin, member
                     type: string
             type: object
         TenantServiceProvisionUserBody:
@@ -19,14 +18,14 @@ components:
             properties:
                 tenant:
                     properties:
-                        createdAt:
+                        created_at:
                             type: string
                         enabled:
                             type: boolean
                         name:
                             type: string
                     type: object
-                updateMask:
+                update_mask:
                     type: string
             type: object
         TenantServiceUpdateTenantUserBody:
@@ -73,6 +72,8 @@ components:
             type: object
         tenantListMyTenantsResponse:
             properties:
+                next_page_token:
+                    type: string
                 tenants:
                     items:
                         $ref: '#/components/schemas/tenantTenant'
@@ -80,6 +81,8 @@ components:
             type: object
         tenantListTenantUsersResponse:
             properties:
+                next_page_token:
+                    type: string
                 users:
                     items:
                         $ref: '#/components/schemas/tenantTenantUser'
@@ -87,6 +90,8 @@ components:
             type: object
         tenantListTenantsResponse:
             properties:
+                next_page_token:
+                    type: string
                 tenants:
                     items:
                         $ref: '#/components/schemas/tenantTenant'
@@ -94,6 +99,8 @@ components:
             type: object
         tenantListUserTenantsResponse:
             properties:
+                next_page_token:
+                    type: string
                 tenants:
                     items:
                         $ref: '#/components/schemas/tenantTenant'
@@ -106,7 +113,7 @@ components:
             type: object
         tenantTenant:
             properties:
-                createdAt:
+                created_at:
                     type: string
                 enabled:
                     type: boolean
@@ -121,7 +128,7 @@ components:
                     type: string
                 role:
                     type: string
-                userId:
+                user_id:
                     type: string
             type: object
         tenantUpdateTenantResponse:
@@ -142,6 +149,16 @@ paths:
     /api/v0/me/tenants:
         get:
             operationId: TenantService_ListMyTenants
+            parameters:
+                - in: query
+                  name: page_token
+                  schema:
+                    type: string
+                - in: query
+                  name: page_size
+                  schema:
+                    format: int32
+                    type: integer
             responses:
                 default:
                     content:
@@ -155,6 +172,16 @@ paths:
     /api/v0/tenants:
         get:
             operationId: TenantService_ListTenants
+            parameters:
+                - in: query
+                  name: page_token
+                  schema:
+                    type: string
+                - in: query
+                  name: page_size
+                  schema:
+                    format: int32
+                    type: integer
             responses:
                 default:
                     content:
@@ -208,12 +235,12 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /api/v0/tenants/{tenantId}:
+    /api/v0/tenants/{tenant_id}:
         delete:
             operationId: TenantService_DeleteTenant
             parameters:
                 - in: path
-                  name: tenantId
+                  name: tenant_id
                   required: true
                   schema:
                     type: string
@@ -226,12 +253,12 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /api/v0/tenants/{tenantId}/invites:
+    /api/v0/tenants/{tenant_id}/invites:
         post:
             operationId: TenantService_InviteMember
             parameters:
                 - in: path
-                  name: tenantId
+                  name: tenant_id
                   required: true
                   schema:
                     type: string
@@ -251,15 +278,24 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /api/v0/tenants/{tenantId}/users:
+    /api/v0/tenants/{tenant_id}/users:
         get:
             operationId: TenantService_ListTenantUsers
             parameters:
                 - in: path
-                  name: tenantId
+                  name: tenant_id
                   required: true
                   schema:
                     type: string
+                - in: query
+                  name: page_token
+                  schema:
+                    type: string
+                - in: query
+                  name: page_size
+                  schema:
+                    format: int32
+                    type: integer
             responses:
                 default:
                     content:
@@ -273,7 +309,7 @@ paths:
             operationId: TenantService_ProvisionUser
             parameters:
                 - in: path
-                  name: tenantId
+                  name: tenant_id
                   required: true
                   schema:
                     type: string
@@ -293,17 +329,17 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /api/v0/tenants/{tenantId}/users/{userId}:
+    /api/v0/tenants/{tenant_id}/users/{user_id}:
         patch:
             operationId: TenantService_UpdateTenantUser
             parameters:
                 - in: path
-                  name: tenantId
+                  name: tenant_id
                   required: true
                   schema:
                     type: string
                 - in: path
-                  name: userId
+                  name: user_id
                   required: true
                   schema:
                     type: string
@@ -323,15 +359,24 @@ paths:
                     description: An unexpected error response.
             tags:
                 - TenantService
-    /api/v0/users/{userId}/tenants:
+    /api/v0/users/{user_id}/tenants:
         get:
             operationId: TenantService_ListUserTenants
             parameters:
                 - in: path
-                  name: userId
+                  name: user_id
                   required: true
                   schema:
                     type: string
+                - in: query
+                  name: page_token
+                  schema:
+                    type: string
+                - in: query
+                  name: page_size
+                  schema:
+                    format: int32
+                    type: integer
             responses:
                 default:
                     content:
