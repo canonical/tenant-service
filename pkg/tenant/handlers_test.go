@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
 	v0 "github.com/canonical/tenant-service/v0"
@@ -18,6 +19,14 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
+
+var testValidator = func() protovalidate.Validator {
+	v, err := protovalidate.New()
+	if err != nil {
+		panic(err)
+	}
+	return v
+}()
 
 //go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_tenant.go -source=./interfaces.go
 //go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_logger.go -source=../../internal/logging/interfaces.go
@@ -35,49 +44,62 @@ func TestHandler_InviteMember(t *testing.T) {
 		{
 			name: "success",
 			request: &v0.InviteMemberRequest{
-				TenantId: "tenant-123",
+				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
 				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().InviteMember(gomock.Any(), "tenant-123", "user@example.com", "member").
+				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").
 					Return("https://link", "code123", nil)
 			},
 			wantErr: false,
 		},
 		{
-			name: "missing tenant_id",
-			request: &v0.InviteMemberRequest{
-				Email: "user@example.com",
-				Role:  "member",
-			},
-			setupMocks: func(mockSvc *MockServiceInterface) {},
-			wantErr:    true,
-			wantCode:   codes.InvalidArgument,
-		},
-		{
-			name: "missing email",
-			request: &v0.InviteMemberRequest{
-				TenantId: "tenant-123",
-				Role:     "member",
-			},
-			setupMocks: func(mockSvc *MockServiceInterface) {},
-			wantErr:    true,
-			wantCode:   codes.InvalidArgument,
-		},
-		{
 			name: "service error",
 			request: &v0.InviteMemberRequest{
-				TenantId: "tenant-123",
+				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
 				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().InviteMember(gomock.Any(), "tenant-123", "user@example.com", "member").
+				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").
 					Return("", "", errors.New("service error"))
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
+		},
+		{
+			name: "invalid tenant_id",
+			request: &v0.InviteMemberRequest{
+				TenantId: "not-a-uuid",
+				Email:    "user@example.com",
+				Role:     "member",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
+		},
+		{
+			name: "invalid email",
+			request: &v0.InviteMemberRequest{
+				TenantId: "11111111-1111-1111-1111-111111111111",
+				Email:    "not-an-email",
+				Role:     "member",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
+		},
+		{
+			name: "empty role",
+			request: &v0.InviteMemberRequest{
+				TenantId: "11111111-1111-1111-1111-111111111111",
+				Email:    "user@example.com",
+				Role:     "",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -92,7 +114,7 @@ func TestHandler_InviteMember(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.InviteMember").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -128,11 +150,12 @@ func TestHandler_ListMyTenants(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		ctx        context.Context
-		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr    bool
-		wantCode   codes.Code
+		name              string
+		ctx               context.Context
+		setupMocks        func(*MockServiceInterface, *MockLoggerInterface)
+		wantErr           bool
+		wantCode          codes.Code
+		wantNextPageToken string
 	}{
 		{
 			name: "success",
@@ -141,6 +164,15 @@ func TestHandler_ListMyTenants(t *testing.T) {
 				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123", gomock.Any()).Return(tenants, "", nil)
 			},
 			wantErr: false,
+		},
+		{
+			name: "success with next page token",
+			ctx:  authentication.WithUserID(context.Background(), "user-123"),
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123", gomock.Any()).Return(tenants, "next-token-abc", nil)
+			},
+			wantErr:           false,
+			wantNextPageToken: "next-token-abc",
 		},
 		{
 			name:       "unauthenticated",
@@ -171,7 +203,7 @@ func TestHandler_ListMyTenants(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.ListMyTenants").
 				Return(tt.ctx, trace.SpanFromContext(tt.ctx))
@@ -194,6 +226,9 @@ func TestHandler_ListMyTenants(t *testing.T) {
 				if resp == nil || len(resp.Tenants) != len(tenants) {
 					t.Errorf("expected %d tenants, got %v", len(tenants), resp)
 				}
+				if resp != nil && resp.NextPageToken != tt.wantNextPageToken {
+					t.Errorf("expected NextPageToken %q, got %q", tt.wantNextPageToken, resp.NextPageToken)
+				}
 			}
 		})
 	}
@@ -206,9 +241,10 @@ func TestHandler_ListTenants(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr    bool
+		name              string
+		setupMocks        func(*MockServiceInterface, *MockLoggerInterface)
+		wantErr           bool
+		wantNextPageToken string
 	}{
 		{
 			name: "success",
@@ -216,6 +252,14 @@ func TestHandler_ListTenants(t *testing.T) {
 				mockSvc.EXPECT().ListTenants(gomock.Any(), gomock.Any()).Return(tenants, "", nil)
 			},
 			wantErr: false,
+		},
+		{
+			name: "success with next page token",
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().ListTenants(gomock.Any(), gomock.Any()).Return(tenants, "next-token-xyz", nil)
+			},
+			wantErr:           false,
+			wantNextPageToken: "next-token-xyz",
 		},
 		{
 			name: "service error",
@@ -237,7 +281,7 @@ func TestHandler_ListTenants(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.ListTenants").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -255,6 +299,9 @@ func TestHandler_ListTenants(t *testing.T) {
 				}
 				if resp == nil {
 					t.Error("expected response but got nil")
+				}
+				if resp != nil && resp.NextPageToken != tt.wantNextPageToken {
+					t.Errorf("expected NextPageToken %q, got %q", tt.wantNextPageToken, resp.NextPageToken)
 				}
 			}
 		})
@@ -281,13 +328,6 @@ func TestHandler_CreateTenant(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:       "missing name",
-			request:    &v0.CreateTenantRequest{},
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
-			wantErr:    true,
-			wantCode:   codes.InvalidArgument,
-		},
-		{
 			name:    "service error",
 			request: &v0.CreateTenantRequest{Name: "Test Tenant"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
@@ -295,6 +335,13 @@ func TestHandler_CreateTenant(t *testing.T) {
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
+		},
+		{
+			name:       "empty name",
+			request:    &v0.CreateTenantRequest{Name: ""},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -309,7 +356,7 @@ func TestHandler_CreateTenant(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.CreateTenant").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -351,7 +398,7 @@ func TestHandler_UpdateTenant(t *testing.T) {
 		{
 			name: "success",
 			request: &v0.UpdateTenantRequest{
-				Tenant:     &v0.Tenant{Id: "tenant-123", Name: "Updated", Enabled: true},
+				Tenant:     &v0.Tenant{Id: "11111111-1111-1111-1111-111111111111", Name: "Updated", Enabled: true},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
@@ -369,7 +416,7 @@ func TestHandler_UpdateTenant(t *testing.T) {
 		{
 			name: "service error",
 			request: &v0.UpdateTenantRequest{
-				Tenant: &v0.Tenant{Id: "tenant-123", Name: "Updated"},
+				Tenant: &v0.Tenant{Id: "11111111-1111-1111-1111-111111111111", Name: "Updated"},
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().UpdateTenant(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("service error"))
@@ -390,7 +437,7 @@ func TestHandler_UpdateTenant(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.UpdateTenant").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -424,22 +471,30 @@ func TestHandler_DeleteTenant(t *testing.T) {
 		request    *v0.DeleteTenantRequest
 		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
 		wantErr    bool
+		wantCode   codes.Code
 	}{
 		{
 			name:    "success",
-			request: &v0.DeleteTenantRequest{TenantId: "tenant-123"},
+			request: &v0.DeleteTenantRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().DeleteTenant(gomock.Any(), "tenant-123").Return(nil)
+				mockSvc.EXPECT().DeleteTenant(gomock.Any(), "11111111-1111-1111-1111-111111111111").Return(nil)
 			},
 			wantErr: false,
 		},
 		{
 			name:    "service error",
-			request: &v0.DeleteTenantRequest{TenantId: "tenant-123"},
+			request: &v0.DeleteTenantRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().DeleteTenant(gomock.Any(), "tenant-123").Return(errors.New("service error"))
+				mockSvc.EXPECT().DeleteTenant(gomock.Any(), "11111111-1111-1111-1111-111111111111").Return(errors.New("service error"))
 			},
 			wantErr: true,
+		},
+		{
+			name:       "invalid tenant_id",
+			request:    &v0.DeleteTenantRequest{TenantId: "not-a-uuid"},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -454,7 +509,7 @@ func TestHandler_DeleteTenant(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.DeleteTenant").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -465,6 +520,10 @@ func TestHandler_DeleteTenant(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error but got none")
+				}
+				st, ok := status.FromError(err)
+				if ok && tt.wantCode != 0 && st.Code() != tt.wantCode {
+					t.Errorf("expected code %v, got %v", tt.wantCode, st.Code())
 				}
 			} else if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -479,31 +538,43 @@ func TestHandler_ProvisionUser(t *testing.T) {
 		request    *v0.ProvisionUserRequest
 		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
 		wantErr    bool
+		wantCode   codes.Code
 	}{
 		{
 			name: "success",
 			request: &v0.ProvisionUserRequest{
-				TenantId: "tenant-123",
+				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
 				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "tenant-123", "user@example.com", "member").Return(nil)
+				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").Return(nil)
 			},
 			wantErr: false,
 		},
 		{
 			name: "service error",
 			request: &v0.ProvisionUserRequest{
-				TenantId: "tenant-123",
+				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
 				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "tenant-123", "user@example.com", "member").
+				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").
 					Return(errors.New("service error"))
 			},
 			wantErr: true,
+		},
+		{
+			name: "invalid tenant_id",
+			request: &v0.ProvisionUserRequest{
+				TenantId: "not-a-uuid",
+				Email:    "user@example.com",
+				Role:     "member",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -518,7 +589,7 @@ func TestHandler_ProvisionUser(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.ProvisionUser").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -529,6 +600,10 @@ func TestHandler_ProvisionUser(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error but got none")
+				}
+				st, ok := status.FromError(err)
+				if ok && tt.wantCode != 0 && st.Code() != tt.wantCode {
+					t.Errorf("expected code %v, got %v", tt.wantCode, st.Code())
 				}
 			} else {
 				if err != nil {
@@ -543,7 +618,7 @@ func TestHandler_ProvisionUser(t *testing.T) {
 }
 
 func TestHandler_UpdateTenantUser(t *testing.T) {
-	user := &types.TenantUser{UserID: "user-123", Email: "user@example.com", Role: "owner"}
+	user := &types.TenantUser{UserID: "22222222-2222-2222-2222-222222222222", Email: "user@example.com", Role: "owner"}
 
 	tests := []struct {
 		name       string
@@ -555,38 +630,39 @@ func TestHandler_UpdateTenantUser(t *testing.T) {
 		{
 			name: "success",
 			request: &v0.UpdateTenantUserRequest{
-				TenantId: "tenant-123",
-				UserId:   "user-123",
+				TenantId: "11111111-1111-1111-1111-111111111111",
+				UserId:   "22222222-2222-2222-2222-222222222222",
 				Role:     "owner",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().UpdateTenantUser(gomock.Any(), "tenant-123", "user-123", "owner").Return(user, nil)
+				mockSvc.EXPECT().UpdateTenantUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "owner").Return(user, nil)
 			},
 			wantErr: false,
 		},
 		{
-			name: "missing tenant_id",
-			request: &v0.UpdateTenantUserRequest{
-				UserId: "user-123",
-				Role:   "owner",
-			},
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
-			wantErr:    true,
-			wantCode:   codes.InvalidArgument,
-		},
-		{
 			name: "service error",
 			request: &v0.UpdateTenantUserRequest{
-				TenantId: "tenant-123",
-				UserId:   "user-123",
+				TenantId: "11111111-1111-1111-1111-111111111111",
+				UserId:   "22222222-2222-2222-2222-222222222222",
 				Role:     "owner",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().UpdateTenantUser(gomock.Any(), "tenant-123", "user-123", "owner").
+				mockSvc.EXPECT().UpdateTenantUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "owner").
 					Return(nil, errors.New("service error"))
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
+		},
+		{
+			name: "invalid tenant_id",
+			request: &v0.UpdateTenantUserRequest{
+				TenantId: "not-a-uuid",
+				UserId:   "22222222-2222-2222-2222-222222222222",
+				Role:     "owner",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -601,7 +677,7 @@ func TestHandler_UpdateTenantUser(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.UpdateTenantUser").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -636,26 +712,44 @@ func TestHandler_ListUserTenants(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		request    *v0.ListUserTenantsRequest
-		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr    bool
+		name              string
+		request           *v0.ListUserTenantsRequest
+		setupMocks        func(*MockServiceInterface, *MockLoggerInterface)
+		wantErr           bool
+		wantCode          codes.Code
+		wantNextPageToken string
 	}{
 		{
 			name:    "success",
-			request: &v0.ListUserTenantsRequest{UserId: "user-123"},
+			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "user-123", gomock.Any()).Return(tenants, "", nil)
+				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "", nil)
 			},
 			wantErr: false,
 		},
 		{
-			name:    "service error",
-			request: &v0.ListUserTenantsRequest{UserId: "user-123"},
+			name:    "success with next page token",
+			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "user-123", gomock.Any()).Return(nil, "", errors.New("service error"))
+				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "next-token-usr", nil)
+			},
+			wantErr:           false,
+			wantNextPageToken: "next-token-usr",
+		},
+		{
+			name:    "service error",
+			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr: true,
+		},
+		{
+			name:       "invalid user_id",
+			request:    &v0.ListUserTenantsRequest{UserId: "not-a-uuid"},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -670,7 +764,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.ListUserTenants").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -682,12 +776,19 @@ func TestHandler_ListUserTenants(t *testing.T) {
 				if err == nil {
 					t.Error("expected error but got none")
 				}
+				st, ok := status.FromError(err)
+				if ok && tt.wantCode != 0 && st.Code() != tt.wantCode {
+					t.Errorf("expected code %v, got %v", tt.wantCode, st.Code())
+				}
 			} else {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 				if resp == nil {
 					t.Error("expected response but got nil")
+				}
+				if resp != nil && resp.NextPageToken != tt.wantNextPageToken {
+					t.Errorf("expected NextPageToken %q, got %q", tt.wantNextPageToken, resp.NextPageToken)
 				}
 			}
 		})
@@ -700,26 +801,44 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		request    *v0.ListTenantUsersRequest
-		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr    bool
+		name              string
+		request           *v0.ListTenantUsersRequest
+		setupMocks        func(*MockServiceInterface, *MockLoggerInterface)
+		wantErr           bool
+		wantCode          codes.Code
+		wantNextPageToken string
 	}{
 		{
 			name:    "success",
-			request: &v0.ListTenantUsersRequest{TenantId: "tenant-123"},
+			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "tenant-123", gomock.Any()).Return(users, "", nil)
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", gomock.Any()).Return(users, "", nil)
 			},
 			wantErr: false,
 		},
 		{
-			name:    "service error",
-			request: &v0.ListTenantUsersRequest{TenantId: "tenant-123"},
+			name:    "success with next page token",
+			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "tenant-123", gomock.Any()).Return(nil, "", errors.New("service error"))
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", gomock.Any()).Return(users, "next-token-tu", nil)
+			},
+			wantErr:           false,
+			wantNextPageToken: "next-token-tu",
+		},
+		{
+			name:    "service error",
+			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr: true,
+		},
+		{
+			name:       "invalid tenant_id",
+			request:    &v0.ListTenantUsersRequest{TenantId: "not-a-uuid"},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 	}
 
@@ -734,7 +853,7 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			h := NewHandler(mockSvc, mockTracer, mockMonitor, mockLogger)
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.ListTenantUsers").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -746,12 +865,19 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 				if err == nil {
 					t.Error("expected error but got none")
 				}
+				st, ok := status.FromError(err)
+				if ok && tt.wantCode != 0 && st.Code() != tt.wantCode {
+					t.Errorf("expected code %v, got %v", tt.wantCode, st.Code())
+				}
 			} else {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 				if resp == nil {
 					t.Error("expected response but got nil")
+				}
+				if resp != nil && resp.NextPageToken != tt.wantNextPageToken {
+					t.Errorf("expected NextPageToken %q, got %q", tt.wantNextPageToken, resp.NextPageToken)
 				}
 			}
 		})

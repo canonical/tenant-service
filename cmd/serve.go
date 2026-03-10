@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
@@ -161,7 +162,13 @@ func serve() error {
 	)
 
 	authMiddleware := authentication.NewMiddleware(jwtVerifier, tracer, monitor, logger)
-	tenantHandler := tenant.NewHandler(tenantService, tracer, monitor, logger)
+
+	validator, err := protovalidate.New()
+	if err != nil {
+		return fmt.Errorf("failed to create request validator: %w", err)
+	}
+
+	tenantHandler := tenant.NewHandler(tenantService, validator, tracer, monitor, logger)
 
 	// Start gRPC server
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", specs.GRPCPort))
@@ -234,3 +241,4 @@ func main() {
 		os.Exit(1)
 	}
 }
+
