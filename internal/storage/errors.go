@@ -15,6 +15,7 @@ var (
 	ErrNotFound            = errors.New("resource not found")
 	ErrDuplicateKey        = errors.New("duplicate key violation")
 	ErrForeignKeyViolation = errors.New("foreign key violation")
+	ErrInvalidPageToken    = errors.New("invalid page token")
 )
 
 // PostgreSQL error codes

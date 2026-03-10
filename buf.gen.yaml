@@ -26,3 +26,4 @@ plugins:
       - merge_file_name=openapi.json
       - disable_default_responses=true
       - preserve_rpc_order=true
+      - json_names_for_fields=false

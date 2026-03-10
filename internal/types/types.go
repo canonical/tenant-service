@@ -41,10 +41,31 @@ type ListOptions struct {
 	PageSize  int32
 }
 
-// ResolvePageSize returns the effective page size, clamped between 1 and maxPageSize.
+// ListOption is a functional option for configuring ListOptions.
+type ListOption func(*ListOptions)
+
+// WithPageToken sets the pagination cursor token.
+func WithPageToken(token string) ListOption {
+	return func(o *ListOptions) {
+		o.PageToken = token
+	}
+}
+
+// WithPageSize sets the number of items per page.
+func WithPageSize(size int32) ListOption {
+	return func(o *ListOptions) {
+		o.PageSize = size
+	}
+}
+
+// ResolvePageSize returns the effective page size. If PageSize is <= 0 the default
+// page size is returned; if it exceeds maxPageSize it is clamped to maxPageSize.
 func (o ListOptions) ResolvePageSize() uint64 {
-	if o.PageSize <= 0 || o.PageSize > maxPageSize {
+	if o.PageSize <= 0 {
 		return uint64(defaultPageSize)
+	}
+	if o.PageSize > maxPageSize {
+		return uint64(maxPageSize)
 	}
 	return uint64(o.PageSize)
 }
