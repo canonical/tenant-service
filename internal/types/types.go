@@ -43,8 +43,11 @@ type ListOptions struct {
 
 // ResolvePageSize returns the effective page size, clamped between 1 and maxPageSize.
 func (o ListOptions) ResolvePageSize() uint64 {
-	if o.PageSize <= 0 || o.PageSize > maxPageSize {
+	if o.PageSize <= 0 {
 		return uint64(defaultPageSize)
+	}
+	if o.PageSize > maxPageSize {
+		return uint64(maxPageSize)
 	}
 	return uint64(o.PageSize)
 }

@@ -30,13 +30,13 @@
         },
         "parameters": [
           {
-            "name": "pageToken",
+            "name": "page_token",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
-            "name": "pageSize",
+            "name": "page_size",
             "in": "query",
             "required": false,
             "type": "integer",
@@ -94,13 +94,13 @@
         },
         "parameters": [
           {
-            "name": "pageToken",
+            "name": "page_token",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
-            "name": "pageSize",
+            "name": "page_size",
             "in": "query",
             "required": false,
             "type": "integer",
@@ -155,13 +155,13 @@
             "type": "string"
           },
           {
-            "name": "pageToken",
+            "name": "page_token",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
-            "name": "pageSize",
+            "name": "page_size",
             "in": "query",
             "required": false,
             "type": "integer",
@@ -192,13 +192,13 @@
             "type": "string"
           },
           {
-            "name": "pageToken",
+            "name": "page_token",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
-            "name": "pageSize",
+            "name": "page_size",
             "in": "query",
             "required": false,
             "type": "integer",
@@ -343,8 +343,7 @@
           "type": "string"
         },
         "role": {
-          "type": "string",
-          "title": "owner, admin, member"
+          "type": "string"
         }
       }
     },
@@ -457,7 +456,7 @@
             "$ref": "#/definitions/tenantTenant"
           }
         },
-        "nextPageToken": {
+        "next_page_token": {
           "type": "string"
         }
       }
@@ -472,7 +471,7 @@
             "$ref": "#/definitions/tenantTenantUser"
           }
         },
-        "nextPageToken": {
+        "next_page_token": {
           "type": "string"
         }
       }
@@ -487,7 +486,7 @@
             "$ref": "#/definitions/tenantTenant"
           }
         },
-        "nextPageToken": {
+        "next_page_token": {
           "type": "string"
         }
       }
@@ -502,7 +501,7 @@
             "$ref": "#/definitions/tenantTenant"
           }
         },
-        "nextPageToken": {
+        "next_page_token": {
           "type": "string"
         }
       }

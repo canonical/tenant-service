@@ -5,6 +5,7 @@ package storage
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -101,7 +102,11 @@ func (s *Storage) ListTenants(ctx context.Context, opts types.ListOptions) ([]*t
 		Limit(pageSize + 1)
 
 	if opts.PageToken != "" {
-		query = query.Where(sq.Gt{"id": opts.PageToken})
+		cursorID, err := decodePageToken(opts.PageToken)
+		if err != nil {
+			return nil, "", ErrInvalidPageToken
+		}
+		query = query.Where(sq.Gt{"id": cursorID})
 	}
 
 	rows, err := query.QueryContext(ctx)
@@ -125,7 +130,7 @@ func (s *Storage) ListTenants(ctx context.Context, opts types.ListOptions) ([]*t
 
 	var nextPageToken string
 	if uint64(len(tenants)) > pageSize {
-		nextPageToken = tenants[pageSize].ID
+		nextPageToken = encodePageToken(tenants[pageSize-1].ID)
 		tenants = tenants[:pageSize]
 	}
 
@@ -152,7 +157,11 @@ func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, opts t
 		Limit(pageSize + 1)
 
 	if opts.PageToken != "" {
-		query = query.Where(sq.Gt{"t.id": opts.PageToken})
+		cursorID, err := decodePageToken(opts.PageToken)
+		if err != nil {
+			return nil, "", ErrInvalidPageToken
+		}
+		query = query.Where(sq.Gt{"t.id": cursorID})
 	}
 
 	rows, err := query.QueryContext(ctx)
@@ -176,7 +185,7 @@ func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, opts t
 
 	var nextPageToken string
 	if uint64(len(tenants)) > pageSize {
-		nextPageToken = tenants[pageSize].ID
+		nextPageToken = encodePageToken(tenants[pageSize-1].ID)
 		tenants = tenants[:pageSize]
 	}
 
@@ -234,7 +243,11 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 		Limit(pageSize + 1)
 
 	if opts.PageToken != "" {
-		query = query.Where(sq.Gt{"id": opts.PageToken})
+		cursorID, err := decodePageToken(opts.PageToken)
+		if err != nil {
+			return nil, "", ErrInvalidPageToken
+		}
+		query = query.Where(sq.Gt{"id": cursorID})
 	}
 
 	rows, err := query.QueryContext(ctx)
@@ -258,11 +271,36 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 
 	var nextPageToken string
 	if uint64(len(members)) > pageSize {
-		nextPageToken = members[pageSize].ID
+		nextPageToken = encodePageToken(members[pageSize-1].ID)
 		members = members[:pageSize]
 	}
 
 	return members, nextPageToken, nil
+}
+
+func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error) {
+	ctx, span := s.tracer.Start(ctx, "storage.GetMemberByTenantAndUserID")
+	defer span.End()
+
+	var m types.Membership
+	err := s.db.Statement(ctx).
+		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
+		From("memberships").
+		Where(sq.Eq{
+			"tenant_id":          tenantID,
+			"kratos_identity_id": userID,
+		}).
+		QueryRowContext(ctx).
+		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get member: %v", err)
+	}
+
+	return &m, nil
 }
 
 func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) (string, error) {
@@ -374,4 +412,16 @@ func (s *Storage) DeleteTenant(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to delete tenant: %w", err)
 	}
 	return nil
+}
+
+func encodePageToken(id string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(id))
+}
+
+func decodePageToken(token string) (string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
 }

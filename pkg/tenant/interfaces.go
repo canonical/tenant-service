@@ -33,6 +33,7 @@ type StorageInterface interface {
 	ListTenantsByUserID(ctx context.Context, userID string, opts types.ListOptions) ([]*types.Tenant, string, error)
 	ListTenants(ctx context.Context, opts types.ListOptions) ([]*types.Tenant, string, error)
 	ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
+	GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
 	ListMembersByTenantID(ctx context.Context, tenantID string, opts types.ListOptions) ([]*types.Membership, string, error)
 	UpdateMember(ctx context.Context, tenantID, userID, role string) error
 }

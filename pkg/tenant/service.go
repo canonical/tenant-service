@@ -396,26 +396,18 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 	)
 
 	// 1. Get current member to check if exists and current role
-	members, _, err := s.storage.ListMembersByTenantID(ctx, tenantID, types.ListOptions{})
+	currentMember, err := s.storage.GetMemberByTenantAndUserID(ctx, tenantID, userID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			err := fmt.Errorf("user %s not found in tenant %s", userID, tenantID)
+			s.recordError(span, "user not found in tenant", err, "tenant_id", tenantID, "user_id", userID)
+			return nil, err
+		}
 		s.recordError(span, "failed to check current membership", err,
 			"tenant_id", tenantID,
 			"user_id", userID,
 		)
 		return nil, fmt.Errorf("failed to check current membership: %w", err)
-	}
-
-	var currentMember *types.Membership
-	for _, m := range members {
-		if m.KratosIdentityID == userID {
-			currentMember = m
-			break
-		}
-	}
-	if currentMember == nil {
-		err := fmt.Errorf("user %s not found in tenant %s", userID, tenantID)
-		s.recordError(span, "user not found in tenant", err, "tenant_id", tenantID, "user_id", userID)
-		return nil, err
 	}
 
 	if currentMember.Role == role {
