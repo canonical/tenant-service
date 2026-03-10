@@ -767,9 +767,6 @@ func TestService_ListTenantUsers(t *testing.T) {
 func TestService_UpdateTenantUser(t *testing.T) {
 	tenantID := "tenant-123"
 	userID := "user-456"
-	currentMembers := []*types.Membership{
-		{KratosIdentityID: userID, Role: "member"},
-	}
 	identity := &ory.Identity{
 		Traits: map[string]interface{}{"email": "user@example.com"},
 	}
@@ -784,7 +781,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			name:    "success - promote member to owner",
 			newRole: "owner",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
-				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(currentMembers, "", nil)
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
 				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenantID, userID).Return(nil)
 				mockAuthz.EXPECT().RemoveTenantMember(gomock.Any(), tenantID, userID).Return(nil)
 				mockStorage.EXPECT().UpdateMember(gomock.Any(), tenantID, userID, "owner").Return(nil)
@@ -796,7 +793,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			name:    "success - same role no change",
 			newRole: "member",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
-				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(currentMembers, "", nil)
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
 			},
 			expectedErr: false,
 		},
@@ -804,7 +801,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			name:    "error - user not found",
 			newRole: "owner",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
-				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return([]*types.Membership{}, "", nil)
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(nil, storage.ErrNotFound)
 			},
 			expectedErr: true,
 		},
@@ -812,7 +809,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			name:    "error - invalid role",
 			newRole: "superadmin",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
-				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(currentMembers, "", nil)
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
 			},
 			expectedErr: true,
 		},

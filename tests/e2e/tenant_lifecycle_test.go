@@ -223,13 +223,12 @@ func TestTenantValidation(t *testing.T) {
 			})
 
 			t.Run("Delete non-existent tenant should be idempotent", func(t *testing.T) {
-				// Per project conventions, deletes should be idempotent
-				// This should not return an error
-				err := client.DeleteTenant(ctx, "non-existent-id-67890")
-				// Note: If the API returns an error for non-existent deletes,
-				// this test documents that behavior
+				// A well-formed UUID that does not exist in the database should
+				// succeed (idempotent delete), not return an error.
+				const nonExistentID = "00000000-0000-7000-8000-000000000000"
+				err := client.DeleteTenant(ctx, nonExistentID)
 				if err != nil {
-					t.Logf("Delete of non-existent tenant returned error: %v (documenting current behavior)", err)
+					t.Errorf("expected idempotent delete of non-existent tenant to succeed, got: %v", err)
 				}
 			})
 		})
