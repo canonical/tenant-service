@@ -194,9 +194,15 @@ if `updated_at` on the tenant/membership row is within the OpenFGA cache TTL win
 
 ### [#14](https://github.com/canonical/tenant-service/issues/14) — Handle client users
 
-- [ ] Determine how client (machine/service) users differ from human users in the data model
-- [ ] Add `user_type` field or separate membership path as appropriate
-- [ ] Update FGA model if required
+- [x] Determine how client (machine/service) users differ from human users in the data model
+- [x] Add `user_type` field or separate membership path as appropriate
+- [x] Update FGA model if required
+- [ ] Expand `CreateTenantClientRequest` to mirror Hydra's supported fields (e.g., `client_name`, `scope`, `audience`, `grant_types`) so the endpoint isn't artificially limited just to ID/Secret.
+- [ ] Add support/documentation for Client Secret Rotation. (Note: Instead of building native rotation endpoints, consider proxying/documenting the native Hydra Admin `PUT /clients/{id}` endpoint to accomplish this).
+
+### Orphaned Identities on Tenant Cascades
+
+- [ ] When a tenant is deleted, the database foreign keys clean up the `memberships` table, but the underlying identities (Kratos user accounts bound specifically to that tenant, and Hydra OAuth2 clients) remain orphaned in their respective systems. A mechanism needs to be introduced to explicitly garbage-collect/delete Kratos users and Hydra clients associated exclusively with the deleted tenant.
 
 ---
 
