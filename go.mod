@@ -19,6 +19,7 @@ require (
 	github.com/openfga/go-sdk v0.7.4
 	github.com/openfga/language/pkg/go v0.2.0-beta.2
 	github.com/ory/client-go v1.22.26
+	github.com/ory/hydra-client-go/v2 v2.2.1
 	github.com/ory/hydra/v2 v2.3.0
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/prometheus/client_golang v1.23.2
@@ -171,7 +172,6 @@ require (
 	github.com/ory/go-acc v0.2.9-0.20230103102148-6b1c9a70dbbe // indirect
 	github.com/ory/go-convenience v0.1.0 // indirect
 	github.com/ory/herodot v0.10.3-0.20230626083119-d7e5192f0d88 // indirect
-	github.com/ory/hydra-client-go/v2 v2.2.1 // indirect
 	github.com/ory/jsonschema/v3 v3.0.8 // indirect
 	github.com/ory/kratos-client-go v1.3.8 // indirect
 	github.com/ory/x v0.0.675 // indirect

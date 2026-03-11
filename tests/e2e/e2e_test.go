@@ -68,7 +68,7 @@ func TestHTTPAuthentication(t *testing.T) {
 
 	t.Run("Request Without Auth Should Fail", func(t *testing.T) {
 		// Try to list tenants without authentication
-		resp, err := client.TenantServiceListTenants(ctx)
+		resp, err := client.TenantServiceListTenants(ctx, nil)
 		if err != nil {
 			// Connection error is acceptable
 			return
@@ -82,7 +82,7 @@ func TestHTTPAuthentication(t *testing.T) {
 
 	t.Run("Request With Valid Auth Should Succeed", func(t *testing.T) {
 		authEditor := authRequestEditor(ctx)
-		resp, err := client.TenantServiceListTenants(ctx, authEditor)
+		resp, err := client.TenantServiceListTenants(ctx, nil, authEditor)
 		if err != nil {
 			t.Fatalf("expected success with valid auth, got error: %v", err)
 		}

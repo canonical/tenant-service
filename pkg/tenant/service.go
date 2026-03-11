@@ -17,12 +17,14 @@ import (
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
+	"github.com/google/uuid"
 )
 
 type Service struct {
 	storage            StorageInterface
 	authz              AuthzInterface
 	kratos             KratosClientInterface
+	hydra              HydraClientInterface
 	invitationLifetime string
 	tracer             tracing.TracingInterface
 	monitor            monitoring.MonitorInterface
@@ -33,6 +35,7 @@ func NewService(
 	storage StorageInterface,
 	authz AuthzInterface,
 	kratos KratosClientInterface,
+	hydra HydraClientInterface,
 	invitationLifetime string,
 	tracer tracing.TracingInterface,
 	monitor monitoring.MonitorInterface,
@@ -42,6 +45,7 @@ func NewService(
 		storage:            storage,
 		authz:              authz,
 		kratos:             kratos,
+		hydra:              hydra,
 		invitationLifetime: invitationLifetime,
 		tracer:             tracer,
 		monitor:            monitor,
@@ -355,12 +359,12 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, opts typ
 	for _, m := range members {
 		email := ""
 		// Fetch identity details from Kratos to get email
-		identity, err := s.kratos.GetIdentity(ctx, m.KratosIdentityID)
+		identity, err := s.kratos.GetIdentity(ctx, m.IdentityID)
 		if err != nil {
 			// Log error but continue, user might have been deleted from Kratos but not from our DB
 			s.logger.Warnw("failed to get identity for user; continuing with unknown email",
 				"tenant_id", tenantID,
-				"user_id", m.KratosIdentityID,
+				"user_id", m.IdentityID,
 				"error", err,
 			)
 			email = "unknown"
@@ -374,7 +378,7 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, opts typ
 		}
 
 		users = append(users, &types.TenantUser{
-			UserID: m.KratosIdentityID,
+			UserID: m.IdentityID,
 			Email:  email,
 			Role:   m.Role,
 		})
@@ -513,6 +517,115 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 		Email:  email,
 		Role:   role,
 	}, nil
+}
+
+func (s *Service) CreateTenantClient(ctx context.Context, tenantID string) (string, string, error) {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.CreateTenantClient")
+	defer span.End()
+
+	actor, _ := authentication.GetUserID(ctx)
+	s.logger.Debugw("creating tenant client", "tenant_id", tenantID, "actor", actor)
+
+	// 1. Verify tenant exists
+	if _, err := s.storage.GetTenantByID(ctx, tenantID); err != nil {
+		s.recordError(span, "tenant not found for client creation", err, "tenant_id", tenantID)
+		return "", "", fmt.Errorf("tenant not found: %w", err)
+	}
+
+	// 2. Generate a deterministic client ID so we can write to storage first
+	clientID := uuid.NewString()
+
+	// 3. Add client as member in storage (within the request transaction;
+	//    if the Hydra call below fails the transaction rolls back automatically)
+	if _, err := s.storage.AddClient(ctx, tenantID, clientID); err != nil {
+		s.recordError(span, "failed to add client to storage", err,
+			"tenant_id", tenantID,
+			"client_id", clientID,
+		)
+		return "", "", fmt.Errorf("failed to add client to storage: %w", err)
+	}
+
+	// 4. Create Hydra client with the chosen ID — this is the last step so
+	//    a failure here causes the transaction to roll back, leaving no
+	//    orphaned state.
+	metadata := map[string]interface{}{
+		"tenant_id": tenantID,
+	}
+	clientSecret, err := s.hydra.CreateOAuth2Client(ctx, clientID, metadata)
+	if err != nil {
+		s.recordError(span, "failed to create OAuth2 client in Hydra", err, "tenant_id", tenantID)
+		return "", "", fmt.Errorf("failed to create OAuth2 client: %w", err)
+	}
+
+	s.logger.Infow("tenant client created",
+		"tenant_id", tenantID,
+		"client_id", clientID,
+	)
+	s.logger.Security().AdminAction(actor, "create_tenant_client", "tenant.Service.CreateTenantClient", tenantID+":"+clientID)
+	s.incrementCounter("client_created", "member")
+	return clientID, clientSecret, nil
+}
+
+func (s *Service) ListTenantClients(ctx context.Context, tenantID string) ([]*types.OAuth2Client, error) {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.ListTenantClients")
+	defer span.End()
+
+	s.logger.Debugw("listing clients for tenant", "tenant_id", tenantID)
+
+	members, err := s.storage.ListClientsByTenantID(ctx, tenantID)
+	if err != nil {
+		s.recordError(span, "failed to list clients", err, "tenant_id", tenantID)
+		return nil, fmt.Errorf("failed to list clients: %w", err)
+	}
+
+	var clients []*types.OAuth2Client
+	for _, m := range members {
+		clients = append(clients, &types.OAuth2Client{
+			ClientID:  m.IdentityID,
+			TenantID:  m.TenantID,
+			CreatedAt: m.CreatedAt,
+		})
+	}
+
+	return clients, nil
+}
+
+func (s *Service) DeleteTenantClient(ctx context.Context, tenantID, clientID string) error {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.DeleteTenantClient")
+	defer span.End()
+
+	actor, _ := authentication.GetUserID(ctx)
+	s.logger.Debugw("deleting tenant client",
+		"tenant_id", tenantID,
+		"client_id", clientID,
+		"actor", actor,
+	)
+
+	// 1. Remove from storage (within the request transaction;
+	//    if the Hydra call below fails the transaction rolls back)
+	if err := s.storage.DeleteMember(ctx, tenantID, clientID); err != nil {
+		s.recordError(span, "failed to delete client from storage", err,
+			"tenant_id", tenantID,
+			"client_id", clientID,
+		)
+		return fmt.Errorf("failed to delete client from storage: %w", err)
+	}
+
+	// 2. Delete from Hydra — last step so a failure rolls back the DB change
+	if err := s.hydra.DeleteOAuth2Client(ctx, clientID); err != nil {
+		s.recordError(span, "failed to delete OAuth2 client from Hydra", err,
+			"tenant_id", tenantID,
+			"client_id", clientID,
+		)
+		return fmt.Errorf("failed to delete OAuth2 client: %w", err)
+	}
+
+	s.logger.Infow("tenant client deleted",
+		"tenant_id", tenantID,
+		"client_id", clientID,
+	)
+	s.logger.Security().AdminAction(actor, "delete_tenant_client", "tenant.Service.DeleteTenantClient", tenantID+":"+clientID)
+	return nil
 }
 
 func (s *Service) incrementCounter(operation, role string) {

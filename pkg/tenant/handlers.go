@@ -325,3 +325,69 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 		NextPageToken: nextPageToken,
 	}, nil
 }
+
+func (h *Handler) CreateTenantClient(ctx context.Context, req *v0.CreateTenantClientRequest) (*v0.CreateTenantClientResponse, error) {
+	ctx, span := h.tracer.Start(ctx, "tenant.Handler.CreateTenantClient")
+	defer span.End()
+
+	if req.TenantId == "" {
+		return nil, status.Error(codes.InvalidArgument, "tenant_id is required")
+	}
+
+	clientID, clientSecret, err := h.service.CreateTenantClient(ctx, req.TenantId)
+	if err != nil {
+		h.logger.Errorw("failed to create tenant client",
+			"tenant_id", req.TenantId,
+			"error", err,
+		)
+		return nil, status.Errorf(codes.Internal, "failed to create tenant client: %v", err)
+	}
+
+	return &v0.CreateTenantClientResponse{
+		ClientId:     clientID,
+		ClientSecret: clientSecret,
+	}, nil
+}
+
+func (h *Handler) ListTenantClients(ctx context.Context, req *v0.ListTenantClientsRequest) (*v0.ListTenantClientsResponse, error) {
+	ctx, span := h.tracer.Start(ctx, "tenant.Handler.ListTenantClients")
+	defer span.End()
+
+	clients, err := h.service.ListTenantClients(ctx, req.TenantId)
+	if err != nil {
+		h.logger.Errorw("failed to list tenant clients", "tenant_id", req.TenantId, "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to list tenant clients: %v", err)
+	}
+
+	pbClients := make([]*v0.OAuth2Client, len(clients))
+	for i, c := range clients {
+		pbClients[i] = &v0.OAuth2Client{
+			ClientId:  c.ClientID,
+			CreatedAt: c.CreatedAt.String(),
+		}
+	}
+
+	return &v0.ListTenantClientsResponse{
+		Clients: pbClients,
+	}, nil
+}
+
+func (h *Handler) DeleteTenantClient(ctx context.Context, req *v0.DeleteTenantClientRequest) (*emptypb.Empty, error) {
+	ctx, span := h.tracer.Start(ctx, "tenant.Handler.DeleteTenantClient")
+	defer span.End()
+
+	if req.TenantId == "" || req.ClientId == "" {
+		return nil, status.Error(codes.InvalidArgument, "tenant_id and client_id are required")
+	}
+
+	if err := h.service.DeleteTenantClient(ctx, req.TenantId, req.ClientId); err != nil {
+		h.logger.Errorw("failed to delete tenant client",
+			"tenant_id", req.TenantId,
+			"client_id", req.ClientId,
+			"error", err,
+		)
+		return nil, status.Errorf(codes.Internal, "failed to delete tenant client: %v", err)
+	}
+
+	return &emptypb.Empty{}, nil
+}

@@ -69,6 +69,7 @@ export PORT="8000"
 export TRACING_ENABLED="false"
 export LOG_LEVEL="debug"
 export KRATOS_ADMIN_URL="http://127.0.0.1:4434"
+export HYDRA_ADMIN_URL="http://127.0.0.1:4445"
 export AUTHENTICATION_ISSUER="http://localhost:4444"
 export AUTHENTICATION_JWKS_URL="http://localhost:4444/.well-known/jwks.json"
 export AUTHENTICATION_ENABLED="true"
@@ -107,4 +108,5 @@ echo "  -u \"$AUTH_CLIENT_ID:$AUTH_CLIENT_SECRET\""
 echo "==============================================="
 echo
 
+sleep 10000
 ./app serve

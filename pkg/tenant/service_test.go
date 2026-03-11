@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/types"
@@ -86,7 +87,7 @@ func TestService_ListTenantsByUserID(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.ListTenantsByUserID").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage)
@@ -152,7 +153,7 @@ func TestService_ListTenants(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.ListTenants").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage)
@@ -294,7 +295,7 @@ func TestService_InviteMember(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.InviteMember").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage, mockAuthz, mockKratos, mockLogger, mockMonitor)
@@ -367,7 +368,7 @@ func TestService_CreateTenant(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.CreateTenant").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage)
@@ -438,7 +439,7 @@ func TestService_UpdateTenant(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.UpdateTenant").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage)
@@ -507,7 +508,7 @@ func TestService_DeleteTenant(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.DeleteTenant").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage, mockAuthz, mockLogger)
@@ -602,7 +603,7 @@ func TestService_ProvisionUser(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.ProvisionUser").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage, mockAuthz, mockKratos, mockMonitor)
@@ -661,7 +662,7 @@ func TestService_ListUserTenants(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.ListUserTenants").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage)
@@ -689,8 +690,8 @@ func TestService_ListTenantUsers(t *testing.T) {
 	identityID1 := "identity-1"
 	identityID2 := "identity-2"
 	members := []*types.Membership{
-		{KratosIdentityID: identityID1, Role: "owner"},
-		{KratosIdentityID: identityID2, Role: "member"},
+		{IdentityID: identityID1, Role: "owner"},
+		{IdentityID: identityID2, Role: "member"},
 	}
 	identity1 := &ory.Identity{
 		Traits: map[string]interface{}{"email": "user1@example.com"},
@@ -744,7 +745,7 @@ func TestService_ListTenantUsers(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.ListTenantUsers").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage, mockKratos, mockLogger)
@@ -781,7 +782,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			name:    "success - promote member to owner",
 			newRole: "owner",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
-				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{IdentityID: userID, Role: "member"}, nil)
 				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenantID, userID).Return(nil)
 				mockAuthz.EXPECT().RemoveTenantMember(gomock.Any(), tenantID, userID).Return(nil)
 				mockStorage.EXPECT().UpdateMember(gomock.Any(), tenantID, userID, "owner").Return(nil)
@@ -793,7 +794,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			name:    "success - same role no change",
 			newRole: "member",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
-				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{IdentityID: userID, Role: "member"}, nil)
 			},
 			expectedErr: false,
 		},
@@ -809,7 +810,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			name:    "error - invalid role",
 			newRole: "superadmin",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
-				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{IdentityID: userID, Role: "member"}, nil)
 			},
 			expectedErr: true,
 		},
@@ -828,7 +829,7 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockAuthz, mockKratos, nil, "1h", mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.UpdateTenantUser").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage, mockAuthz, mockKratos, mockLogger)
@@ -846,6 +847,234 @@ func TestService_UpdateTenantUser(t *testing.T) {
 				if user == nil {
 					t.Error("expected user but got nil")
 				}
+			}
+		})
+	}
+}
+
+func TestService_CreateTenantClient(t *testing.T) {
+	tenantID := "tenant-123"
+	clientSecret := "hydra-client-secret"
+	tenant := &types.Tenant{ID: tenantID, Name: "Test Tenant"}
+
+	testCases := []struct {
+		name        string
+		setupMocks  func(*MockStorageInterface, *MockHydraClientInterface, *MockMonitorInterface)
+		expectedErr bool
+	}{
+		{
+			name: "success",
+			setupMocks: func(mockStorage *MockStorageInterface, mockHydra *MockHydraClientInterface, mockMonitor *MockMonitorInterface) {
+				mockStorage.EXPECT().GetTenantByID(gomock.Any(), tenantID).Return(tenant, nil)
+				mockStorage.EXPECT().AddClient(gomock.Any(), tenantID, gomock.Any()).Return("member-id", nil)
+				mockHydra.EXPECT().CreateOAuth2Client(gomock.Any(), gomock.Any(), gomock.Any()).Return(clientSecret, nil)
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "client_created", "role": "member"}).Return(nil)
+			},
+			expectedErr: false,
+		},
+		{
+			name: "error - tenant not found",
+			setupMocks: func(mockStorage *MockStorageInterface, mockHydra *MockHydraClientInterface, mockMonitor *MockMonitorInterface) {
+				mockStorage.EXPECT().GetTenantByID(gomock.Any(), tenantID).Return(nil, errors.New("not found"))
+			},
+			expectedErr: true,
+		},
+		{
+			name: "error - storage add fails",
+			setupMocks: func(mockStorage *MockStorageInterface, mockHydra *MockHydraClientInterface, mockMonitor *MockMonitorInterface) {
+				mockStorage.EXPECT().GetTenantByID(gomock.Any(), tenantID).Return(tenant, nil)
+				mockStorage.EXPECT().AddClient(gomock.Any(), tenantID, gomock.Any()).Return("", errors.New("storage error"))
+			},
+			expectedErr: true,
+		},
+		{
+			name: "error - hydra create fails",
+			setupMocks: func(mockStorage *MockStorageInterface, mockHydra *MockHydraClientInterface, mockMonitor *MockMonitorInterface) {
+				mockStorage.EXPECT().GetTenantByID(gomock.Any(), tenantID).Return(tenant, nil)
+				mockStorage.EXPECT().AddClient(gomock.Any(), tenantID, gomock.Any()).Return("member-id", nil)
+				mockHydra.EXPECT().CreateOAuth2Client(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errors.New("hydra error"))
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockStorage := NewMockStorageInterface(ctrl)
+			mockAuthz := NewMockAuthzInterface(ctrl)
+			mockKratos := NewMockKratosClientInterface(ctrl)
+			mockHydra := NewMockHydraClientInterface(ctrl)
+			mockTracer := NewMockTracingInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+			mockMonitor := NewMockMonitorInterface(ctrl)
+
+			s := NewService(mockStorage, mockAuthz, mockKratos, mockHydra, "1h", mockTracer, mockMonitor, mockLogger)
+
+			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.CreateTenantClient").Return(context.Background(), trace.SpanFromContext(context.Background()))
+			tc.setupMocks(mockStorage, mockHydra, mockMonitor)
+
+			clientID, secret, err := s.CreateTenantClient(context.Background(), tenantID)
+
+			if tc.expectedErr {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if clientID == "" {
+					t.Error("expected non-empty client ID")
+				}
+				if secret != clientSecret {
+					t.Errorf("expected secret %q, got %q", clientSecret, secret)
+				}
+			}
+		})
+	}
+}
+
+func TestService_ListTenantClients(t *testing.T) {
+	tenantID := "tenant-123"
+	now := time.Now()
+	members := []*types.Membership{
+		{ID: "m1", TenantID: tenantID, IdentityID: "client-1", IdentityType: "client", CreatedAt: now},
+		{ID: "m2", TenantID: tenantID, IdentityID: "client-2", IdentityType: "client", CreatedAt: now},
+	}
+
+	testCases := []struct {
+		name            string
+		setupMocks      func(*MockStorageInterface)
+		expectedClients int
+		expectedErr     bool
+	}{
+		{
+			name: "success",
+			setupMocks: func(mockStorage *MockStorageInterface) {
+				mockStorage.EXPECT().ListClientsByTenantID(gomock.Any(), tenantID).Return(members, nil)
+			},
+			expectedClients: 2,
+			expectedErr:     false,
+		},
+		{
+			name: "success - empty",
+			setupMocks: func(mockStorage *MockStorageInterface) {
+				mockStorage.EXPECT().ListClientsByTenantID(gomock.Any(), tenantID).Return([]*types.Membership{}, nil)
+			},
+			expectedClients: 0,
+			expectedErr:     false,
+		},
+		{
+			name: "error - storage fails",
+			setupMocks: func(mockStorage *MockStorageInterface) {
+				mockStorage.EXPECT().ListClientsByTenantID(gomock.Any(), tenantID).Return(nil, errors.New("storage error"))
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockStorage := NewMockStorageInterface(ctrl)
+			mockAuthz := NewMockAuthzInterface(ctrl)
+			mockKratos := NewMockKratosClientInterface(ctrl)
+			mockHydra := NewMockHydraClientInterface(ctrl)
+			mockTracer := NewMockTracingInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+			mockMonitor := NewMockMonitorInterface(ctrl)
+
+			s := NewService(mockStorage, mockAuthz, mockKratos, mockHydra, "1h", mockTracer, mockMonitor, mockLogger)
+
+			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.ListTenantClients").Return(context.Background(), trace.SpanFromContext(context.Background()))
+			tc.setupMocks(mockStorage)
+
+			clients, err := s.ListTenantClients(context.Background(), tenantID)
+
+			if tc.expectedErr {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if len(clients) != tc.expectedClients {
+					t.Errorf("expected %d clients, got %d", tc.expectedClients, len(clients))
+				}
+			}
+		})
+	}
+}
+
+func TestService_DeleteTenantClient(t *testing.T) {
+	tenantID := "tenant-123"
+	clientID := "client-456"
+
+	testCases := []struct {
+		name        string
+		setupMocks  func(*MockStorageInterface, *MockHydraClientInterface)
+		expectedErr bool
+	}{
+		{
+			name: "success",
+			setupMocks: func(mockStorage *MockStorageInterface, mockHydra *MockHydraClientInterface) {
+				mockStorage.EXPECT().DeleteMember(gomock.Any(), tenantID, clientID).Return(nil)
+				mockHydra.EXPECT().DeleteOAuth2Client(gomock.Any(), clientID).Return(nil)
+			},
+			expectedErr: false,
+		},
+		{
+			name: "error - storage delete fails",
+			setupMocks: func(mockStorage *MockStorageInterface, mockHydra *MockHydraClientInterface) {
+				mockStorage.EXPECT().DeleteMember(gomock.Any(), tenantID, clientID).Return(errors.New("storage error"))
+			},
+			expectedErr: true,
+		},
+		{
+			name: "error - hydra delete fails",
+			setupMocks: func(mockStorage *MockStorageInterface, mockHydra *MockHydraClientInterface) {
+				mockStorage.EXPECT().DeleteMember(gomock.Any(), tenantID, clientID).Return(nil)
+				mockHydra.EXPECT().DeleteOAuth2Client(gomock.Any(), clientID).Return(errors.New("hydra error"))
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockStorage := NewMockStorageInterface(ctrl)
+			mockAuthz := NewMockAuthzInterface(ctrl)
+			mockKratos := NewMockKratosClientInterface(ctrl)
+			mockHydra := NewMockHydraClientInterface(ctrl)
+			mockTracer := NewMockTracingInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+			mockMonitor := NewMockMonitorInterface(ctrl)
+
+			s := NewService(mockStorage, mockAuthz, mockKratos, mockHydra, "1h", mockTracer, mockMonitor, mockLogger)
+
+			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.DeleteTenantClient").Return(context.Background(), trace.SpanFromContext(context.Background()))
+			tc.setupMocks(mockStorage, mockHydra)
+
+			err := s.DeleteTenantClient(context.Background(), tenantID, clientID)
+
+			if tc.expectedErr {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}

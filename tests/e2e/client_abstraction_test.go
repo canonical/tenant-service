@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -129,8 +128,24 @@ type TenantClient interface {
 	// Implementations should be idempotent per project conventions.
 	DeleteTenant(ctx context.Context, id string) error
 
+	// CreateTenantClient creates an OAuth2 client associated with a tenant.
+	// Returns the client ID and client secret.
+	CreateTenantClient(ctx context.Context, tenantID string) (clientID string, clientSecret string, err error)
+
+	// ListTenantClients retrieves all OAuth2 clients associated with a tenant.
+	ListTenantClients(ctx context.Context, tenantID string) ([]TenantClientInfo, error)
+
+	// DeleteTenantClient removes an OAuth2 client associated with a tenant.
+	DeleteTenantClient(ctx context.Context, tenantID, clientID string) error
+
 	// Close releases any resources held by the client.
 	Close() error
+}
+
+// TenantClientInfo represents an OAuth2 client associated with a tenant.
+type TenantClientInfo struct {
+	ClientID  string
+	CreatedAt string
 }
 
 // HTTPTenantClient implements TenantClient using the HTTP/REST API.
@@ -206,7 +221,7 @@ func (c *HTTPTenantClient) ListTenants(ctx context.Context) ([]Tenant, error) {
 		return nil, err
 	}
 
-	resp, err := c.client.TenantServiceListTenants(ctx, authEditor)
+	resp, err := c.client.TenantServiceListTenants(ctx, nil, authEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +262,7 @@ func (c *HTTPTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 	updateMask := "name"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
 		Tenant: &struct {
-			CreatedAt *string `json:"createdAt,omitempty"`
+			CreatedAt *string `json:"created_at,omitempty"`
 			Enabled   *bool   `json:"enabled,omitempty"`
 			Name      *string `json:"name,omitempty"`
 		}{
@@ -296,29 +311,22 @@ func (c *HTTPTenantClient) DeleteTenant(ctx context.Context, id string) error {
 	return nil
 }
 
-// paginationQueryEditor returns a RequestEditorFn that appends page_size and
-// page_token to the request URL query string.
-func paginationQueryEditor(pageToken string, pageSize int32) httpclient.RequestEditorFn {
-	return func(ctx context.Context, req *http.Request) error {
-		q := req.URL.Query()
-		if pageSize > 0 {
-			q.Set("page_size", strconv.Itoa(int(pageSize)))
-		}
-		if pageToken != "" {
-			q.Set("page_token", pageToken)
-		}
-		req.URL.RawQuery = q.Encode()
-		return nil
-	}
-}
-
+// ListTenantsPaged retrieves a single page of tenants using the pagination params struct.
 func (c *HTTPTenantClient) ListTenantsPaged(ctx context.Context, pageToken string, pageSize int32) ([]Tenant, string, error) {
 	authEditor, err := c.authEditor(ctx)
 	if err != nil {
 		return nil, "", err
 	}
 
-	resp, err := c.client.TenantServiceListTenants(ctx, authEditor, paginationQueryEditor(pageToken, pageSize))
+	params := &httpclient.TenantServiceListTenantsParams{}
+	if pageSize > 0 {
+		params.PageSize = &pageSize
+	}
+	if pageToken != "" {
+		params.PageToken = &pageToken
+	}
+
+	resp, err := c.client.TenantServiceListTenants(ctx, params, authEditor)
 	if err != nil {
 		return nil, "", err
 	}
@@ -356,7 +364,15 @@ func (c *HTTPTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 		return nil, "", err
 	}
 
-	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, authEditor, paginationQueryEditor(pageToken, pageSize))
+	params := &httpclient.TenantServiceListTenantUsersParams{}
+	if pageSize > 0 {
+		params.PageSize = &pageSize
+	}
+	if pageToken != "" {
+		params.PageToken = &pageToken
+	}
+
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, params, authEditor)
 	if err != nil {
 		return nil, "", err
 	}
@@ -411,6 +427,97 @@ func (c *HTTPTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, em
 		}
 		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 	}
+	return nil
+}
+
+func (c *HTTPTenantClient) CreateTenantClient(ctx context.Context, tenantID string) (string, string, error) {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return "", "", err
+	}
+
+	resp, err := c.client.TenantServiceCreateTenantClient(ctx, tenantID, httpclient.TenantServiceCreateTenantClientJSONRequestBody{}, authEditor)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return "", "", fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return "", "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result.ClientID, result.ClientSecret, nil
+}
+
+func (c *HTTPTenantClient) ListTenantClients(ctx context.Context, tenantID string) ([]TenantClientInfo, error) {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.TenantServiceListTenantClients(ctx, tenantID, authEditor)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Clients []struct {
+			ClientID  string `json:"client_id"`
+			CreatedAt string `json:"created_at"`
+		} `json:"clients"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	clients := make([]TenantClientInfo, len(result.Clients))
+	for i, c := range result.Clients {
+		clients[i] = TenantClientInfo{ClientID: c.ClientID, CreatedAt: c.CreatedAt}
+	}
+	return clients, nil
+}
+
+func (c *HTTPTenantClient) DeleteTenantClient(ctx context.Context, tenantID, clientID string) error {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.client.TenantServiceDeleteTenantClient(ctx, tenantID, clientID, authEditor)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
 	return nil
 }
 
@@ -576,6 +683,55 @@ func (c *GRPCTenantClient) DeleteTenant(ctx context.Context, id string) error {
 
 	_, err = c.client.DeleteTenant(authCtx, &v0.DeleteTenantRequest{
 		TenantId: id,
+	})
+	return err
+}
+
+func (c *GRPCTenantClient) CreateTenantClient(ctx context.Context, tenantID string) (string, string, error) {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return "", "", err
+	}
+
+	resp, err := c.client.CreateTenantClient(authCtx, &v0.CreateTenantClientRequest{
+		TenantId: tenantID,
+	})
+	if err != nil {
+		return "", "", err
+	}
+
+	return resp.ClientId, resp.ClientSecret, nil
+}
+
+func (c *GRPCTenantClient) ListTenantClients(ctx context.Context, tenantID string) ([]TenantClientInfo, error) {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.ListTenantClients(authCtx, &v0.ListTenantClientsRequest{
+		TenantId: tenantID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	clients := make([]TenantClientInfo, len(resp.Clients))
+	for i, c := range resp.Clients {
+		clients[i] = TenantClientInfo{ClientID: c.ClientId, CreatedAt: c.CreatedAt}
+	}
+	return clients, nil
+}
+
+func (c *GRPCTenantClient) DeleteTenantClient(ctx context.Context, tenantID, clientID string) error {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.client.DeleteTenantClient(authCtx, &v0.DeleteTenantClientRequest{
+		TenantId: tenantID,
+		ClientId: clientID,
 	})
 	return err
 }

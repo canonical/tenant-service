@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
+	"github.com/canonical/tenant-service/internal/hydra"
 	"github.com/canonical/tenant-service/internal/kratos"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring/prometheus"
@@ -151,10 +152,24 @@ func serve() error {
 		logger,
 	)
 
+	var hydraClient tenant.HydraClientInterface
+	if specs.HydraAdminURL != "" {
+		hydraClient = hydra.NewClient(
+			specs.HydraAdminURL,
+			tracer,
+			monitor,
+			logger,
+		)
+		logger.Info("Hydra admin client configured")
+	} else {
+		logger.Warn("HYDRA_ADMIN_URL not set; client management endpoints will not work")
+	}
+
 	tenantService := tenant.NewService(
 		s,
 		authorizer,
 		kratosClient,
+		hydraClient,
 		specs.InvitationLifetime,
 		tracer,
 		monitor,

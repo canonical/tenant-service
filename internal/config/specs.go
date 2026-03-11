@@ -11,6 +11,7 @@ type EnvSpec struct {
 	TracingEnabled   bool   `envconfig:"tracing_enabled" default:"true"`
 
 	KratosAdminURL string `envconfig:"kratos_admin_url" required:"true"`
+	HydraAdminURL  string `envconfig:"hydra_admin_url"`
 
 	InvitationLifetime string `envconfig:"invitation_lifetime" default:"24h"`
 

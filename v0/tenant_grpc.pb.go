@@ -20,16 +20,19 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	TenantService_ListMyTenants_FullMethodName    = "/identity.platform.api.tenant.TenantService/ListMyTenants"
-	TenantService_InviteMember_FullMethodName     = "/identity.platform.api.tenant.TenantService/InviteMember"
-	TenantService_ListTenants_FullMethodName      = "/identity.platform.api.tenant.TenantService/ListTenants"
-	TenantService_ListUserTenants_FullMethodName  = "/identity.platform.api.tenant.TenantService/ListUserTenants"
-	TenantService_ListTenantUsers_FullMethodName  = "/identity.platform.api.tenant.TenantService/ListTenantUsers"
-	TenantService_CreateTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/CreateTenant"
-	TenantService_UpdateTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/UpdateTenant"
-	TenantService_DeleteTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/DeleteTenant"
-	TenantService_ProvisionUser_FullMethodName    = "/identity.platform.api.tenant.TenantService/ProvisionUser"
-	TenantService_UpdateTenantUser_FullMethodName = "/identity.platform.api.tenant.TenantService/UpdateTenantUser"
+	TenantService_ListMyTenants_FullMethodName      = "/identity.platform.api.tenant.TenantService/ListMyTenants"
+	TenantService_InviteMember_FullMethodName       = "/identity.platform.api.tenant.TenantService/InviteMember"
+	TenantService_ListTenants_FullMethodName        = "/identity.platform.api.tenant.TenantService/ListTenants"
+	TenantService_ListUserTenants_FullMethodName    = "/identity.platform.api.tenant.TenantService/ListUserTenants"
+	TenantService_ListTenantUsers_FullMethodName    = "/identity.platform.api.tenant.TenantService/ListTenantUsers"
+	TenantService_CreateTenant_FullMethodName       = "/identity.platform.api.tenant.TenantService/CreateTenant"
+	TenantService_UpdateTenant_FullMethodName       = "/identity.platform.api.tenant.TenantService/UpdateTenant"
+	TenantService_DeleteTenant_FullMethodName       = "/identity.platform.api.tenant.TenantService/DeleteTenant"
+	TenantService_ProvisionUser_FullMethodName      = "/identity.platform.api.tenant.TenantService/ProvisionUser"
+	TenantService_UpdateTenantUser_FullMethodName   = "/identity.platform.api.tenant.TenantService/UpdateTenantUser"
+	TenantService_CreateTenantClient_FullMethodName = "/identity.platform.api.tenant.TenantService/CreateTenantClient"
+	TenantService_ListTenantClients_FullMethodName  = "/identity.platform.api.tenant.TenantService/ListTenantClients"
+	TenantService_DeleteTenantClient_FullMethodName = "/identity.platform.api.tenant.TenantService/DeleteTenantClient"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -48,6 +51,10 @@ type TenantServiceClient interface {
 	DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ProvisionUser(ctx context.Context, in *ProvisionUserRequest, opts ...grpc.CallOption) (*ProvisionUserResponse, error)
 	UpdateTenantUser(ctx context.Context, in *UpdateTenantUserRequest, opts ...grpc.CallOption) (*UpdateTenantUserResponse, error)
+	// Client endpoints
+	CreateTenantClient(ctx context.Context, in *CreateTenantClientRequest, opts ...grpc.CallOption) (*CreateTenantClientResponse, error)
+	ListTenantClients(ctx context.Context, in *ListTenantClientsRequest, opts ...grpc.CallOption) (*ListTenantClientsResponse, error)
+	DeleteTenantClient(ctx context.Context, in *DeleteTenantClientRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type tenantServiceClient struct {
@@ -148,6 +155,33 @@ func (c *tenantServiceClient) UpdateTenantUser(ctx context.Context, in *UpdateTe
 	return out, nil
 }
 
+func (c *tenantServiceClient) CreateTenantClient(ctx context.Context, in *CreateTenantClientRequest, opts ...grpc.CallOption) (*CreateTenantClientResponse, error) {
+	out := new(CreateTenantClientResponse)
+	err := c.cc.Invoke(ctx, TenantService_CreateTenantClient_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ListTenantClients(ctx context.Context, in *ListTenantClientsRequest, opts ...grpc.CallOption) (*ListTenantClientsResponse, error) {
+	out := new(ListTenantClientsResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListTenantClients_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) DeleteTenantClient(ctx context.Context, in *DeleteTenantClientRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_DeleteTenantClient_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility
@@ -164,6 +198,10 @@ type TenantServiceServer interface {
 	DeleteTenant(context.Context, *DeleteTenantRequest) (*emptypb.Empty, error)
 	ProvisionUser(context.Context, *ProvisionUserRequest) (*ProvisionUserResponse, error)
 	UpdateTenantUser(context.Context, *UpdateTenantUserRequest) (*UpdateTenantUserResponse, error)
+	// Client endpoints
+	CreateTenantClient(context.Context, *CreateTenantClientRequest) (*CreateTenantClientResponse, error)
+	ListTenantClients(context.Context, *ListTenantClientsRequest) (*ListTenantClientsResponse, error)
+	DeleteTenantClient(context.Context, *DeleteTenantClientRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -200,6 +238,15 @@ func (UnimplementedTenantServiceServer) ProvisionUser(context.Context, *Provisio
 }
 func (UnimplementedTenantServiceServer) UpdateTenantUser(context.Context, *UpdateTenantUserRequest) (*UpdateTenantUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateTenantUser not implemented")
+}
+func (UnimplementedTenantServiceServer) CreateTenantClient(context.Context, *CreateTenantClientRequest) (*CreateTenantClientResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateTenantClient not implemented")
+}
+func (UnimplementedTenantServiceServer) ListTenantClients(context.Context, *ListTenantClientsRequest) (*ListTenantClientsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTenantClients not implemented")
+}
+func (UnimplementedTenantServiceServer) DeleteTenantClient(context.Context, *DeleteTenantClientRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteTenantClient not implemented")
 }
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 
@@ -394,6 +441,60 @@ func _TenantService_UpdateTenantUser_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_CreateTenantClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTenantClientRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).CreateTenantClient(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_CreateTenantClient_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).CreateTenantClient(ctx, req.(*CreateTenantClientRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ListTenantClients_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTenantClientsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListTenantClients(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListTenantClients_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListTenantClients(ctx, req.(*ListTenantClientsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_DeleteTenantClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTenantClientRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).DeleteTenantClient(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_DeleteTenantClient_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).DeleteTenantClient(ctx, req.(*DeleteTenantClientRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -440,6 +541,18 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateTenantUser",
 			Handler:    _TenantService_UpdateTenantUser_Handler,
+		},
+		{
+			MethodName: "CreateTenantClient",
+			Handler:    _TenantService_CreateTenantClient_Handler,
+		},
+		{
+			MethodName: "ListTenantClients",
+			Handler:    _TenantService_ListTenantClients_Handler,
+		},
+		{
+			MethodName: "DeleteTenantClient",
+			Handler:    _TenantService_DeleteTenantClient_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

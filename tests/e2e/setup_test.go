@@ -167,6 +167,7 @@ func setupTestEnvironment() (*TestEnvironment, error) {
 		"AUTHENTICATION_ENABLED":          "true",
 		"AUTHENTICATION_ISSUER":           "http://localhost:4444",
 		"AUTHENTICATION_ALLOWED_SUBJECTS": clientId,
+		"HYDRA_ADMIN_URL":                 "http://localhost:4445",
 	}
 
 	cmd, err := startServer(ctx, binPath, envVars)
