@@ -22,6 +22,9 @@ type ServiceInterface interface {
 	ListTenantsByUserID(ctx context.Context, userID string, opts types.ListOptions) ([]*types.Tenant, string, error)
 	ListTenants(ctx context.Context, opts types.ListOptions) ([]*types.Tenant, string, error)
 	ListTenantUsers(ctx context.Context, tenantID string, opts types.ListOptions) ([]*types.TenantUser, string, error)
+	CreateTenantClient(ctx context.Context, tenantID string) (string, string, error)
+	ListTenantClients(ctx context.Context, tenantID string) ([]*types.OAuth2Client, error)
+	DeleteTenantClient(ctx context.Context, tenantID, clientID string) error
 }
 
 type StorageInterface interface {
@@ -29,13 +32,16 @@ type StorageInterface interface {
 	UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) error
 	DeleteTenant(ctx context.Context, id string) error
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
+	AddClient(ctx context.Context, tenantID, clientID string) (string, error)
 	GetTenantByID(ctx context.Context, id string) (*types.Tenant, error)
 	ListTenantsByUserID(ctx context.Context, userID string, opts types.ListOptions) ([]*types.Tenant, string, error)
 	ListTenants(ctx context.Context, opts types.ListOptions) ([]*types.Tenant, string, error)
 	ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
 	GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
 	ListMembersByTenantID(ctx context.Context, tenantID string, opts types.ListOptions) ([]*types.Membership, string, error)
+	ListClientsByTenantID(ctx context.Context, tenantID string) ([]*types.Membership, error)
 	UpdateMember(ctx context.Context, tenantID, userID, role string) error
+	DeleteMember(ctx context.Context, tenantID, identityID string) error
 }
 
 type AuthzInterface interface {
@@ -52,4 +58,10 @@ type KratosClientInterface interface {
 	CreateIdentity(ctx context.Context, email string) (string, error)
 	GetIdentity(ctx context.Context, id string) (*ory.Identity, error)
 	CreateRecoveryLink(ctx context.Context, identityID string, expiresIn string) (string, string, error)
+}
+
+// HydraClientInterface defines operations for managing Hydra OAuth2 clients.
+type HydraClientInterface interface {
+	CreateOAuth2Client(ctx context.Context, clientID string, metadata map[string]interface{}) (string, error)
+	DeleteOAuth2Client(ctx context.Context, clientID string) error
 }

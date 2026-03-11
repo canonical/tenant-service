@@ -12,6 +12,12 @@ const (
 	maxPageSize     int32 = 100
 )
 
+// Identity type constants for the memberships table discriminator.
+const (
+	IdentityTypeUser   = "user"
+	IdentityTypeClient = "client"
+)
+
 type Tenant struct {
 	ID        string    `db:"id"`
 	Name      string    `db:"name"`
@@ -20,11 +26,12 @@ type Tenant struct {
 }
 
 type Membership struct {
-	ID               string    `db:"id"`
-	TenantID         string    `db:"tenant_id"`
-	KratosIdentityID string    `db:"kratos_identity_id"`
-	Role             string    `db:"role"`
-	CreatedAt        time.Time `db:"created_at"`
+	ID           string    `db:"id"`
+	TenantID     string    `db:"tenant_id"`
+	IdentityID   string    `db:"identity_id"`
+	IdentityType string    `db:"identity_type"`
+	Role         string    `db:"role"`
+	CreatedAt    time.Time `db:"created_at"`
 }
 
 type TenantUser struct {
@@ -51,4 +58,11 @@ func (o ListOptions) ResolvePageSize() uint64 {
 		return uint64(maxPageSize)
 	}
 	return uint64(o.PageSize)
+}
+
+// OAuth2Client represents an OAuth2 client associated with a tenant.
+type OAuth2Client struct {
+	ClientID  string
+	TenantID  string
+	CreatedAt time.Time
 }

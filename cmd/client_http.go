@@ -83,7 +83,7 @@ func (c *httpTenantClient) handleRequest(resp *http.Response, err error, out pro
 
 func (c *httpTenantClient) ListMyTenants(ctx context.Context, in *v0.ListMyTenantsRequest, opts ...grpc.CallOption) (*v0.ListMyTenantsResponse, error) {
 	out := new(v0.ListMyTenantsResponse)
-	resp, err := c.client.TenantServiceListMyTenants(ctx)
+	resp, err := c.client.TenantServiceListMyTenants(ctx, nil)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (c *httpTenantClient) ListMyTenants(ctx context.Context, in *v0.ListMyTenan
 
 func (c *httpTenantClient) ListTenants(ctx context.Context, in *v0.ListTenantsRequest, opts ...grpc.CallOption) (*v0.ListTenantsResponse, error) {
 	out := new(v0.ListTenantsResponse)
-	resp, err := c.client.TenantServiceListTenants(ctx)
+	resp, err := c.client.TenantServiceListTenants(ctx, nil)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (c *httpTenantClient) InviteMember(ctx context.Context, in *v0.InviteMember
 
 func (c *httpTenantClient) ListUserTenants(ctx context.Context, in *v0.ListUserTenantsRequest, opts ...grpc.CallOption) (*v0.ListUserTenantsResponse, error) {
 	out := new(v0.ListUserTenantsResponse)
-	resp, err := c.client.TenantServiceListUserTenants(ctx, in.UserId)
+	resp, err := c.client.TenantServiceListUserTenants(ctx, in.UserId, nil)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (c *httpTenantClient) ProvisionUser(ctx context.Context, in *v0.ProvisionUs
 
 func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenantUsersRequest, opts ...grpc.CallOption) (*v0.ListTenantUsersResponse, error) {
 	out := new(v0.ListTenantUsersResponse)
-	resp, err := c.client.TenantServiceListTenantUsers(ctx, in.TenantId)
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, in.TenantId, nil)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -185,4 +185,31 @@ func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenan
 
 func (c *httpTenantClient) UpdateTenantUser(ctx context.Context, in *v0.UpdateTenantUserRequest, opts ...grpc.CallOption) (*v0.UpdateTenantUserResponse, error) {
 	return nil, fmt.Errorf("method UpdateTenantUser not implemented in HTTP client")
+}
+
+func (c *httpTenantClient) CreateTenantClient(ctx context.Context, in *v0.CreateTenantClientRequest, opts ...grpc.CallOption) (*v0.CreateTenantClientResponse, error) {
+	out := new(v0.CreateTenantClientResponse)
+	resp, err := c.client.TenantServiceCreateTenantClientWithBody(ctx, in.TenantId, "application/json", nil)
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *httpTenantClient) ListTenantClients(ctx context.Context, in *v0.ListTenantClientsRequest, opts ...grpc.CallOption) (*v0.ListTenantClientsResponse, error) {
+	out := new(v0.ListTenantClientsResponse)
+	resp, err := c.client.TenantServiceListTenantClients(ctx, in.TenantId)
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *httpTenantClient) DeleteTenantClient(ctx context.Context, in *v0.DeleteTenantClientRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	resp, err := c.client.TenantServiceDeleteTenantClient(ctx, in.TenantId, in.ClientId)
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

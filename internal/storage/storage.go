@@ -152,7 +152,7 @@ func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, opts t
 		Select("t.id", "t.name", "t.created_at", "t.enabled").
 		From("tenants t").
 		Join("memberships m ON t.id = m.tenant_id").
-		Where(sq.Eq{"m.kratos_identity_id": userID}).
+		Where(sq.Eq{"m.identity_id": userID}).
 		OrderBy("t.id").
 		Limit(pageSize + 1)
 
@@ -200,7 +200,7 @@ func (s *Storage) listTenantsByUserID(ctx context.Context, userID string, showDi
 		Select("t.id", "t.name", "t.created_at", "t.enabled").
 		From("tenants t").
 		Join("memberships m ON t.id = m.tenant_id").
-		Where(sq.Eq{"m.kratos_identity_id": userID})
+		Where(sq.Eq{"m.identity_id": userID})
 
 	if !showDisabled {
 		query = query.Where(sq.Eq{"t.enabled": true})
@@ -236,9 +236,9 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 	pageSize := opts.ResolvePageSize()
 
 	query := s.db.Statement(ctx).
-		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
+		Select("id", "tenant_id", "identity_id", "identity_type", "role", "created_at").
 		From("memberships").
-		Where(sq.Eq{"tenant_id": tenantID}).
+		Where(sq.Eq{"tenant_id": tenantID, "identity_type": types.IdentityTypeUser}).
 		OrderBy("id").
 		Limit(pageSize + 1)
 
@@ -259,7 +259,7 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 	var members []*types.Membership
 	for rows.Next() {
 		var m types.Membership
-		if err := rows.Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.TenantID, &m.IdentityID, &m.IdentityType, &m.Role, &m.CreatedAt); err != nil {
 			return nil, "", fmt.Errorf("failed to scan member: %w", err)
 		}
 		members = append(members, &m)
@@ -284,14 +284,14 @@ func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, user
 
 	var m types.Membership
 	err := s.db.Statement(ctx).
-		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
+		Select("id", "tenant_id", "identity_id", "identity_type", "role", "created_at").
 		From("memberships").
 		Where(sq.Eq{
-			"tenant_id":          tenantID,
-			"kratos_identity_id": userID,
+			"tenant_id":   tenantID,
+			"identity_id": userID,
 		}).
 		QueryRowContext(ctx).
-		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt)
+		Scan(&m.ID, &m.TenantID, &m.IdentityID, &m.IdentityType, &m.Role, &m.CreatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -314,8 +314,8 @@ func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) 
 
 	_, err = s.db.Statement(ctx).
 		Insert("memberships").
-		Columns("id", "tenant_id", "kratos_identity_id", "role").
-		Values(id.String(), tenantID, userID, role).
+		Columns("id", "tenant_id", "identity_id", "identity_type", "role").
+		Values(id.String(), tenantID, userID, types.IdentityTypeUser, role).
 		ExecContext(ctx)
 
 	if err != nil {
@@ -339,8 +339,8 @@ func (s *Storage) UpdateMember(ctx context.Context, tenantID, userID, role strin
 		Update("memberships").
 		Set("role", role).
 		Where(sq.Eq{
-			"tenant_id":          tenantID,
-			"kratos_identity_id": userID,
+			"tenant_id":   tenantID,
+			"identity_id": userID,
 		}).
 		ExecContext(ctx)
 
@@ -428,4 +428,81 @@ func decodePageToken(token string) (string, error) {
 		return "", ErrInvalidPageToken
 	}
 	return parsed.String(), nil
+}
+
+func (s *Storage) AddClient(ctx context.Context, tenantID, clientID string) (string, error) {
+	ctx, span := s.tracer.Start(ctx, "storage.AddClient")
+	defer span.End()
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate membership ID: %w", err)
+	}
+
+	_, err = s.db.Statement(ctx).
+		Insert("memberships").
+		Columns("id", "tenant_id", "identity_id", "identity_type", "role").
+		Values(id.String(), tenantID, clientID, types.IdentityTypeClient, "member").
+		ExecContext(ctx)
+
+	if err != nil {
+		if IsDuplicateKeyError(err) {
+			return "", ErrDuplicateKey
+		}
+		if IsForeignKeyViolation(err) {
+			return "", ErrForeignKeyViolation
+		}
+		return "", fmt.Errorf("failed to add client: %w", err)
+	}
+
+	return id.String(), nil
+}
+
+func (s *Storage) ListClientsByTenantID(ctx context.Context, tenantID string) ([]*types.Membership, error) {
+	ctx, span := s.tracer.Start(ctx, "storage.ListClientsByTenantID")
+	defer span.End()
+
+	query := s.db.Statement(ctx).
+		Select("id", "tenant_id", "identity_id", "identity_type", "role", "created_at").
+		From("memberships").
+		Where(sq.Eq{"tenant_id": tenantID, "identity_type": types.IdentityTypeClient})
+
+	rows, err := query.QueryContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list clients: %w", err)
+	}
+	defer rows.Close()
+
+	var clients []*types.Membership
+	for rows.Next() {
+		var m types.Membership
+		if err := rows.Scan(&m.ID, &m.TenantID, &m.IdentityID, &m.IdentityType, &m.Role, &m.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan client: %w", err)
+		}
+		clients = append(clients, &m)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return clients, nil
+}
+
+func (s *Storage) DeleteMember(ctx context.Context, tenantID, identityID string) error {
+	ctx, span := s.tracer.Start(ctx, "storage.DeleteMember")
+	defer span.End()
+
+	_, err := s.db.Statement(ctx).
+		Delete("memberships").
+		Where(sq.Eq{
+			"tenant_id":   tenantID,
+			"identity_id": identityID,
+		}).
+		ExecContext(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete member: %w", err)
+	}
+	return nil
 }

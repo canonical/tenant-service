@@ -333,9 +333,97 @@
           "TenantService"
         ]
       }
+    },
+    "/api/v0/tenants/{tenant_id}/clients": {
+      "get": {
+        "operationId": "TenantService_ListTenantClients",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      },
+      "post": {
+        "summary": "Client endpoints",
+        "operationId": "TenantService_CreateTenantClient",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TenantServiceCreateTenantClientBody"
+            }
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
+    },
+    "/api/v0/tenants/{tenant_id}/clients/{client_id}": {
+      "delete": {
+        "operationId": "TenantService_DeleteTenantClient",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
     }
   },
   "definitions": {
+    "TenantServiceCreateTenantClientBody": {
+      "type": "object"
+    },
     "TenantServiceInviteMemberBody": {
       "type": "object",
       "properties": {
@@ -416,6 +504,17 @@
         }
       }
     },
+    "tenantCreateTenantClientResponse": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        }
+      }
+    },
     "tenantCreateTenantRequest": {
       "type": "object",
       "properties": {
@@ -458,6 +557,18 @@
         },
         "next_page_token": {
           "type": "string"
+        }
+      }
+    },
+    "tenantListTenantClientsResponse": {
+      "type": "object",
+      "properties": {
+        "clients": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/tenantOAuth2Client"
+          }
         }
       }
     },
@@ -505,6 +616,18 @@
           "type": "string"
         }
       }
+    },
+    "tenantOAuth2Client": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        }
+      },
+      "title": "Client messages"
     },
     "tenantProvisionUserResponse": {
       "type": "object",
