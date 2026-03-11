@@ -17,7 +17,7 @@ require (
 	github.com/oapi-codegen/runtime v1.2.0
 	github.com/openfga/go-sdk v0.7.4
 	github.com/openfga/language/pkg/go v0.2.0-beta.2
-	github.com/ory/client-go v1.22.26
+	github.com/ory/client-go v1.22.28
 	github.com/ory/hydra/v2 v2.3.0
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/prometheus/client_golang v1.23.2
@@ -34,10 +34,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.40.0
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/oauth2 v0.35.0
+	golang.org/x/oauth2 v0.36.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.2
 	google.golang.org/protobuf v1.36.11
 	k8s.io/api v0.35.2
 	k8s.io/apimachinery v0.35.2
