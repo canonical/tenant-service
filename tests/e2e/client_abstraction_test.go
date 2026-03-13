@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -93,6 +94,13 @@ type Tenant struct {
 	Name string
 }
 
+// TenantUser represents a user within a tenant.
+type TenantUser struct {
+	UserID string
+	Email  string
+	Role   string
+}
+
 // TenantClient abstracts tenant operations across HTTP and gRPC protocols.
 // Implementations must handle authentication and protocol-specific details.
 type TenantClient interface {
@@ -102,6 +110,17 @@ type TenantClient interface {
 
 	// ListTenants retrieves all tenants the authenticated user has access to.
 	ListTenants(ctx context.Context) ([]Tenant, error)
+
+	// ListTenantsPaged retrieves a single page of tenants.
+	// Pass pageToken="" and pageSize=0 for the first page with the server default size.
+	// Returns the items, the next-page cursor (empty string on last page), and any error.
+	ListTenantsPaged(ctx context.Context, pageToken string, pageSize int32) ([]Tenant, string, error)
+
+	// ListTenantUsersPaged retrieves a single page of users for the given tenant.
+	ListTenantUsersPaged(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]TenantUser, string, error)
+
+	// ProvisionTenantUser adds a user (by email) to a tenant with the given role.
+	ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error
 
 	// UpdateTenant modifies the tenant with the given ID.
 	UpdateTenant(ctx context.Context, id, name string) error
@@ -277,6 +296,124 @@ func (c *HTTPTenantClient) DeleteTenant(ctx context.Context, id string) error {
 	return nil
 }
 
+// paginationQueryEditor returns a RequestEditorFn that appends page_size and
+// page_token to the request URL query string.
+func paginationQueryEditor(pageToken string, pageSize int32) httpclient.RequestEditorFn {
+	return func(ctx context.Context, req *http.Request) error {
+		q := req.URL.Query()
+		if pageSize > 0 {
+			q.Set("page_size", strconv.Itoa(int(pageSize)))
+		}
+		if pageToken != "" {
+			q.Set("page_token", pageToken)
+		}
+		req.URL.RawQuery = q.Encode()
+		return nil
+	}
+}
+
+func (c *HTTPTenantClient) ListTenantsPaged(ctx context.Context, pageToken string, pageSize int32) ([]Tenant, string, error) {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := c.client.TenantServiceListTenants(ctx, authEditor, paginationQueryEditor(pageToken, pageSize))
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, "", fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return nil, "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Tenants []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"tenants"`
+		NextPageToken string `json:"next_page_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	tenants := make([]Tenant, len(result.Tenants))
+	for i, t := range result.Tenants {
+		tenants[i] = Tenant{ID: t.ID, Name: t.Name}
+	}
+	return tenants, result.NextPageToken, nil
+}
+
+func (c *HTTPTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]TenantUser, string, error) {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, authEditor, paginationQueryEditor(pageToken, pageSize))
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, "", fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return nil, "", fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Users []struct {
+			UserID string `json:"user_id"`
+			Email  string `json:"email"`
+			Role   string `json:"role"`
+		} `json:"users"`
+		NextPageToken string `json:"next_page_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	users := make([]TenantUser, len(result.Users))
+	for i, u := range result.Users {
+		users[i] = TenantUser{UserID: u.UserID, Email: u.Email, Role: u.Role}
+	}
+	return users, result.NextPageToken, nil
+}
+
+func (c *HTTPTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.client.TenantServiceProvisionUser(ctx, tenantID, httpclient.TenantServiceProvisionUserJSONRequestBody{
+		Email: &email,
+		Role:  &role,
+	}, authEditor)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *HTTPTenantClient) Close() error {
 	return nil
 }
@@ -356,6 +493,63 @@ func (c *GRPCTenantClient) ListTenants(ctx context.Context) ([]Tenant, error) {
 		tenants[i] = Tenant{ID: t.Id, Name: t.Name}
 	}
 	return tenants, nil
+}
+
+func (c *GRPCTenantClient) ListTenantsPaged(ctx context.Context, pageToken string, pageSize int32) ([]Tenant, string, error) {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := c.client.ListTenants(authCtx, &v0.ListTenantsRequest{
+		PageToken: pageToken,
+		PageSize:  pageSize,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	tenants := make([]Tenant, len(resp.Tenants))
+	for i, t := range resp.Tenants {
+		tenants[i] = Tenant{ID: t.Id, Name: t.Name}
+	}
+	return tenants, resp.NextPageToken, nil
+}
+
+func (c *GRPCTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]TenantUser, string, error) {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := c.client.ListTenantUsers(authCtx, &v0.ListTenantUsersRequest{
+		TenantId:  tenantID,
+		PageToken: pageToken,
+		PageSize:  pageSize,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	users := make([]TenantUser, len(resp.Users))
+	for i, u := range resp.Users {
+		users[i] = TenantUser{UserID: u.UserId, Email: u.Email, Role: u.Role}
+	}
+	return users, resp.NextPageToken, nil
+}
+
+func (c *GRPCTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.client.ProvisionUser(authCtx, &v0.ProvisionUserRequest{
+		TenantId: tenantID,
+		Email:    email,
+		Role:     role,
+	})
+	return err
 }
 
 func (c *GRPCTenantClient) UpdateTenant(ctx context.Context, id, name string) error {

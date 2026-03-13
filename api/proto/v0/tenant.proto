@@ -5,6 +5,7 @@ package identity.platform.api.tenant;
 import "google/api/annotations.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/empty.proto";
+import "buf/validate/validate.proto";
 
 option go_package = "github.com/canonical/tenant-service/api/tenant/v0;tenantv0";
 
@@ -80,38 +81,46 @@ service TenantService {
 // Messages
 
 message UpdateTenantUserRequest {
-  string tenant_id = 1;
-  string user_id = 2;
-  string role = 3;
+  string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+  string user_id = 2 [(buf.validate.field).string.uuid = true];
+  string role = 3 [(buf.validate.field).string.min_len = 1];
 }
 
 message UpdateTenantUserResponse {
   TenantUser user = 1;
 }
 
-message ListMyTenantsRequest {}
+message ListMyTenantsRequest {
+    string page_token = 1;
+    int32 page_size = 2 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+}
 
 message ListMyTenantsResponse {
     repeated Tenant tenants = 1;
+    string next_page_token = 2;
 }
 
-message ListTenantsRequest {}
+message ListTenantsRequest {
+    string page_token = 1;
+    int32 page_size = 2 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+}
 
 message ListTenantsResponse {
     repeated Tenant tenants = 1;
+    string next_page_token = 2;
 }
 
 message Tenant {
-    string id = 1;
+    string id = 1 [(buf.validate.field).string.uuid = true];
     string name = 2;
     string created_at = 3;
     bool enabled = 4;
 }
 
 message InviteMemberRequest {
-    string tenant_id = 1;
-    string email = 2;
-    string role = 3; // owner, admin, member
+    string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+    string email = 2 [(buf.validate.field).string.email = true];
+    string role = 3 [(buf.validate.field).string.min_len = 1];
 }
 
 message InviteMemberResponse {
@@ -121,15 +130,18 @@ message InviteMemberResponse {
 }
 
 message ListUserTenantsRequest {
-    string user_id = 1;
+    string user_id = 1 [(buf.validate.field).string.uuid = true];
+    string page_token = 2;
+    int32 page_size = 3 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
 }
 
 message ListUserTenantsResponse {
     repeated Tenant tenants = 1;
+    string next_page_token = 2;
 }
 
 message CreateTenantRequest {
-    string name = 1;
+    string name = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 message CreateTenantResponse {
@@ -137,7 +149,7 @@ message CreateTenantResponse {
 }
 
 message UpdateTenantRequest {
-    Tenant tenant = 1;
+    Tenant tenant = 1 [(buf.validate.field).required = true];
     google.protobuf.FieldMask update_mask = 2;
 }
 
@@ -146,13 +158,13 @@ message UpdateTenantResponse {
 }
 
 message DeleteTenantRequest {
-    string tenant_id = 1;
+    string tenant_id = 1 [(buf.validate.field).string.uuid = true];
 }
 
 message ProvisionUserRequest {
-    string tenant_id = 1;
-    string email = 2;
-    string role = 3;
+    string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+    string email = 2 [(buf.validate.field).string.email = true];
+    string role = 3 [(buf.validate.field).string.min_len = 1];
 }
 
 message ProvisionUserResponse {
@@ -160,11 +172,14 @@ message ProvisionUserResponse {
 }
 
 message ListTenantUsersRequest {
-    string tenant_id = 1;
+    string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+    string page_token = 2;
+    int32 page_size = 3 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
 }
 
 message ListTenantUsersResponse {
     repeated TenantUser users = 1;
+    string next_page_token = 2;
 }
 
 message TenantUser {

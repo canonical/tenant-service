@@ -5,6 +5,7 @@ package storage
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -87,17 +88,29 @@ func (s *Storage) GetTenantByID(ctx context.Context, id string) (*types.Tenant, 
 	return &t, nil
 }
 
-func (s *Storage) ListTenants(ctx context.Context) ([]*types.Tenant, error) {
+func (s *Storage) ListTenants(ctx context.Context, options ...types.ListOption) ([]*types.Tenant, string, error) {
 	ctx, span := s.tracer.Start(ctx, "storage.ListTenants")
 	defer span.End()
 
+	// TODO: respect Enabled filter from ListOptions when added (see issue #12 follow-up).
+	pageSize, cursorID, err := resolveListOptions(options)
+	if err != nil {
+		return nil, "", err
+	}
+
 	query := s.db.Statement(ctx).
 		Select("id", "name", "created_at", "enabled").
-		From("tenants")
+		From("tenants").
+		OrderBy("id").
+		Limit(pageSize + 1)
+
+	if cursorID != "" {
+		query = query.Where(sq.Gt{"id": cursorID})
+	}
 
 	rows, err := query.QueryContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list tenants: %w", err)
+		return nil, "", fmt.Errorf("failed to list tenants: %w", err)
 	}
 	defer rows.Close()
 
@@ -105,24 +118,76 @@ func (s *Storage) ListTenants(ctx context.Context) ([]*types.Tenant, error) {
 	for rows.Next() {
 		var t types.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.Enabled); err != nil {
-			return nil, fmt.Errorf("failed to scan tenant: %w", err)
+			return nil, "", fmt.Errorf("failed to scan tenant: %w", err)
 		}
 		tenants = append(tenants, &t)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating tenant rows: %w", err)
+		return nil, "", fmt.Errorf("error iterating tenant rows: %w", err)
 	}
 
-	return tenants, nil
+	var nextPageToken string
+	if uint64(len(tenants)) > pageSize {
+		nextPageToken = encodePageToken(tenants[pageSize-1].ID)
+		tenants = tenants[:pageSize]
+	}
+
+	return tenants, nextPageToken, nil
 }
 
 func (s *Storage) ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error) {
 	return s.listTenantsByUserID(ctx, userID, false)
 }
 
-func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error) {
-	return s.listTenantsByUserID(ctx, userID, true)
+func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, options ...types.ListOption) ([]*types.Tenant, string, error) {
+	ctx, span := s.tracer.Start(ctx, "storage.ListTenantsByUserID")
+	defer span.End()
+
+	// TODO: respect Enabled filter from ListOptions when added (see issue #12 follow-up).
+	pageSize, cursorID, err := resolveListOptions(options)
+	if err != nil {
+		return nil, "", err
+	}
+
+	query := s.db.Statement(ctx).
+		Select("t.id", "t.name", "t.created_at", "t.enabled").
+		From("tenants t").
+		Join("memberships m ON t.id = m.tenant_id").
+		Where(sq.Eq{"m.kratos_identity_id": userID}).
+		OrderBy("t.id").
+		Limit(pageSize + 1)
+
+	if cursorID != "" {
+		query = query.Where(sq.Gt{"t.id": cursorID})
+	}
+
+	rows, err := query.QueryContext(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to list tenants: %w", err)
+	}
+	defer rows.Close()
+
+	var tenants []*types.Tenant
+	for rows.Next() {
+		var t types.Tenant
+		if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.Enabled); err != nil {
+			return nil, "", fmt.Errorf("failed to scan tenant: %w", err)
+		}
+		tenants = append(tenants, &t)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	var nextPageToken string
+	if uint64(len(tenants)) > pageSize {
+		nextPageToken = encodePageToken(tenants[pageSize-1].ID)
+		tenants = tenants[:pageSize]
+	}
+
+	return tenants, nextPageToken, nil
 }
 
 func (s *Storage) listTenantsByUserID(ctx context.Context, userID string, showDisabled bool) ([]*types.Tenant, error) {
@@ -161,18 +226,30 @@ func (s *Storage) listTenantsByUserID(ctx context.Context, userID string, showDi
 	return tenants, nil
 }
 
-func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string) ([]*types.Membership, error) {
+func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, options ...types.ListOption) ([]*types.Membership, string, error) {
 	ctx, span := s.tracer.Start(ctx, "storage.ListMembersByTenantID")
 	defer span.End()
+
+	// TODO: respect Role filter from ListOptions when added (see issue #12 follow-up).
+	pageSize, cursorID, err := resolveListOptions(options)
+	if err != nil {
+		return nil, "", err
+	}
 
 	query := s.db.Statement(ctx).
 		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
 		From("memberships").
-		Where(sq.Eq{"tenant_id": tenantID})
+		Where(sq.Eq{"tenant_id": tenantID}).
+		OrderBy("id").
+		Limit(pageSize + 1)
+
+	if cursorID != "" {
+		query = query.Where(sq.Gt{"id": cursorID})
+	}
 
 	rows, err := query.QueryContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list members: %w", err)
+		return nil, "", fmt.Errorf("failed to list members: %w", err)
 	}
 	defer rows.Close()
 
@@ -180,16 +257,47 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string) ([
 	for rows.Next() {
 		var m types.Membership
 		if err := rows.Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan member: %w", err)
+			return nil, "", fmt.Errorf("failed to scan member: %w", err)
 		}
 		members = append(members, &m)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration error: %w", err)
+		return nil, "", fmt.Errorf("rows iteration error: %w", err)
 	}
 
-	return members, nil
+	var nextPageToken string
+	if uint64(len(members)) > pageSize {
+		nextPageToken = encodePageToken(members[pageSize-1].ID)
+		members = members[:pageSize]
+	}
+
+	return members, nextPageToken, nil
+}
+
+func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error) {
+	ctx, span := s.tracer.Start(ctx, "storage.GetMemberByTenantAndUserID")
+	defer span.End()
+
+	var m types.Membership
+	err := s.db.Statement(ctx).
+		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
+		From("memberships").
+		Where(sq.Eq{
+			"tenant_id":          tenantID,
+			"kratos_identity_id": userID,
+		}).
+		QueryRowContext(ctx).
+		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get member: %v", err)
+	}
+
+	return &m, nil
 }
 
 func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) (string, error) {
@@ -301,4 +409,38 @@ func (s *Storage) DeleteTenant(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to delete tenant: %w", err)
 	}
 	return nil
+}
+
+func encodePageToken(id string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(id))
+}
+
+func decodePageToken(token string) (string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return "", ErrInvalidPageToken
+	}
+	parsed, err := uuid.Parse(string(raw))
+	if err != nil {
+		return "", ErrInvalidPageToken
+	}
+	return parsed.String(), nil
+}
+
+// resolveListOptions applies the given functional options and decodes the page
+// token. It returns the effective page size and the cursor ID to use in a
+// WHERE clause (empty string when no token was provided).
+func resolveListOptions(options []types.ListOption) (pageSize uint64, cursorID string, err error) {
+	opts := &types.ListOptions{}
+	for _, o := range options {
+		o(opts)
+	}
+	pageSize = opts.ResolvePageSize()
+	if opts.PageToken != "" {
+		cursorID, err = decodePageToken(opts.PageToken)
+		if err != nil {
+			return 0, "", err
+		}
+	}
+	return pageSize, cursorID, nil
 }

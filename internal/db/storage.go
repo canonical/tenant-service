@@ -21,9 +21,7 @@ import (
 )
 
 const (
-	defaultPage      uint64 = 1
-	defaultPageSize  uint64 = 100
-	defaultTxTimeout        = time.Second * 60
+	defaultTxTimeout = time.Second * 60
 )
 
 type TxContextKey struct{}
@@ -39,22 +37,6 @@ type Config struct {
 	MaxConnLifetime time.Duration
 	MaxConnIdleTime time.Duration
 	TracingEnabled  bool
-}
-
-// Offset calculates the offset for pagination based on the provided page parameter and page size.
-func Offset(pageParam int64, pageSize uint64) uint64 {
-	if pageParam <= 0 {
-		return (defaultPage - 1) * pageSize
-	}
-	return uint64(pageParam-1) * pageSize
-}
-
-// PageSize calculates the page size for pagination based on the provided size parameter.
-func PageSize(sizeParam int64) uint64 {
-	if sizeParam <= 0 {
-		return defaultPageSize
-	}
-	return uint64(sizeParam)
 }
 
 // lazyTx wraps transaction state for lazy initialization.
