@@ -1,5 +1,7 @@
 components:
     schemas:
+        TenantServiceCreateTenantClientBody:
+            type: object
         TenantServiceInviteMemberBody:
             properties:
                 email:
@@ -51,6 +53,13 @@ components:
                 message:
                     type: string
             type: object
+        tenantCreateTenantClientResponse:
+            properties:
+                client_id:
+                    type: string
+                client_secret:
+                    type: string
+            type: object
         tenantCreateTenantRequest:
             properties:
                 name:
@@ -79,6 +88,13 @@ components:
                         $ref: '#/components/schemas/tenantTenant'
                     type: array
             type: object
+        tenantListTenantClientsResponse:
+            properties:
+                clients:
+                    items:
+                        $ref: '#/components/schemas/tenantOAuth2Client'
+                    type: array
+            type: object
         tenantListTenantUsersResponse:
             properties:
                 next_page_token:
@@ -105,6 +121,14 @@ components:
                     items:
                         $ref: '#/components/schemas/tenantTenant'
                     type: array
+            type: object
+        tenantOAuth2Client:
+            properties:
+                client_id:
+                    type: string
+                created_at:
+                    type: string
+            title: Client messages
             type: object
         tenantProvisionUserResponse:
             properties:
@@ -241,6 +265,72 @@ paths:
             parameters:
                 - in: path
                   name: tenant_id
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /api/v0/tenants/{tenant_id}/clients:
+        get:
+            operationId: TenantService_ListTenantClients
+            parameters:
+                - in: path
+                  name: tenant_id
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+        post:
+            operationId: TenantService_CreateTenantClient
+            parameters:
+                - in: path
+                  name: tenant_id
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TenantServiceCreateTenantClientBody'
+                required: true
+                x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            summary: Client endpoints
+            tags:
+                - TenantService
+    /api/v0/tenants/{tenant_id}/clients/{client_id}:
+        delete:
+            operationId: TenantService_DeleteTenantClient
+            parameters:
+                - in: path
+                  name: tenant_id
+                  required: true
+                  schema:
+                    type: string
+                - in: path
+                  name: client_id
                   required: true
                   schema:
                     type: string

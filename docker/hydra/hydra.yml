@@ -32,6 +32,7 @@ oauth2:
   # Allow groups to be a top-level claim in access tokens instead of nested under ext
   allowed_top_level_claims:
     - groups
+    - tenants
   mirror_top_level_claims: false
 
 strategies:

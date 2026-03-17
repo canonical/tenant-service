@@ -76,6 +76,26 @@ service TenantService {
         body: "*"
     };
   }
+
+  // Client endpoints
+  rpc CreateTenantClient(CreateTenantClientRequest) returns (CreateTenantClientResponse) {
+    option (google.api.http) = {
+        post: "/api/v0/tenants/{tenant_id}/clients"
+        body: "*"
+    };
+  }
+
+  rpc ListTenantClients(ListTenantClientsRequest) returns (ListTenantClientsResponse) {
+    option (google.api.http) = {
+        get: "/api/v0/tenants/{tenant_id}/clients"
+    };
+  }
+
+  rpc DeleteTenantClient(DeleteTenantClientRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+        delete: "/api/v0/tenants/{tenant_id}/clients/{client_id}"
+    };
+  }
 }
 
 // Messages
@@ -186,4 +206,32 @@ message TenantUser {
     string user_id = 1;
     string email = 2;
     string role = 3;
+}
+
+// Client messages
+message OAuth2Client {
+    string client_id = 1;
+    string created_at = 2;
+}
+
+message CreateTenantClientRequest {
+    string tenant_id = 1;
+}
+
+message CreateTenantClientResponse {
+    string client_id = 1;
+    string client_secret = 2;
+}
+
+message ListTenantClientsRequest {
+    string tenant_id = 1;
+}
+
+message ListTenantClientsResponse {
+    repeated OAuth2Client clients = 1;
+}
+
+message DeleteTenantClientRequest {
+    string tenant_id = 1;
+    string client_id = 2;
 }
