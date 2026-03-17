@@ -22,6 +22,6 @@ type StorageInterface interface {
 	UpdateMember(ctx context.Context, tenantID, userID, role string) error
 	GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
 	DeleteMember(ctx context.Context, tenantID, identityID string) error
-	ListMembersByTenantID(ctx context.Context, tenantID string, opts types.ListOptions) ([]*types.Membership, string, error)
+	ListMembersByTenantID(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.Membership, string, error)
 	ListClientsByTenantID(ctx context.Context, tenantID string) ([]*types.Membership, error)
 }
