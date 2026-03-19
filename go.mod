@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
+	buf.build/go/protovalidate v1.1.3
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/canonical/identity-platform-api v0.0.0-20251124101154-ab78e5ddfcd5
 	github.com/coreos/go-oidc/v3 v3.17.0
@@ -38,7 +39,7 @@ require (
 	golang.org/x/oauth2 v0.35.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11
 	k8s.io/api v0.35.2
 	k8s.io/apimachinery v0.35.2
@@ -46,7 +47,6 @@ require (
 )
 
 require (
-	buf.build/go/protovalidate v1.1.3 // indirect
 	cel.dev/expr v0.25.1 // indirect
 	code.dny.dev/ssrf v0.2.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect

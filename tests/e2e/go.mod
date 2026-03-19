@@ -7,7 +7,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/ory/hydra-client-go/v2 v2.2.1
 	github.com/testcontainers/testcontainers-go/modules/compose v0.36.0
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11
 )
 
