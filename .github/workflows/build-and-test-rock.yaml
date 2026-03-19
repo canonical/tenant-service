@@ -23,6 +23,5 @@ jobs:
     needs: [build]
     with:
       oci-archive-name: "tenant-service"
-      trivyignore-path: ".trivyignore"
     secrets:
       host-github-token: ${{ secrets.PAT_TOKEN }}

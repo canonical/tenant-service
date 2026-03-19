@@ -18,10 +18,10 @@ type ServiceInterface interface {
 	DeleteTenant(ctx context.Context, id string) error
 	ProvisionUser(ctx context.Context, tenantID, email, role string) error
 	UpdateTenantUser(ctx context.Context, tenantID, userID, role string) (*types.TenantUser, error)
-	ListUserTenants(ctx context.Context, userID string) ([]*types.Tenant, error)
-	ListTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
-	ListTenants(ctx context.Context) ([]*types.Tenant, error)
-	ListTenantUsers(ctx context.Context, tenantID string) ([]*types.TenantUser, error)
+	ListUserTenants(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error)
+	ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error)
+	ListTenants(ctx context.Context, opts ...types.ListOption) ([]*types.Tenant, string, error)
+	ListTenantUsers(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.TenantUser, string, error)
 }
 
 type StorageInterface interface {
@@ -30,10 +30,11 @@ type StorageInterface interface {
 	DeleteTenant(ctx context.Context, id string) error
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
 	GetTenantByID(ctx context.Context, id string) (*types.Tenant, error)
-	ListTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
-	ListTenants(ctx context.Context) ([]*types.Tenant, error)
+	ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error)
+	ListTenants(ctx context.Context, opts ...types.ListOption) ([]*types.Tenant, string, error)
 	ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
-	ListMembersByTenantID(ctx context.Context, tenantID string) ([]*types.Membership, error)
+	GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
+	ListMembersByTenantID(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.Membership, string, error)
 	UpdateMember(ctx context.Context, tenantID, userID, role string) error
 }
 
