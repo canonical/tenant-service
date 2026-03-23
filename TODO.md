@@ -19,47 +19,67 @@ The `Authorizer` and OpenFGA model are wired up but never consulted in the servi
 - [ ] `CreateTenant`: decide and enforce who is allowed to create tenants (admin-only vs. self-service)
 - [ ] Add `SecurityLogger` audit calls for all state-changing operations (currently wired but unused)
 
-### Token hook — inject single `tenant_id` instead of a list
+### Token hook — inject single `tenant_id` instead of a list ✅ Done
 
 The current `HandleTokenHook` queries all active tenants for the user and injects them as a
 `tenants: [...]` list. The correct behaviour is to read the `tenant_id` that was selected during
 login from the session (set at the Hydra consent step in Flow 2), validate that the user is still
 an active member of that tenant, and inject a single `tenant_id` claim.
 
-- [ ] Read `tenant_id` from `req.Session.Extra["tenant_id"]` in `pkg/webhooks/service.go`
-- [ ] Replace the `ListActiveTenantsByUserID` call with a single membership existence check
-      (`GetMembership(ctx, tenantID, userID)` — requires the storage method from the login hook work)
-- [ ] Change claim key from `tenants` (array) to `tenant_id` (string) in both `IDToken` and `AccessToken`
-- [ ] Return `403 Forbidden` if the user is not an active member of the requested tenant
-- [ ] Add unit tests
+- [x] Read `tenant_id` from `req.Session.Extra["tenant_id"]` in `pkg/webhooks/service.go`
+- [x] Replace the `ListActiveTenantsByUserID` call with a single membership existence check
+      (`GetActiveMemberByTenantAndUserID(ctx, tenantID, userID)`)
+- [x] Change claim key from `tenants` (array) to `tenant_id` (string) in both `IDToken` and `AccessToken`
+- [x] Return `403 Forbidden` if the user is not an active member of the requested tenant
+- [x] Add unit tests
 
-### [#15](https://github.com/canonical/tenant-service/issues/15) — Implement Kratos login hook
+### [#15](https://github.com/canonical/tenant-service/issues/15) — Implement Kratos login hook ✅ Done
 
 Implement the `POST /api/v0/webhooks/login` endpoint so that Kratos can validate during login
 that the user is a member of the tenant they are trying to access.
 Required for **Tenant-Aware Login** (Flow 2) and **Tenant Switching** (Flow 6) to work end-to-end.
 
-- [ ] Add `login` handler to `pkg/webhooks/handlers.go` — register `POST /webhooks/login`
-- [ ] Add `HandleLoginHook(ctx, identityID, tenantID string) error` to `pkg/webhooks/service.go`
-- [ ] Query `memberships` to verify `(tenantID, identityID)` exists
-- [ ] Return `200 OK` if valid, `403 Forbidden` if user is not a member
-- [ ] Add `StorageInterface.GetMembership(ctx, tenantID, identityID)` method
-- [ ] Add `storage.GetMembership` SQL implementation
-- [ ] Add unit tests for the new handler and service method
+- [x] Add `login` handler to `pkg/webhooks/handlers.go` — `POST /api/v0/webhooks/login`
+- [x] Add `HandleLoginHook(ctx, identityID, email, tenantID string) error` to `pkg/webhooks/service.go`
+- [x] Query `memberships JOIN tenants` to verify active membership
+- [x] Return `200 OK` if valid, `403 Forbidden` if user is not a member
+- [x] Lazy reconciliation for orphaned identities (no memberships → re-run registration logic)
+- [x] Add `StorageInterface.GetActiveMemberByTenantAndUserID` and `HasAnyMembership` methods
+- [x] Storage SQL implementation for both new methods
+- [x] Unit tests for handler and service (including reconciliation path)
+- [x] E2E tests in `tests/e2e/webhook_login_test.go`
+- [x] Kratos config updated in `docker/kratos/kratos.yml` with login after-hook
+- [x] Design documented in `docs/adr/0008-tenant-aware-login.md`
 
-### [#15](https://github.com/canonical/tenant-service/issues/15) — Implement tenant lookup endpoint
+### [#15](https://github.com/canonical/tenant-service/issues/15) — Implement tenant lookup endpoint ✅ Done
 
 Implement `GET /api/v0/tenants/lookup?email=...` so the Login UI can discover a user's tenants
 by email during the identifier-first login step.
 Required for **Tenant-Aware Login** (Flow 2) and **Tenant Switching** (Flow 6).
 
-- [ ] Add `LookupTenantsByEmail` gRPC method to `api/proto/v0/tenant.proto` with HTTP binding
+- [x] Add `LookupTenantsByEmail` gRPC method to `api/proto/v0/tenant.proto` with HTTP binding
       `GET /api/v0/tenants/lookup` and query param `email`
-- [ ] Regenerate protobuf (`buf generate`)
-- [ ] Implement `Handler.LookupTenantsByEmail` in `pkg/tenant/handlers.go`
-- [ ] Implement `Service.LookupTenantsByEmail(ctx, email string)` in `pkg/tenant/service.go`
+- [x] Regenerate protobuf (`buf generate`)
+- [x] Implement `Handler.LookupTenantsByEmail` in `pkg/tenant/handlers.go`
+- [x] Implement `Service.LookupTenantsByEmail(ctx, email string)` in `pkg/tenant/service.go`
       — calls Kratos Admin to resolve email → identityID, then calls storage
-- [ ] Add unit tests
+- [x] Register as unauthenticated route in `pkg/web/router.go`
+- [x] Add unit tests
+- [x] E2E tests in `tests/e2e/webhook_login_test.go`
+- [x] Login UI implementation prompt in `docs/login-ui-prompt.md`
+
+### Lookup endpoint hardening
+
+The `GET /api/v0/tenants/lookup` endpoint is currently unauthenticated. The following hardening
+steps should be implemented before the service is exposed in a production environment.
+
+- [ ] Rate limiting should be enforced at the proxy/ingress layer (e.g. Traefik rate-limit
+      middleware, nginx `limit_req`), not in the service itself; configure it there before
+      exposing the endpoint publicly
+- [ ] Add a fixed-time response path so that known vs. unknown emails are indistinguishable by
+      response timing (constant-time lookup)
+- [ ] Add a service-account OAuth2 client for the Login UI and require a Bearer token on the
+      lookup endpoint (Login UI obtains it via `client_credentials` before initiating login)
 
 ---
 
@@ -198,6 +218,30 @@ if `updated_at` on the tenant/membership row is within the OpenFGA cache TTL win
 - [ ] Add `user_type` field or separate membership path as appropriate
 - [ ] Update FGA model if required
 
+### Machine user token enrichment (Option B from ADR 0008)
+
+The token hook (ADR 0008, Option B) for machine users is deferred. Until implemented, machine
+users running `client_credentials` flows will not receive a `tenant_id` claim in their tokens.
+
+- [ ] Investigate Hydra configuration for passing a custom request parameter (e.g. `tenant_id`)
+      through to the token hook in `client_credentials` and `authorization_code` flows
+- [ ] Implement `HandleTokenHook` branch for when `req.Session.Subject` is a client ID
+      (no Kratos session exists) — read `tenant_id` from token request scope or extra claim
+- [ ] Add unit tests for machine-user token hook branch
+- [ ] Document in ADR 0008 once implementation is known
+
+### Reconciliation failure observability ✅ Done
+
+When the lazy reconciliation path in `HandleLoginHook` fails (openFGA or DB error), the user's
+login is blocked but there is no metric or alert to signal that orphaned identities exist.
+
+- [x] Increment a `login_reconciliation_error` counter via `MonitorInterface` on reconciliation
+      failures in `pkg/webhooks/service.go` (tags: `operation`, `identity_id`)
+- [x] The `identity_id` is logged at `ErrorLevel` via `recordError` so operations can locate
+      stuck identities in the log stream
+- [ ] Add a Prometheus alert rule for `business_operations_total{operation="login_reconciliation_error"} > 0`
+      (configure in the ops/alerting repository, not in the service itself)
+
 ---
 
 ## 🟢 Low — Improvements & Cleanup
@@ -223,9 +267,11 @@ if `updated_at` on the tenant/membership row is within the OpenFGA cache TTL win
 
 ### Testing
 
-- [ ] Implement unit tests for `pkg/tenant` (handler + service layers)
-- [ ] Initialise E2E test suite
-- [ ] Implement browser-based E2E tests for Hydra/Kratos hooks
+- [x] Implement unit tests for `pkg/tenant` service layer (`LookupTenantsByEmail`)
+- [x] Implement unit tests for `pkg/webhooks` (token hook + login hook)
+- [x] Initialise E2E test suite
+- [x] E2E tests for login hook and tenant lookup (`tests/e2e/webhook_login_test.go`)
+- [x] Implement browser-based E2E tests for Hydra/Kratos hooks (full flow with real Kratos sessions)
 
 ### Infrastructure
 

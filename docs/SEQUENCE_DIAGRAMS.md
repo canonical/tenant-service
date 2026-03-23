@@ -11,10 +11,11 @@ This document describes the end-to-end user flows for the Tenant Service, as def
 
 ## Flow 1 — Self-Service Registration
 
-A new user registers via the Login UI. Kratos pauses identity creation and calls the Tenant API
-webhook. The Tenant API atomically creates a disabled "shadow tenant" and assigns the user as
-owner in both PostgreSQL and OpenFGA. Only on `200 OK` does Kratos commit the identity — ensuring
-no orphaned identities are ever created.
+A new user registers via the Login UI. Kratos fires the Tenant API webhook **after** the identity
+has already been persisted. The Tenant API creates a disabled "shadow tenant" and assigns the user
+as owner in both PostgreSQL and OpenFGA. If the webhook fails, the Kratos identity still exists but
+has no membership — an "orphaned identity". These are automatically remediated by the login hook
+(Flow 2) via lazy reconciliation. See [ADR 0008](adr/0008-tenant-aware-login.md).
 
 **Systems:** Login UI → Kratos → Tenant API → PostgreSQL → OpenFGA
 
@@ -40,6 +41,9 @@ sequenceDiagram
     TenantAPI->>MW: Begin DB transaction (non-GET request)
     MW->>WebhookSvc: HandleRegistration(ctx, identityID, email)
 
+    WebhookSvc->>WebhookSvc: Validate identityID and email are non-empty
+    Note over WebhookSvc: Returns error if either is missing
+
     WebhookSvc->>DB: INSERT INTO tenants<br/>(id=uuid_v7, name="alice@example.com's Org", enabled=false)
     DB-->>WebhookSvc: tenant{id, name, created_at, enabled=false}
 
@@ -54,7 +58,7 @@ sequenceDiagram
     TenantAPI-->>Kratos: 200 OK
     deactivate TenantAPI
 
-    Note over Kratos: Identity committed to Kratos DB only after 200 OK
+    Note over Kratos: Identity was already committed before the webhook fired
     Kratos-->>UI: Set session cookie & redirect
     UI-->>User: Welcome dashboard
 
@@ -62,7 +66,8 @@ sequenceDiagram
         WebhookSvc-->>MW: error
         MW->>DB: ROLLBACK transaction
         TenantAPI-->>Kratos: 500 Internal Server Error
-        Note over Kratos: Aborts identity creation — no orphan identities
+        Note over Kratos: Shows error to user — identity already exists in Kratos DB
+        Note over Kratos: Orphaned identity (no membership) is reconciled on next login (Flow 2)
         Kratos-->>UI: Registration error
         UI-->>User: Show error message
     end
@@ -72,59 +77,180 @@ sequenceDiagram
 
 ## Flow 2 — Tenant-Aware Login
 
-A user visits the portal, enters their email, and the Login UI discovers which tenants they belong
-to. If they belong to multiple tenants they select one. The selected `tenant_id` is injected into
-the Kratos login payload. Kratos fires a login validation webhook to the Tenant API which approves
-or rejects the auth method for that tenant.
+A user visits the portal and starts an OAuth2 authorization-code flow. The Login UI Go backend's
+`handleCreateFlow` endpoint manages the entire decision through the **InterceptLogin** plugin
+pattern. The `TenantResolverInterface` plugin encapsulates all tenant-specific logic, keeping the
+handler itself multi-tenancy-agnostic.
 
-**Systems:** Login UI → Tenant API (lookup) → Kratos → Tenant API (login webhook)
+When the user has an active Kratos session, `InterceptLogin` evaluates three possible outcomes:
+- **DeferMFAChecks**: The user has a session but hasn't authenticated for this specific login
+  challenge yet (cookie has no matching `LoginChallengeHash`). MFA/WebAuthn enforcement is
+  deferred until after the user completes first-factor auth.
+- **SelectTenant**: The user is authenticated but needs to choose a tenant (2+ tenants found,
+  none stored in cookie yet). The backend redirects to `/ui/select_tenant`.
+- **AcceptLogin**: The tenant has been resolved (single tenant auto-selected, or user previously
+  chose one). The backend accepts the Hydra login immediately.
 
-> See [issue #15](https://github.com/canonical/tenant-service/issues/15) for implementation status.
+When multi-tenancy is **disabled**, the `NoOpTenantResolver` returns all-zero fields (no special
+handling), and the handler falls through to its standard `MustReAuthenticate` logic unchanged.
+
+After the identifier-first step (email entry), the backend checks `NeedsTenantSelectionByEmail`
+to determine if the user needs to pick a tenant — this happens **before** the password form is
+shown. If the user belongs to 2+ active tenants, the backend redirects to `/ui/select_tenant`;
+single-tenant users are automatically redirected through the selection page (which auto-submits);
+zero-tenant users proceed immediately with a `__none__` sentinel. Only after tenant resolution
+is complete does the password form appear.
+
+Finally, during the consent step, the Go backend reads the `TenantID` from the encrypted state
+cookie and passes it to Hydra as `_tenant_id` in the consent accept payload.
+
+**Systems:** Login UI (Go) → Tenant API → Kratos → Hydra
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant UI as Login UI
+    participant Frontend as Login UI (Next.js)
+    participant Backend as Login UI (Go)
+    participant Plugin as TenantResolver Plugin
     participant TenantAPI as Tenant API
     participant Kratos as Ory Kratos
     participant Hydra as Ory Hydra
 
-    User->>UI: Access portal / login page
-    UI->>Kratos: GET /self-service/login/browser
-    Kratos-->>UI: Return flow ID
+    User->>Frontend: Click "Authorize" (starts OAuth2 flow)
+    Frontend->>Backend: GET /api/kratos/self-service/login/browser<br/>?login_challenge=abc123
 
-    User->>UI: Enter email "alice@example.com"
+    alt No active Kratos session
+        Note over Backend: session == nil → skip InterceptLogin entirely
+        Backend->>Kratos: Create new login flow (refresh=true)
+        Kratos-->>Backend: LoginFlow{id: "flow-id"}
+        Backend-->>Frontend: {flow_id: "...", redirect_to: "/ui/login?flow=..."}
+        Frontend->>User: Show identifier-first login form
 
-    UI->>TenantAPI: GET /api/v0/tenants/lookup?email=alice@example.com
-    TenantAPI-->>UI: [{id: "t1", name: "Canonical"}, {id: "t2", name: "Acme"}]
+        User->>Frontend: Enter email
+        Frontend->>Backend: POST /api/kratos/self-service/login/id-first
+        Backend->>Kratos: Submit identifier_first
+        Kratos-->>Backend: Flow advanced to password step
 
-    alt Multiple tenants found
-        UI->>User: Display "Select Organisation" screen
-        User->>UI: Selects "Canonical" (t1)
-    else Single tenant found
-        UI->>UI: Auto-select tenant
+        Note over Backend,Plugin: NeedsTenantSelectionByEmail — tenant check BEFORE password
+        Backend->>Plugin: NeedsTenantSelectionByEmail(ctx, email, cookie, loginChallenge)
+        Plugin->>TenantAPI: GET /api/v0/tenants/lookup?email=alice@example.com
+
+        alt 0 tenants
+            TenantAPI-->>Plugin: {"tenants": []}
+            Plugin-->>Backend: needsSelection=false, cookie.TenantID="__none__"
+            Backend-->>Frontend: {redirect_to: "/ui/login?flow=..."} (password form)
+        else 1 tenant
+            TenantAPI-->>Plugin: {"tenants": [{id: "t1"}]}
+            Plugin-->>Backend: needsSelection=true
+            Backend-->>Frontend: {redirect_to: "/ui/select_tenant?flow=...&login_challenge=..."}
+            Frontend->>Frontend: Tenant page auto-selects single tenant
+            Frontend-->>Frontend: Redirect back to /ui/login?flow=... (password form)
+        else 2+ tenants
+            TenantAPI-->>Plugin: {"tenants": [{id: "t1"}, {id: "t2"}]}
+            Plugin-->>Backend: needsSelection=true
+            Backend-->>Frontend: {redirect_to: "/ui/select_tenant?flow=...&login_challenge=..."}
+            Frontend->>User: Display "Select a tenant" screen
+            User->>Frontend: Selects "Canonical" (t1)
+            Frontend->>Backend: POST /api/v0/auth/tenant<br/>{login_challenge: "abc123", tenant_id: "t1", flow: "flow-id"}
+            Backend->>Backend: Store t1 in cookie
+            Backend-->>Frontend: {redirect_to: "/ui/login?flow=..."} (password form)
+        end
+
+        Frontend->>User: Show password form
+        User->>Frontend: Enter password & submit
+        Frontend->>Kratos: POST /self-service/login?flow=...
+        Kratos-->>Frontend: Session created
+
+        Frontend->>Backend: GET /api/kratos/self-service/login/browser<br/>?login_challenge=abc123
     end
 
-    Note over UI: Filter available login providers<br/>based on tenant's allowed auth methods
+    Note over Backend,Plugin: User now has a Kratos session → handleCreateFlow calls InterceptLogin
+    Backend->>Plugin: InterceptLogin(ctx, session, cookie, loginChallenge)
 
-    User->>UI: Enter credentials & submit
-    UI->>Kratos: POST /self-service/login?flow=...<br/>{credentials, transient_payload: {tenant_id: "t1"}}
+    alt Cookie has no matching LoginChallengeHash (first visit for this challenge)
+        Plugin-->>Backend: {DeferMFAChecks: true}
+        Note over Backend: Skip MFA/WebAuthn checks
+        Backend->>Plugin: (falls through to NeedsTenantSelection via handleUpdateFlow)
 
-    Kratos->>TenantAPI: POST /api/v0/webhooks/login<br/>{identity_id, transient_payload.tenant_id}
+        Plugin->>TenantAPI: GET /api/v0/tenants/lookup?email=alice@example.com
+
+        alt 0 tenants
+            TenantAPI-->>Plugin: {"tenants": []}
+            Plugin-->>Backend: Set cookie.TenantID = "__none__"
+            Backend->>Hydra: PUT /oauth2/auth/requests/login/accept
+            Hydra-->>Backend: Redirect to consent
+        else 1 tenant
+            TenantAPI-->>Plugin: {"tenants": [{id: "t1"}]}
+            Plugin-->>Backend: Auto-store t1 in cookie
+            Backend->>Hydra: PUT /oauth2/auth/requests/login/accept
+            Hydra-->>Backend: Redirect to consent
+        else 2+ tenants
+            TenantAPI-->>Plugin: {"tenants": [{id: "t1"}, {id: "t2"}]}
+            Plugin-->>Backend: {SelectTenant: true}
+            Backend-->>Frontend: Redirect to /ui/select_tenant?flow=...&login_challenge=...
+            Frontend->>User: Display "Select a tenant" screen
+            User->>Frontend: Selects "Canonical" (t1)
+            Frontend->>Backend: POST /api/v0/auth/tenant<br/>{login_challenge: "abc123", tenant_id: "t1"}
+            Backend->>Backend: Store t1 in cookie<br/>(keyed by LoginChallengeHash)
+            Backend-->>Frontend: {redirect_to: "/ui/login?flow=..."}
+            Frontend->>Backend: GET /api/kratos/self-service/login/browser<br/>?login_challenge=abc123
+            Backend->>Plugin: InterceptLogin (cookie now has t1)
+            Plugin-->>Backend: {AcceptLogin: true, Cookie: updated}
+            Backend->>Hydra: PUT /oauth2/auth/requests/login/accept
+        end
+
+    else Cookie has matching LoginChallengeHash + TenantID already resolved
+        Plugin-->>Backend: {AcceptLogin: true, Cookie: updated}
+        Note over Backend: MFA/WebAuthn already passed
+        Backend->>Hydra: PUT /oauth2/auth/requests/login/accept
+        Hydra-->>Backend: Redirect to consent
+
+    else Cookie has matching hash but no TenantID (needs selection)
+        Plugin->>TenantAPI: GET /api/v0/tenants/lookup?email=...
+        TenantAPI-->>Plugin: 2+ tenants
+        Plugin-->>Backend: {SelectTenant: true}
+        Backend-->>Frontend: Redirect to /ui/select_tenant
+    end
+
+    Note over Backend,Hydra: Consent step — _tenant_id injected
+    Frontend->>Backend: Consent route
+    Backend->>Backend: Read TenantID from state cookie
+    Backend->>Hydra: PUT /oauth2/auth/requests/consent/accept<br/>{ session: { access_token: { "_tenant_id": "t1" } } }
+    Hydra-->>Backend: Redirect to callback
+
+    Note over Hydra,TenantAPI: Token Hook (Final Arbiter)
+    Hydra->>TenantAPI: POST /api/v0/webhooks/token
     activate TenantAPI
-    TenantAPI->>TenantAPI: Verify user is member of tenant<br/>& auth method is permitted
-    TenantAPI-->>Kratos: 200 OK (allowed)
+    TenantAPI->>TenantAPI: Verify active membership for _tenant_id
+    TenantAPI-->>Hydra: 200 OK {session: {id_token: {tenant_id: "t1"},<br/>access_token: {tenant_id: "t1"}}}
     deactivate TenantAPI
 
-    Kratos-->>UI: 200 OK — session created
-
-    Note over UI,Hydra: Token enrichment via Hydra consent
-    UI->>Hydra: PUT /oauth2/auth/requests/consent/accept<br/>{session.id_token.tenant_id: "t1"}
-    Hydra-->>UI: Redirect to callback with tokens
-
-    UI-->>User: Logged in to "Canonical" tenant
+    Backend-->>Frontend: Redirect to callback
+    Frontend-->>User: Logged in with tenant_id in tokens
 ```
+
+### InterceptLogin Plugin Decision Table
+
+| Session? | Cookie matches challenge? | TenantID in cookie? | Plugin returns | Handler action |
+|----------|--------------------------|---------------------|----------------|----------------|
+| No       | —                        | —                   | (not called)   | Create new login flow |
+| Yes      | No                       | —                   | `DeferMFAChecks` | Skip MFA, fall through to `MustReAuthenticate` |
+| Yes      | Yes                      | Yes                 | `AcceptLogin`  | Accept Hydra login immediately |
+| Yes      | Yes                      | No (0 tenants)      | `AcceptLogin`  | Auto-set `__none__`, accept |
+| Yes      | Yes                      | No (1 tenant)       | `AcceptLogin`  | Auto-store tenant, accept |
+| Yes      | Yes                      | No (2+ tenants)     | `SelectTenant` | Redirect to selection page |
+
+### max_age=0 Interaction
+
+When the OAuth2 authorize request includes `max_age=0`, Hydra's login challenge signals
+that re-authentication is required. The `MustReAuthenticate` check on the Go backend
+detects this and creates a new login flow with `refresh=true`, forcing the user to enter
+credentials again regardless of their existing session. With multi-tenancy **enabled**,
+the InterceptLogin plugin returns `DeferMFAChecks` for the fresh challenge (no matching
+`LoginChallengeHash` yet), so MFA is only enforced after the user re-authenticates.
+After re-authentication, the full tenant resolution pipeline runs again — the user must
+re-select their tenant for a fresh challenge.
 
 ---
 
@@ -155,7 +281,7 @@ sequenceDiagram
     TenantAPI->>WebhookSvc: HandleTokenHook(ctx, req)
 
     WebhookSvc->>WebhookSvc: Extract userID = req.Session.Subject
-    WebhookSvc->>WebhookSvc: Extract tenantID = req.Session.Extra["tenant_id"]
+    WebhookSvc->>WebhookSvc: Extract tenantID = req.Session.Extra["_tenant_id"]
 
     WebhookSvc->>DB: SELECT 1 FROM memberships<br/>WHERE kratos_identity_id = userID AND tenant_id = tenantID<br/>JOIN tenants WHERE enabled = true
     DB-->>WebhookSvc: membership exists
@@ -375,8 +501,7 @@ sequenceDiagram
     UI->>User: Show login form
     User->>UI: Enter email
 
-    UI->>TenantAPI: GET /api/v0/tenants/lookup?email=alice@example.com
-    TenantAPI-->>UI: [{id: "t1", name: "Canonical"}, {id: "t2", name: "Acme"}]
+    Note over UI,TenantAPI: Re-runs Tenant-Aware Login (Flow 2)<br/>identifier_first submission → resolve → select tenant
 
     UI->>User: Display "Select Organisation" screen
     User->>UI: Select different tenant (e.g. "Acme")
@@ -392,11 +517,13 @@ sequenceDiagram
 
 ## Implementation Gap Summary
 
-| Gap | Affects Flow | GitHub Issue |
-|---|---|---|
-| `GET /api/v0/tenants/lookup?email=...` — tenant discovery endpoint | Flow 2, Flow 6 | [#15](https://github.com/canonical/tenant-service/issues/15) |
-| `POST /api/v0/webhooks/login` — login validation webhook | Flow 2, Flow 6 | [#15](https://github.com/canonical/tenant-service/issues/15) |
-| Token hook injects single `tenant_id` (not a list) — reads from session, validates membership | Flow 3 | — |
-| `CheckTenantAccess` before every write operation | Flow 4, Flow 5 | [#11](https://github.com/canonical/tenant-service/issues/11) |
-| `InviteMember`: verify caller owns the tenant via OpenFGA | Flow 4 | [#11](https://github.com/canonical/tenant-service/issues/11) |
-| `ProvisionUser`: call `CreateRecoveryLink` to email provisioned user | Flow 5 | [TODO.md](../TODO.md) |
+| Gap | Affects Flow | Status | GitHub Issue |
+|---|---|---|---|
+| `GET /api/v0/tenants/lookup?email=...` — tenant discovery endpoint | Flow 2, Flow 6 | **Done** | [#15](https://github.com/canonical/tenant-service/issues/15) |
+| `POST /api/v0/webhooks/login` — login validation webhook | Flow 2, Flow 6 | **Done** | [#15](https://github.com/canonical/tenant-service/issues/15) |
+| Token hook injects single `tenant_id` (not a list) — reads from session, validates membership | Flow 3 | **Done** | — |
+| InterceptLogin plugin — backend-driven tenant resolution in `handleCreateFlow` | Flow 2 | **Done** | — |
+| `max_age=0` support — forced re-authentication respects tenant pipeline | Flow 2 | **Done** | — |
+| `CheckTenantAccess` before every write operation | Flow 4, Flow 5 | Open | [#11](https://github.com/canonical/tenant-service/issues/11) |
+| `InviteMember`: verify caller owns the tenant via OpenFGA | Flow 4 | Open | [#11](https://github.com/canonical/tenant-service/issues/11) |
+| `ProvisionUser`: call `CreateRecoveryLink` to email provisioned user | Flow 5 | Open | [TODO.md](../TODO.md) |
