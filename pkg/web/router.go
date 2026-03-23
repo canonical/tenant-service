@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/tenant-service/pkg/authentication"
 	"github.com/canonical/tenant-service/pkg/metrics"
 	"github.com/canonical/tenant-service/pkg/status"
+	"github.com/canonical/tenant-service/pkg/tenant"
 	"github.com/canonical/tenant-service/pkg/webhooks"
 	v0 "github.com/canonical/tenant-service/v0"
 	chi "github.com/go-chi/chi/v5"
@@ -26,7 +27,7 @@ import (
 )
 
 func NewRouter(
-	tenantHandler v0.TenantServiceServer,
+	tenantHandler *tenant.Handler,
 	authMiddleware *authentication.Middleware,
 	s storage.StorageInterface,
 	dbClient db.DBClientInterface,
@@ -68,6 +69,10 @@ func NewRouter(
 	metrics.NewAPI(logger).RegisterEndpoints(router)
 	status.NewAPI(tracer, monitor, logger).RegisterEndpoints(router)
 	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger), logger).RegisterEndpoints(router)
+
+	// Unauthenticated tenant lookup — used by the Login UI before the user has a token.
+	// See ADR 0008 for security trade-offs. Rate limiting should be enforced at the proxy/gateway layer.
+	tenantHandler.RegisterUnauthenticatedEndpoints(router)
 
 	// Protected routes
 	authRouter := chi.NewRouter()

@@ -5,7 +5,9 @@ package tenant
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
 
 	"buf.build/go/protovalidate"
 	"github.com/canonical/tenant-service/internal/logging"
@@ -15,6 +17,7 @@ import (
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
 	v0 "github.com/canonical/tenant-service/v0"
+	chi "github.com/go-chi/chi/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -334,4 +337,72 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 		Users:         pbUsers,
 		NextPageToken: nextPageToken,
 	}, nil
+}
+
+func (h *Handler) LookupTenantsByEmail(ctx context.Context, req *v0.LookupTenantsByEmailRequest) (*v0.LookupTenantsByEmailResponse, error) {
+	ctx, span := h.tracer.Start(ctx, "tenant.Handler.LookupTenantsByEmail")
+	defer span.End()
+
+	if err := h.validator.Validate(req); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+
+	tenants, err := h.service.LookupTenantsByEmail(ctx, req.Email)
+	if err != nil {
+		h.logger.Errorw("failed to look up tenants by email", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to look up tenants")
+	}
+
+	pbTenants := make([]*v0.Tenant, len(tenants))
+	for i, t := range tenants {
+		pbTenants[i] = &v0.Tenant{
+			Id:        t.ID,
+			Name:      t.Name,
+			CreatedAt: t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Enabled:   t.Enabled,
+		}
+	}
+
+	return &v0.LookupTenantsByEmailResponse{
+		Tenants: pbTenants,
+	}, nil
+}
+
+// RegisterUnauthenticatedEndpoints registers HTTP endpoints that must be accessible without
+// a Bearer token. The lookup route is consumed by the Login UI before the user authenticates.
+func (h *Handler) RegisterUnauthenticatedEndpoints(mux chi.Router) {
+	mux.Get("/api/v0/tenants/lookup", h.lookupHTTP)
+}
+
+func (h *Handler) lookupHTTP(w http.ResponseWriter, r *http.Request) {
+	type tenantItem struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	type response struct {
+		Tenants []tenantItem `json:"tenants"`
+	}
+
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, `{"error":"email query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	tenants, err := h.service.LookupTenantsByEmail(r.Context(), email)
+	if err != nil {
+		h.logger.Errorw("tenant lookup failed", "email", email, "error", err)
+		http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	items := make([]tenantItem, len(tenants))
+	for i, t := range tenants {
+		items[i] = tenantItem{ID: t.ID, Name: t.Name}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response{Tenants: items}); err != nil {
+		h.logger.Errorw("tenant lookup: response encoding error", "error", err)
+	}
 }

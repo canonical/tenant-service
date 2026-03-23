@@ -20,16 +20,17 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	TenantService_ListMyTenants_FullMethodName    = "/identity.platform.api.tenant.TenantService/ListMyTenants"
-	TenantService_InviteMember_FullMethodName     = "/identity.platform.api.tenant.TenantService/InviteMember"
-	TenantService_ListTenants_FullMethodName      = "/identity.platform.api.tenant.TenantService/ListTenants"
-	TenantService_ListUserTenants_FullMethodName  = "/identity.platform.api.tenant.TenantService/ListUserTenants"
-	TenantService_ListTenantUsers_FullMethodName  = "/identity.platform.api.tenant.TenantService/ListTenantUsers"
-	TenantService_CreateTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/CreateTenant"
-	TenantService_UpdateTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/UpdateTenant"
-	TenantService_DeleteTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/DeleteTenant"
-	TenantService_ProvisionUser_FullMethodName    = "/identity.platform.api.tenant.TenantService/ProvisionUser"
-	TenantService_UpdateTenantUser_FullMethodName = "/identity.platform.api.tenant.TenantService/UpdateTenantUser"
+	TenantService_ListMyTenants_FullMethodName        = "/identity.platform.api.tenant.TenantService/ListMyTenants"
+	TenantService_InviteMember_FullMethodName         = "/identity.platform.api.tenant.TenantService/InviteMember"
+	TenantService_ListTenants_FullMethodName          = "/identity.platform.api.tenant.TenantService/ListTenants"
+	TenantService_ListUserTenants_FullMethodName      = "/identity.platform.api.tenant.TenantService/ListUserTenants"
+	TenantService_ListTenantUsers_FullMethodName      = "/identity.platform.api.tenant.TenantService/ListTenantUsers"
+	TenantService_CreateTenant_FullMethodName         = "/identity.platform.api.tenant.TenantService/CreateTenant"
+	TenantService_UpdateTenant_FullMethodName         = "/identity.platform.api.tenant.TenantService/UpdateTenant"
+	TenantService_DeleteTenant_FullMethodName         = "/identity.platform.api.tenant.TenantService/DeleteTenant"
+	TenantService_ProvisionUser_FullMethodName        = "/identity.platform.api.tenant.TenantService/ProvisionUser"
+	TenantService_UpdateTenantUser_FullMethodName     = "/identity.platform.api.tenant.TenantService/UpdateTenantUser"
+	TenantService_LookupTenantsByEmail_FullMethodName = "/identity.platform.api.tenant.TenantService/LookupTenantsByEmail"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -48,6 +49,12 @@ type TenantServiceClient interface {
 	DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ProvisionUser(ctx context.Context, in *ProvisionUserRequest, opts ...grpc.CallOption) (*ProvisionUserResponse, error)
 	UpdateTenantUser(ctx context.Context, in *UpdateTenantUserRequest, opts ...grpc.CallOption) (*UpdateTenantUserResponse, error)
+	// LookupTenantsByEmail returns the active tenants a user belongs to, looked up by email.
+	// This endpoint is used by the Login UI before authentication to discover which tenant(s)
+	// the user can log in to. Only enabled tenants are returned.
+	// NOTE: This endpoint is registered unauthenticated on the chi mux (outside the auth router)
+	// so the Login UI can call it before the user has a token. See ADR 0008.
+	LookupTenantsByEmail(ctx context.Context, in *LookupTenantsByEmailRequest, opts ...grpc.CallOption) (*LookupTenantsByEmailResponse, error)
 }
 
 type tenantServiceClient struct {
@@ -148,6 +155,15 @@ func (c *tenantServiceClient) UpdateTenantUser(ctx context.Context, in *UpdateTe
 	return out, nil
 }
 
+func (c *tenantServiceClient) LookupTenantsByEmail(ctx context.Context, in *LookupTenantsByEmailRequest, opts ...grpc.CallOption) (*LookupTenantsByEmailResponse, error) {
+	out := new(LookupTenantsByEmailResponse)
+	err := c.cc.Invoke(ctx, TenantService_LookupTenantsByEmail_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility
@@ -164,6 +180,12 @@ type TenantServiceServer interface {
 	DeleteTenant(context.Context, *DeleteTenantRequest) (*emptypb.Empty, error)
 	ProvisionUser(context.Context, *ProvisionUserRequest) (*ProvisionUserResponse, error)
 	UpdateTenantUser(context.Context, *UpdateTenantUserRequest) (*UpdateTenantUserResponse, error)
+	// LookupTenantsByEmail returns the active tenants a user belongs to, looked up by email.
+	// This endpoint is used by the Login UI before authentication to discover which tenant(s)
+	// the user can log in to. Only enabled tenants are returned.
+	// NOTE: This endpoint is registered unauthenticated on the chi mux (outside the auth router)
+	// so the Login UI can call it before the user has a token. See ADR 0008.
+	LookupTenantsByEmail(context.Context, *LookupTenantsByEmailRequest) (*LookupTenantsByEmailResponse, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -200,6 +222,9 @@ func (UnimplementedTenantServiceServer) ProvisionUser(context.Context, *Provisio
 }
 func (UnimplementedTenantServiceServer) UpdateTenantUser(context.Context, *UpdateTenantUserRequest) (*UpdateTenantUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateTenantUser not implemented")
+}
+func (UnimplementedTenantServiceServer) LookupTenantsByEmail(context.Context, *LookupTenantsByEmailRequest) (*LookupTenantsByEmailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LookupTenantsByEmail not implemented")
 }
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 
@@ -394,6 +419,24 @@ func _TenantService_UpdateTenantUser_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_LookupTenantsByEmail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LookupTenantsByEmailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).LookupTenantsByEmail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_LookupTenantsByEmail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).LookupTenantsByEmail(ctx, req.(*LookupTenantsByEmailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -440,6 +483,10 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateTenantUser",
 			Handler:    _TenantService_UpdateTenantUser_Handler,
+		},
+		{
+			MethodName: "LookupTenantsByEmail",
+			Handler:    _TenantService_LookupTenantsByEmail_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

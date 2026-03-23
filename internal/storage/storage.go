@@ -5,6 +5,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 var _ StorageInterface = (*Storage)(nil)
@@ -79,7 +79,7 @@ func (s *Storage) GetTenantByID(ctx context.Context, id string) (*types.Tenant, 
 		Scan(&t.ID, &t.Name, &t.CreatedAt, &t.Enabled)
 
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get tenant: %w", err)
@@ -291,13 +291,60 @@ func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, user
 		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt)
 
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get member: %v", err)
 	}
 
 	return &m, nil
+}
+
+func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error) {
+	ctx, span := s.tracer.Start(ctx, "storage.GetActiveMemberByTenantAndUserID")
+	defer span.End()
+
+	var m types.Membership
+	err := s.db.Statement(ctx).
+		Select("m.id", "m.tenant_id", "m.kratos_identity_id", "m.role", "m.created_at").
+		From("memberships m").
+		Join("tenants t ON t.id = m.tenant_id").
+		Where(sq.Eq{
+			"m.tenant_id":          tenantID,
+			"m.kratos_identity_id": userID,
+			"t.enabled":            true,
+		}).
+		QueryRowContext(ctx).
+		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get active member: %v", err)
+	}
+
+	return &m, nil
+}
+
+func (s *Storage) HasAnyMembership(ctx context.Context, identityID string) (bool, error) {
+	ctx, span := s.tracer.Start(ctx, "storage.HasAnyMembership")
+	defer span.End()
+
+	var count int
+	err := s.db.Statement(ctx).
+		Select("COUNT(*)").
+		From("memberships").
+		Where(sq.Eq{"kratos_identity_id": identityID}).
+		Limit(1).
+		QueryRowContext(ctx).
+		Scan(&count)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check membership existence: %v", err)
+	}
+
+	return count > 0, nil
 }
 
 func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) (string, error) {

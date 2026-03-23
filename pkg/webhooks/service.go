@@ -5,6 +5,7 @@ package webhooks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.opentelemetry.io/otel/codes"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
+	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/ory/hydra/v2/oauth2"
@@ -62,11 +64,16 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		return err
 	}
 
+	if email == "" {
+		err := fmt.Errorf("identity email is required")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		s.recordRegistrationMetric("webhook_registration_failure")
+		return err
+	}
+
 	// 1. Create a tenant named '{Email}'s Org'
 	tenantName := fmt.Sprintf("%s's Org", email)
-	if email == "" {
-		tenantName = ""
-	}
 
 	tenant := &types.Tenant{
 		Name:    tenantName,
@@ -129,20 +136,13 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 		return nil, err
 	}
 
-	// Fetch Tenants
-	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, userID)
-	if err != nil {
-		s.recordError(span, "failed to list tenants for token hook", err, "user_id", userID)
-		return nil, fmt.Errorf("failed to list tenants: %w", err)
+	// Extract the tenant_id the Login UI placed in the session at the consent step.
+	var tenantID string
+	if req.Session != nil && req.Session.Extra != nil {
+		if v, ok := req.Session.Extra["tenant_id"].(string); ok {
+			tenantID = v
+		}
 	}
-
-	// Format Response
-	tenantList := make([]string, 0, len(tenants))
-	for _, t := range tenants {
-		tenantList = append(tenantList, t.ID)
-	}
-
-	s.logger.Debugw("token hook tenants resolved", "user_id", userID, "tenant_count", len(tenantList))
 
 	resp := TokenHookResponse{
 		Session: struct {
@@ -154,10 +154,111 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 		},
 	}
 
-	if len(tenantList) > 0 {
-		resp.Session.IDToken["tenants"] = tenantList
-		resp.Session.AccessToken["tenants"] = tenantList
+	if tenantID == "" {
+		// No tenant was selected (e.g. user logged in without tenant context, pending activation).
+		// Return a valid response without a tenant_id claim.
+		s.logger.Debugw("token hook: no tenant_id in session, skipping tenant claim", "user_id", userID)
+		return &resp, nil
 	}
+
+	// Validate that the user is still an active member of the requested tenant.
+	_, err := s.storage.GetActiveMemberByTenantAndUserID(ctx, tenantID, userID)
+	if err != nil {
+		if isNotFound(err) {
+			s.recordError(span, "token hook: user is not an active member of tenant", ErrNotMember,
+				"user_id", userID,
+				"tenant_id", tenantID,
+			)
+			return nil, ErrNotMember
+		}
+		s.recordError(span, "token hook: failed to validate tenant membership", err,
+			"user_id", userID,
+			"tenant_id", tenantID,
+		)
+		return nil, fmt.Errorf("failed to validate tenant membership: %w", err)
+	}
+
+	s.logger.Debugw("token hook: injecting tenant_id claim", "user_id", userID, "tenant_id", tenantID)
+	resp.Session.IDToken["tenant_id"] = tenantID
+	resp.Session.AccessToken["tenant_id"] = tenantID
 
 	return &resp, nil
 }
+
+// HandleLoginHook validates that the given identity is permitted to log in.
+//
+// If tenantID is non-empty, it checks that the identity is an active member of
+// that tenant, returning ErrNotMember if not.
+//
+// If tenantID is empty, the hook performs orphaned-identity reconciliation: if
+// the identity has no memberships (registration webhook previously failed), it
+// re-runs the registration logic to create a disabled shadow tenant and assign
+// the user as owner. Login is always allowed when tenantID is absent.
+func (s *Service) HandleLoginHook(ctx context.Context, identityID, email, tenantID string) error {
+	ctx, span := s.tracer.Start(ctx, "webhooks.Service.HandleLoginHook")
+	defer span.End()
+
+	s.logger.Debugw("handling login hook",
+		"identity_id", identityID,
+		"tenant_id", tenantID,
+	)
+
+	if identityID == "" {
+		err := fmt.Errorf("identity ID is empty")
+		span.RecordError(err)
+		return err
+	}
+
+	if tenantID != "" {
+		// Verify active membership.
+		_, err := s.storage.GetActiveMemberByTenantAndUserID(ctx, tenantID, identityID)
+		if err != nil {
+			if isNotFound(err) {
+				s.recordError(span, "login hook: user is not an active member of tenant", ErrNotMember,
+					"identity_id", identityID,
+					"tenant_id", tenantID,
+				)
+				return ErrNotMember
+			}
+			s.recordError(span, "login hook: failed to check tenant membership", err,
+				"identity_id", identityID,
+				"tenant_id", tenantID,
+			)
+			return fmt.Errorf("failed to check tenant membership: %w", err)
+		}
+
+		s.logger.Debugw("login hook: membership verified", "identity_id", identityID, "tenant_id", tenantID)
+		s.logger.Security().AdminAction(identityID, "login_with_tenant", "webhooks.Service.HandleLoginHook", tenantID)
+		return nil
+	}
+
+	// No tenant selected — check for orphaned identity and reconcile if needed.
+	hasMembership, err := s.storage.HasAnyMembership(ctx, identityID)
+	if err != nil {
+		s.recordError(span, "login hook: failed to check membership existence", err, "identity_id", identityID)
+		return fmt.Errorf("failed to check membership: %w", err)
+	}
+
+	if !hasMembership {
+		s.logger.Infow("login hook: orphaned identity detected, running lazy reconciliation",
+			"identity_id", identityID,
+			"email", email,
+		)
+		if err := s.HandleRegistration(ctx, identityID, email); err != nil {
+			s.recordError(span, "login hook: lazy reconciliation failed", err, "identity_id", identityID)
+			if counterErr := s.monitor.IncrementCounter(map[string]string{"operation": "login_reconciliation_error", "identity_id": identityID}); counterErr != nil {
+				s.logger.Errorw("failed to increment reconciliation error counter", "error", counterErr)
+			}
+			return fmt.Errorf("failed to reconcile orphaned identity: %w", err)
+		}
+		s.logger.Infow("login hook: lazy reconciliation succeeded", "identity_id", identityID)
+	}
+
+	return nil
+}
+
+// isNotFound reports whether err is a storage "not found" sentinel.
+func isNotFound(err error) bool {
+	return errors.Is(err, storage.ErrNotFound)
+}
+

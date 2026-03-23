@@ -333,6 +333,31 @@
           "TenantService"
         ]
       }
+    },
+    "/api/v0/tenants/lookup": {
+      "get": {
+        "summary": "LookupTenantsByEmail returns the active tenants a user belongs to, looked up by email.\nThis endpoint is used by the Login UI before authentication to discover which tenant(s)\nthe user can log in to. Only enabled tenants are returned.\nNOTE: This endpoint is registered unauthenticated on the chi mux (outside the auth router)\nso the Login UI can call it before the user has a token. See ADR 0008.",
+        "operationId": "TenantService_LookupTenantsByEmail",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
     }
   },
   "definitions": {
@@ -503,6 +528,18 @@
         },
         "next_page_token": {
           "type": "string"
+        }
+      }
+    },
+    "tenantLookupTenantsByEmailResponse": {
+      "type": "object",
+      "properties": {
+        "tenants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/tenantTenant"
+          }
         }
       }
     },

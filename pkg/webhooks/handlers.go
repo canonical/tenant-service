@@ -5,6 +5,7 @@ package webhooks
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/canonical/tenant-service/internal/logging"
@@ -27,6 +28,7 @@ func NewAPI(service ServiceInterface, logger logging.LoggerInterface) *API {
 func (a *API) RegisterEndpoints(mux *chi.Mux) {
 	mux.Post("/api/v0/webhooks/registration", a.registration)
 	mux.Post("/api/v0/webhooks/token", a.tokenHook)
+	mux.Post("/api/v0/webhooks/login", a.loginHook)
 }
 
 func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +41,13 @@ func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := a.service.HandleTokenHook(r.Context(), req)
 	if err != nil {
+		if errors.Is(err, ErrNotMember) {
+			a.logger.Infow("token hook: user is not an active member of tenant")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "user is not an active member of the tenant"})
+			return
+		}
 		a.logger.Errorw("token hook: service error", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -72,4 +81,42 @@ func (a *API) registration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (a *API) loginHook(w http.ResponseWriter, r *http.Request) {
+	var payload KratosLoginPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		a.logger.Errorw("login hook: invalid request body", "error", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	a.logger.Debugw("received login webhook",
+		"identity_id", payload.IdentityID,
+		"tenant_id", payload.TenantID,
+	)
+
+	if err := a.service.HandleLoginHook(r.Context(), payload.IdentityID, payload.Email, payload.TenantID); err != nil {
+		if errors.Is(err, ErrNotMember) {
+			a.logger.Infow("login hook: access denied",
+				"identity_id", payload.IdentityID,
+				"tenant_id", payload.TenantID,
+			)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "user is not an active member of the tenant"})
+			return
+		}
+		a.logger.Errorw("login hook: service error",
+			"identity_id", payload.IdentityID,
+			"tenant_id", payload.TenantID,
+			"error", err,
+		)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{})
 }

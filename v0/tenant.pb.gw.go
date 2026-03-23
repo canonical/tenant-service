@@ -443,6 +443,38 @@ func local_request_TenantService_UpdateTenantUser_0(ctx context.Context, marshal
 	return msg, metadata, err
 }
 
+var filter_TenantService_LookupTenantsByEmail_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+
+func request_TenantService_LookupTenantsByEmail_0(ctx context.Context, marshaler runtime.Marshaler, client TenantServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq LookupTenantsByEmailRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_TenantService_LookupTenantsByEmail_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.LookupTenantsByEmail(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_TenantService_LookupTenantsByEmail_0(ctx context.Context, marshaler runtime.Marshaler, server TenantServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq LookupTenantsByEmailRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_TenantService_LookupTenantsByEmail_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.LookupTenantsByEmail(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 // RegisterTenantServiceHandlerServer registers the http handlers for service TenantService to "mux".
 // UnaryRPC     :call TenantServiceServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -648,6 +680,26 @@ func RegisterTenantServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 			return
 		}
 		forward_TenantService_UpdateTenantUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_TenantService_LookupTenantsByEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/LookupTenantsByEmail", runtime.WithHTTPPathPattern("/api/v0/tenants/lookup"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_TenantService_LookupTenantsByEmail_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_TenantService_LookupTenantsByEmail_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -859,31 +911,50 @@ func RegisterTenantServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_TenantService_UpdateTenantUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_TenantService_LookupTenantsByEmail_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.platform.api.tenant.TenantService/LookupTenantsByEmail", runtime.WithHTTPPathPattern("/api/v0/tenants/lookup"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_TenantService_LookupTenantsByEmail_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_TenantService_LookupTenantsByEmail_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
-	pattern_TenantService_ListMyTenants_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v0", "me", "tenants"}, ""))
-	pattern_TenantService_InviteMember_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "invites"}, ""))
-	pattern_TenantService_ListTenants_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v0", "tenants"}, ""))
-	pattern_TenantService_ListUserTenants_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "users", "user_id", "tenants"}, ""))
-	pattern_TenantService_ListTenantUsers_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "users"}, ""))
-	pattern_TenantService_CreateTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v0", "tenants"}, ""))
-	pattern_TenantService_UpdateTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v0", "tenants", "tenant.id"}, ""))
-	pattern_TenantService_DeleteTenant_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v0", "tenants", "tenant_id"}, ""))
-	pattern_TenantService_ProvisionUser_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "users"}, ""))
-	pattern_TenantService_UpdateTenantUser_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v0", "tenants", "tenant_id", "users", "user_id"}, ""))
+	pattern_TenantService_ListMyTenants_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v0", "me", "tenants"}, ""))
+	pattern_TenantService_InviteMember_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "invites"}, ""))
+	pattern_TenantService_ListTenants_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v0", "tenants"}, ""))
+	pattern_TenantService_ListUserTenants_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "users", "user_id", "tenants"}, ""))
+	pattern_TenantService_ListTenantUsers_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "users"}, ""))
+	pattern_TenantService_CreateTenant_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v0", "tenants"}, ""))
+	pattern_TenantService_UpdateTenant_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v0", "tenants", "tenant.id"}, ""))
+	pattern_TenantService_DeleteTenant_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v0", "tenants", "tenant_id"}, ""))
+	pattern_TenantService_ProvisionUser_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v0", "tenants", "tenant_id", "users"}, ""))
+	pattern_TenantService_UpdateTenantUser_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v0", "tenants", "tenant_id", "users", "user_id"}, ""))
+	pattern_TenantService_LookupTenantsByEmail_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v0", "tenants", "lookup"}, ""))
 )
 
 var (
-	forward_TenantService_ListMyTenants_0    = runtime.ForwardResponseMessage
-	forward_TenantService_InviteMember_0     = runtime.ForwardResponseMessage
-	forward_TenantService_ListTenants_0      = runtime.ForwardResponseMessage
-	forward_TenantService_ListUserTenants_0  = runtime.ForwardResponseMessage
-	forward_TenantService_ListTenantUsers_0  = runtime.ForwardResponseMessage
-	forward_TenantService_CreateTenant_0     = runtime.ForwardResponseMessage
-	forward_TenantService_UpdateTenant_0     = runtime.ForwardResponseMessage
-	forward_TenantService_DeleteTenant_0     = runtime.ForwardResponseMessage
-	forward_TenantService_ProvisionUser_0    = runtime.ForwardResponseMessage
-	forward_TenantService_UpdateTenantUser_0 = runtime.ForwardResponseMessage
+	forward_TenantService_ListMyTenants_0        = runtime.ForwardResponseMessage
+	forward_TenantService_InviteMember_0         = runtime.ForwardResponseMessage
+	forward_TenantService_ListTenants_0          = runtime.ForwardResponseMessage
+	forward_TenantService_ListUserTenants_0      = runtime.ForwardResponseMessage
+	forward_TenantService_ListTenantUsers_0      = runtime.ForwardResponseMessage
+	forward_TenantService_CreateTenant_0         = runtime.ForwardResponseMessage
+	forward_TenantService_UpdateTenant_0         = runtime.ForwardResponseMessage
+	forward_TenantService_DeleteTenant_0         = runtime.ForwardResponseMessage
+	forward_TenantService_ProvisionUser_0        = runtime.ForwardResponseMessage
+	forward_TenantService_UpdateTenantUser_0     = runtime.ForwardResponseMessage
+	forward_TenantService_LookupTenantsByEmail_0 = runtime.ForwardResponseMessage
 )

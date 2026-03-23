@@ -36,3 +36,12 @@ type TokenHookResponse struct {
 		AccessToken map[string]interface{} `json:"access_token,omitempty"`
 	} `json:"session"`
 }
+
+// KratosLoginPayload is the JSON body sent by Kratos to the login webhook.
+// The body template in kratos.yml extracts identity_id, email, and tenant_id
+// from the Kratos flow context.
+type KratosLoginPayload struct {
+	IdentityID string `json:"identity_id"`
+	Email      string `json:"email"`
+	TenantID   string `json:"tenant_id"` // may be empty when no tenant was pre-selected
+}

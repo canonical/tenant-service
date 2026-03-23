@@ -22,6 +22,7 @@ type ServiceInterface interface {
 	ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error)
 	ListTenants(ctx context.Context, opts ...types.ListOption) ([]*types.Tenant, string, error)
 	ListTenantUsers(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.TenantUser, string, error)
+	LookupTenantsByEmail(ctx context.Context, email string) ([]*types.Tenant, error)
 }
 
 type StorageInterface interface {

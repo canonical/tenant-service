@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/canonical/tenant-service v0.0.0-00010101000000-000000000000
+	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/ory/hydra-client-go/v2 v2.2.1
 	github.com/testcontainers/testcontainers-go/modules/compose v0.36.0
@@ -87,7 +88,6 @@ require (
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect

@@ -76,6 +76,12 @@ service TenantService {
         body: "*"
     };
   }
+
+  rpc LookupTenantsByEmail(LookupTenantsByEmailRequest) returns (LookupTenantsByEmailResponse) {
+    option (google.api.http) = {
+      get: "/api/v0/tenants/lookup"
+    };
+  }
 }
 
 // Messages
@@ -186,4 +192,12 @@ message TenantUser {
     string user_id = 1;
     string email = 2;
     string role = 3;
+}
+
+message LookupTenantsByEmailRequest {
+    string email = 1 [(buf.validate.field).string.email = true];
+}
+
+message LookupTenantsByEmailResponse {
+    repeated Tenant tenants = 1;
 }
