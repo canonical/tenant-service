@@ -9,6 +9,7 @@ import (
 	"github.com/ory/hydra/v2/oauth2"
 )
 
+// KratosIdentity represents a user identity from Kratos.
 type KratosIdentity struct {
 	ID    string                 `json:"user_id"`
 	Email string                 `json:"email"`
@@ -30,6 +31,7 @@ func (k *KratosIdentity) UnmarshalJSON(data []byte) error {
 
 type TokenHookRequest = oauth2.TokenHookRequest
 
+// TokenHookResponse represents the response containing the tokens session.
 type TokenHookResponse struct {
 	Session struct {
 		IDToken     map[string]interface{} `json:"id_token,omitempty"`

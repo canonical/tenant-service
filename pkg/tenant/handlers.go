@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// Handler implements the gRPC and HTTP API endpoints.
 type Handler struct {
 	v0.UnimplementedTenantServiceServer
 	service   ServiceInterface
@@ -32,6 +33,7 @@ type Handler struct {
 	validator protovalidate.Validator
 }
 
+// NewHandler creates a new tenant API handler.
 func NewHandler(
 	service ServiceInterface,
 	validator protovalidate.Validator,

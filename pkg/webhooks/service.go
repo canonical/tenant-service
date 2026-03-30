@@ -19,6 +19,8 @@ import (
 	"github.com/ory/hydra/v2/oauth2"
 )
 
+// Service provides webhook business logic.
+// Service provides webhook business logic.
 type Service struct {
 	storage StorageInterface
 	authz   AuthorizerInterface
@@ -27,6 +29,8 @@ type Service struct {
 	logger  logging.LoggerInterface
 }
 
+// NewService creates a new webhook service.
+// NewService creates a new webhook service.
 func NewService(
 	storage StorageInterface,
 	authz AuthorizerInterface,
@@ -137,12 +141,7 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 	}
 
 	// Extract the tenant_id the Login UI placed in the session at the consent step.
-	var tenantID string
-	if req.Session != nil && req.Session.Extra != nil {
-		if v, ok := req.Session.Extra["tenant_id"].(string); ok {
-			tenantID = v
-		}
-	}
+	tenantID := s.extractTenantIDFromSession(req)
 
 	resp := TokenHookResponse{
 		Session: struct {
@@ -204,9 +203,11 @@ func (s *Service) HandleLoginHook(ctx context.Context, identityID, email, tenant
 	)
 
 	if identityID == "" {
-		err := fmt.Errorf("identity ID is empty")
-		span.RecordError(err)
-		return err
+		// Empty identity_id means Kratos fired the hook for an intermediate authentication
+		// step (before all factors are satisfied, flow.state != "passed_challenge"). The
+		// Jsonnet template returns {} in that case. Treat this as a no-op.
+		s.logger.Debugw("login hook: empty identity_id, skipping (intermediate auth step)")
+		return nil
 	}
 
 	if tenantID != "" {
@@ -262,3 +263,17 @@ func isNotFound(err error) bool {
 	return errors.Is(err, storage.ErrNotFound)
 }
 
+// extractTenantIDFromSession retrieves the tenant_id safely from the OAuth2 session extra payload.
+//
+// The Login UI guarantees that the "_none" sentinel (cookies.NoTenantAvailable)
+// is never forwarded to the consent session. If it were to arrive here, the
+// membership check would fail (no tenant with id "_none" exists), resulting
+// in a 403 — correct fail-closed behavior.
+func (s *Service) extractTenantIDFromSession(req *oauth2.TokenHookRequest) string {
+	if req.Session != nil && req.Session.Extra != nil {
+		if v, ok := req.Session.Extra["_tenant_id"].(string); ok {
+			return v
+		}
+	}
+	return ""
+}

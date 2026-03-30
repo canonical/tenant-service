@@ -359,12 +359,11 @@ func TestService_HandleLoginHook(t *testing.T) {
 			},
 		},
 		{
-			name:        "error - empty identity_id",
-			identityID:  "",
-			email:       email,
-			tenantID:    tenantID,
-			expectedErr: true,
-			setupMocks:  func(*MockStorageInterface, *MockAuthorizerInterface, *MockMonitorInterface) {},
+			name:       "success - empty identity_id (intermediate auth step, no-op)",
+			identityID: "",
+			email:      email,
+			tenantID:   tenantID,
+			setupMocks: func(*MockStorageInterface, *MockAuthorizerInterface, *MockMonitorInterface) {},
 		},
 		{
 			name:        "error - storage error on GetActiveMember",

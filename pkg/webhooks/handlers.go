@@ -13,11 +13,13 @@ import (
 	"github.com/ory/hydra/v2/oauth2"
 )
 
+// API implements HTTP handler endpoints for webhooks.
 type API struct {
 	service ServiceInterface
 	logger  logging.LoggerInterface
 }
 
+// NewAPI creates a new webhook API handler.
 func NewAPI(service ServiceInterface, logger logging.LoggerInterface) *API {
 	return &API{
 		service: service,

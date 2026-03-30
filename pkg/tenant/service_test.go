@@ -858,10 +858,10 @@ func TestService_LookupTenantsByEmail(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		setupMocks      func(*MockStorageInterface, *MockKratosClientInterface)
-		expectedLen     int
-		expectedErr     bool
+		name        string
+		setupMocks  func(*MockStorageInterface, *MockKratosClientInterface)
+		expectedLen int
+		expectedErr bool
 	}{
 		{
 			name: "success - email found with active tenants",

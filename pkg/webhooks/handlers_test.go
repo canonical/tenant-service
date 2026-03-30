@@ -239,7 +239,6 @@ func TestAPI_LoginHook(t *testing.T) {
 	}
 }
 
-
 func TestAPI_Registration(t *testing.T) {
 	tests := []struct {
 		name           string
