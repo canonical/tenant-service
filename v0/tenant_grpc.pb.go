@@ -49,11 +49,6 @@ type TenantServiceClient interface {
 	DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ProvisionUser(ctx context.Context, in *ProvisionUserRequest, opts ...grpc.CallOption) (*ProvisionUserResponse, error)
 	UpdateTenantUser(ctx context.Context, in *UpdateTenantUserRequest, opts ...grpc.CallOption) (*UpdateTenantUserResponse, error)
-	// LookupTenantsByEmail returns the active tenants a user belongs to, looked up by email.
-	// This endpoint is used by the Login UI before authentication to discover which tenant(s)
-	// the user can log in to. Only enabled tenants are returned.
-	// NOTE: This endpoint is registered unauthenticated on the chi mux (outside the auth router)
-	// so the Login UI can call it before the user has a token. See ADR 0008.
 	LookupTenantsByEmail(ctx context.Context, in *LookupTenantsByEmailRequest, opts ...grpc.CallOption) (*LookupTenantsByEmailResponse, error)
 }
 
@@ -180,11 +175,6 @@ type TenantServiceServer interface {
 	DeleteTenant(context.Context, *DeleteTenantRequest) (*emptypb.Empty, error)
 	ProvisionUser(context.Context, *ProvisionUserRequest) (*ProvisionUserResponse, error)
 	UpdateTenantUser(context.Context, *UpdateTenantUserRequest) (*UpdateTenantUserResponse, error)
-	// LookupTenantsByEmail returns the active tenants a user belongs to, looked up by email.
-	// This endpoint is used by the Login UI before authentication to discover which tenant(s)
-	// the user can log in to. Only enabled tenants are returned.
-	// NOTE: This endpoint is registered unauthenticated on the chi mux (outside the auth router)
-	// so the Login UI can call it before the user has a token. See ADR 0008.
 	LookupTenantsByEmail(context.Context, *LookupTenantsByEmailRequest) (*LookupTenantsByEmailResponse, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }

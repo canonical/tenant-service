@@ -20,7 +20,6 @@ import (
 )
 
 // Service provides tenant business logic.
-// Service provides tenant business logic.
 type Service struct {
 	storage            StorageInterface
 	authz              AuthzInterface
@@ -31,7 +30,6 @@ type Service struct {
 	logger             logging.LoggerInterface
 }
 
-// NewService creates a new tenant service.
 // NewService creates a new tenant service.
 func NewService(
 	storage StorageInterface,

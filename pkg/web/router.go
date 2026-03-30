@@ -72,11 +72,10 @@ func NewRouter(
 
 	// Unauthenticated tenant lookup — used by the Login UI before the user has a token.
 	// See ADR 0008 for security trade-offs. Rate limiting should be enforced at the proxy/gateway layer.
-	tenantHandler.RegisterUnauthenticatedEndpoints(router)
 
-	// Protected routes
+	// Protected routes — lookup is excluded so the Login UI can call it without a Bearer token.
 	authRouter := chi.NewRouter()
-	authRouter.Use(authMiddleware.Authenticate())
+	authRouter.Use(authMiddleware.AuthenticateExcluding("/api/v0/tenants/lookup"))
 	authRouter.Mount("/", gRPCGatewayMux)
 
 	router.Mount("/", authRouter)

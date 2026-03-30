@@ -133,6 +133,26 @@ func (m *Middleware) unauthorizedResponse(w http.ResponseWriter, message string)
 	}
 }
 
+// AuthenticateExcluding returns a middleware that enforces authentication on all routes
+// except those whose path exactly matches one of the given excluded paths. Excluded paths
+// are served without any token requirement (e.g. for Login UI pre-auth flows).
+func (m *Middleware) AuthenticateExcluding(paths ...string) func(http.Handler) http.Handler {
+	excluded := make(map[string]struct{}, len(paths))
+	for _, p := range paths {
+		excluded[p] = struct{}{}
+	}
+	return func(next http.Handler) http.Handler {
+		authed := m.Authenticate()(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, ok := excluded[r.URL.Path]; ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			authed.ServeHTTP(w, r)
+		})
+	}
+}
+
 func NewMiddleware(verifier TokenVerifierInterface, tracer tracing.TracingInterface, monitor monitoring.MonitorInterface, logger logging.LoggerInterface) *Middleware {
 	return &Middleware{
 		verifier: verifier,

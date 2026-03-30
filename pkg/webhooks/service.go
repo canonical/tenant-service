@@ -20,7 +20,6 @@ import (
 )
 
 // Service provides webhook business logic.
-// Service provides webhook business logic.
 type Service struct {
 	storage StorageInterface
 	authz   AuthorizerInterface
@@ -29,7 +28,6 @@ type Service struct {
 	logger  logging.LoggerInterface
 }
 
-// NewService creates a new webhook service.
 // NewService creates a new webhook service.
 func NewService(
 	storage StorageInterface,

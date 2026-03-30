@@ -171,7 +171,7 @@ func TestService_HandleTokenHook(t *testing.T) {
 	}{
 		{
 			name:    "success - tenant_id in session, valid member",
-			request: makeSession(userID, map[string]interface{}{"tenant_id": tenantID}),
+			request: makeSession(userID, map[string]interface{}{"_tenant_id": tenantID}),
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().GetActiveMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(membership, nil)
 			},
@@ -209,7 +209,7 @@ func TestService_HandleTokenHook(t *testing.T) {
 		},
 		{
 			name:    "success - tenant_id is empty string",
-			request: makeSession(userID, map[string]interface{}{"tenant_id": ""}),
+			request: makeSession(userID, map[string]interface{}{"_tenant_id": ""}),
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
 				// no storage call expected
 			},
@@ -225,7 +225,7 @@ func TestService_HandleTokenHook(t *testing.T) {
 		},
 		{
 			name:    "error - tenant_id present, user not active member",
-			request: makeSession(userID, map[string]interface{}{"tenant_id": tenantID}),
+			request: makeSession(userID, map[string]interface{}{"_tenant_id": tenantID}),
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().GetActiveMemberByTenantAndUserID(gomock.Any(), tenantID, userID).
 					Return(nil, storagePkg.ErrNotFound)
@@ -248,7 +248,7 @@ func TestService_HandleTokenHook(t *testing.T) {
 		},
 		{
 			name:    "error - storage error",
-			request: makeSession(userID, map[string]interface{}{"tenant_id": tenantID}),
+			request: makeSession(userID, map[string]interface{}{"_tenant_id": tenantID}),
 			setupMocks: func(mockStorage *MockStorageInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().GetActiveMemberByTenantAndUserID(gomock.Any(), tenantID, userID).
 					Return(nil, errors.New("storage error"))

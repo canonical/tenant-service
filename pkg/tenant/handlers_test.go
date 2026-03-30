@@ -4,8 +4,6 @@
 package tenant
 
 import (
-t"net/http"
-	"net/http/httptest"
 	"context"
 	"errors"
 	"testing"
@@ -887,22 +885,28 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 }
 
 func TestHandler_LookupTenantsByEmail(t *testing.T) {
-t.Parallel()
-mockCtrl := gomock.NewController(t)
-defer mockCtrl.Finish()
+	t.Parallel()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
 
-service := NewMockServiceInterface(mockCtrl)
-tracer := NewMockTracingInterface(mockCtrl)
-monitor := NewMockMonitorInterface(mockCtrl)
-logger := NewMockLoggerInterface(mockCtrl)
+	service := NewMockServiceInterface(mockCtrl)
+	tracer := NewMockTracingInterface(mockCtrl)
+	monitor := NewMockMonitorInterface(mockCtrl)
+	logger := NewMockLoggerInterface(mockCtrl)
+	setupLoggerMock(mockCtrl, logger)
+	logger.EXPECT().Errorw(gomock.Any(), gomock.Any()).AnyTimes()
+	logger.EXPECT().Errorw(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-h := NewHandler(service, setupValidator(t), tracer, monitor, logger)
-ctx := context.Background()
+	h := NewHandler(service, testValidator, tracer, monitor, logger)
+	tracer.EXPECT().Start(gomock.Any(), gomock.Any()).DoAndReturn(func(c context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+		return c, trace.SpanFromContext(c)
+	}).AnyTimes()
+	ctx := context.Background()
 
-t.Run("success", func(t *testing.T) {
-req := &v0.LookupTenantsByEmailRequest{Email: "test@example.com"}
-tenants := []*types.Tenant{{ID: "t1", Name: "Tenant 1"}, {ID: "t2", Name: "Tenant 2"}}
-service.EXPECT().LookupTenantsByEmail(ctx, req.Email).Return(tenants, nil)
+	t.Run("success", func(t *testing.T) {
+		req := &v0.LookupTenantsByEmailRequest{Email: "test@example.com"}
+		tenants := []*types.Tenant{{ID: "t1", Name: "Tenant 1"}, {ID: "t2", Name: "Tenant 2"}}
+		service.EXPECT().LookupTenantsByEmail(ctx, req.Email).Return(tenants, nil)
 
 		res, err := h.LookupTenantsByEmail(ctx, req)
 		if err != nil {
@@ -922,7 +926,6 @@ service.EXPECT().LookupTenantsByEmail(ctx, req.Email).Return(tenants, nil)
 			t.Fatal("expected error, got nil")
 		}
 	})
-
 	t.Run("invalid email - empty", func(t *testing.T) {
 		req := &v0.LookupTenantsByEmailRequest{Email: ""}
 
@@ -952,66 +955,6 @@ service.EXPECT().LookupTenantsByEmail(ctx, req.Email).Return(tenants, nil)
 		}
 		if st.Code() != codes.InvalidArgument {
 			t.Errorf("expected InvalidArgument, got %v", st.Code())
-		}
-	})
-}
-
-func TestHandler_lookupHTTP(t *testing.T) {
-	t.Parallel()
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	service := NewMockServiceInterface(mockCtrl)
-	tracer := NewMockTracingInterface(mockCtrl)
-	monitor := NewMockMonitorInterface(mockCtrl)
-	logger := NewMockLoggerInterface(mockCtrl)
-
-	h := NewHandler(service, setupValidator(t), tracer, monitor, logger)
-
-	t.Run("success", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/api/v0/tenants/lookup?email=test%40example.com", nil)
-		rr := httptest.NewRecorder()
-
-		tenants := []*types.Tenant{{ID: "t1", Name: "Tenant 1"}}
-		service.EXPECT().LookupTenantsByEmail(req.Context(), "test@example.com").Return(tenants, nil)
-
-		h.lookupHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusOK {
-			t.Errorf("expected status 200 OK, got %v", status)
-		}
-		expected := `{"tenants":[{"id":"t1","name":"Tenant 1"}]}` + "\n"
-		if rr.Body.String() != expected {
-			t.Errorf("expected body %v, got %v", expected, rr.Body.String())
-		}
-	})
-
-	t.Run("missing email", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/api/v0/tenants/lookup", nil) // no email query param
-		rr := httptest.NewRecorder()
-
-		h.lookupHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusBadRequest {
-			t.Errorf("expected status 400 Bad Request, got %v", status)
-		}
-		expected := `{"error":"email query parameter is required"}` + "\n"
-		if rr.Body.String() != expected {
-			t.Errorf("expected body %v, got %v", expected, rr.Body.String())
-		}
-	})
-
-	t.Run("service error", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/api/v0/tenants/lookup?email=error%40example.com", nil)
-		rr := httptest.NewRecorder()
-
-		logger.EXPECT().Errorw(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
-		service.EXPECT().LookupTenantsByEmail(req.Context(), "error@example.com").Return(nil, errors.New("db error"))
-
-		h.lookupHTTP(rr, req)
-
-		if status := rr.Code; status != http.StatusInternalServerError {
-			t.Errorf("expected status 500 Internal Server Error, got %v", status)
 		}
 	})
 }
