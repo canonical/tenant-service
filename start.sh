@@ -80,6 +80,7 @@ export OPENFGA_API_TOKEN="42"
 export OPENFGA_STORE_ID=$(fga store create --name tenant-service --api-token $OPENFGA_API_TOKEN | yq .store.id)
 export OPENFGA_AUTHORIZATION_MODEL_ID=$(./app create-fga-model --fga-api-url http://127.0.0.1:8080 --fga-api-token $OPENFGA_API_TOKEN --fga-store-id $OPENFGA_STORE_ID --format json | yq .model_id)
 export AUTHORIZATION_ENABLED="true"
+export WEBHOOKS_API_TOKEN="secret_api_key"
 export DSN="postgres://tenants:tenants@127.0.0.1:5432/tenants"
 
 echo "Running database migrations..."

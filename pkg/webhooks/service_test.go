@@ -309,7 +309,6 @@ func TestService_HandleLoginHook(t *testing.T) {
 		KratosIdentityID: identityID,
 		Role:             "owner",
 	}
-	
 
 	testCases := []struct {
 		name        string

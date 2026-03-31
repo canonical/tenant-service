@@ -27,6 +27,7 @@ import (
 )
 
 func NewRouter(
+	token string,
 	tenantHandler *tenant.Handler,
 	authMiddleware *authentication.Middleware,
 	s storage.StorageInterface,
@@ -51,6 +52,11 @@ func NewRouter(
 		middlewares = append(middlewares, db.TransactionMiddleware(dbClient, logger))
 	}
 
+	var webhookAuthMiddleware *webhooks.APITokenAuthMiddleware = nil
+	if token != "" {
+		webhookAuthMiddleware = webhooks.NewAuthMiddleware(token, tracer, logger)
+	}
+
 	gRPCGatewayMux := runtime.NewServeMux(
 		runtime.WithForwardResponseRewriter(types.ForwardErrorResponseRewriter),
 		runtime.WithDisablePathLengthFallback(),
@@ -68,7 +74,7 @@ func NewRouter(
 
 	metrics.NewAPI(logger).RegisterEndpoints(router)
 	status.NewAPI(tracer, monitor, logger).RegisterEndpoints(router)
-	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger), logger).RegisterEndpoints(router)
+	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger), webhookAuthMiddleware, logger).RegisterEndpoints(router)
 
 	// Unauthenticated tenant lookup — used by the Login UI before the user has a token.
 	// See ADR 0008 for security trade-offs. Rate limiting should be enforced at the proxy/gateway layer.

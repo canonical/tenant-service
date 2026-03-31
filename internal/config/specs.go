@@ -20,6 +20,8 @@ type EnvSpec struct {
 	Port     int `envconfig:"port" default:"8080"`
 	GRPCPort int `envconfig:"grpc_port" default:"50051"`
 
+	WebhooksAPIToken string `envconfig:"webhooks_api_token" default:""`
+
 	DSN string `envconfig:"DSN" required:"true"`
 
 	DBMaxConns        int32         `envconfig:"db_max_conns" default:"25"`

@@ -153,6 +153,7 @@ func setupTestEnvironment() (*TestEnvironment, error) {
 
 	// Start the service with authentication enabled
 	envVars := map[string]string{
+		"WEBHOOKS_API_TOKEN": "secret_api_key",
 		"DSN":                             dsn,
 		"KRATOS_ADMIN_URL":                "http://localhost:4434",
 		"OPENFGA_API_SCHEME":              "http",

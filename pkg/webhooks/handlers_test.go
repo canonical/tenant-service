@@ -89,7 +89,7 @@ func TestAPI_TokenHook(t *testing.T) {
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 
-			api := NewAPI(mockService, mockLogger)
+			api := NewAPI(mockService, nil, mockLogger)
 
 			var body []byte
 			var err error
@@ -202,7 +202,7 @@ func TestAPI_LoginHook(t *testing.T) {
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 
-			api := NewAPI(mockService, mockLogger)
+			api := NewAPI(mockService, nil, mockLogger)
 
 			var body []byte
 			var err error
@@ -285,7 +285,7 @@ func TestAPI_Registration(t *testing.T) {
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 
-			api := NewAPI(mockService, mockLogger)
+			api := NewAPI(mockService, nil, mockLogger)
 
 			var body []byte
 			var err error

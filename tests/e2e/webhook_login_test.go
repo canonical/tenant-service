@@ -41,6 +41,7 @@ func postWebhook(ctx context.Context, baseURL, path string, body interface{}) (*
 		return nil, fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "secret_api_key")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	return client.Do(req)
@@ -194,6 +195,7 @@ func TestWebhookLogin_InvalidBody(t *testing.T) {
 		serviceBaseURL()+"/api/v0/webhooks/login",
 		bytes.NewBufferString("not-valid-json"))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "secret_api_key")
 
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
@@ -288,5 +290,36 @@ func TestTenantLookup_MissingEmail(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		body, _ := io.ReadAll(resp.Body)
 		t.Errorf("expected 400, got %d: %s", resp.StatusCode, string(body))
+	}
+}
+
+func TestWebhook_Unauthorized(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	endpoints := []string{
+		"/api/v0/webhooks/login",
+		"/api/v0/webhooks/registration",
+		"/api/v0/webhooks/token",
+	}
+
+	for _, endpoint := range endpoints {
+		t.Run(endpoint, func(t *testing.T) {
+			req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
+				serviceBaseURL()+endpoint,
+				bytes.NewBufferString("{}"))
+			req.Header.Set("Content-Type", "application/json")
+			// No Authorization header
+
+			resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Errorf("expected status %d but got %d", http.StatusUnauthorized, resp.StatusCode)
+			}
+		})
 	}
 }

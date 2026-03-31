@@ -15,22 +15,38 @@ import (
 
 // API implements HTTP handler endpoints for webhooks.
 type API struct {
-	service ServiceInterface
-	logger  logging.LoggerInterface
+	service    ServiceInterface
+	middleware *APITokenAuthMiddleware
+
+	logger logging.LoggerInterface
 }
 
 // NewAPI creates a new webhook API handler.
-func NewAPI(service ServiceInterface, logger logging.LoggerInterface) *API {
-	return &API{
-		service: service,
-		logger:  logger,
+func NewAPI(
+	service ServiceInterface,
+	middleware *APITokenAuthMiddleware,
+	logger logging.LoggerInterface,
+) *API {
+	a := new(API)
+
+	a.service = service
+	if middleware != nil {
+		a.middleware = middleware
 	}
+
+	a.logger = logger
+
+	return a
 }
 
 func (a *API) RegisterEndpoints(mux *chi.Mux) {
-	mux.Post("/api/v0/webhooks/registration", a.registration)
-	mux.Post("/api/v0/webhooks/token", a.tokenHook)
-	mux.Post("/api/v0/webhooks/login", a.loginHook)
+	var r chi.Router = mux
+	if a.middleware != nil {
+		r = mux.With(a.middleware.AuthMiddleware)
+	}
+	r.Post("/api/v0/webhooks/registration", a.registration)
+	r.Post("/api/v0/webhooks/token", a.tokenHook)
+	r.Post("/api/v0/webhooks/login", a.loginHook)
 }
 
 func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {
@@ -51,14 +67,14 @@ func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		a.logger.Errorw("token hook: service error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		a.logger.Errorw("token hook: response encoding error", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }
 
@@ -78,7 +94,7 @@ func (a *API) registration(w http.ResponseWriter, r *http.Request) {
 			"email", identity.Email,
 			"error", err,
 		)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -115,7 +131,7 @@ func (a *API) loginHook(w http.ResponseWriter, r *http.Request) {
 			"tenant_id", payload.TenantID,
 			"error", err,
 		)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 

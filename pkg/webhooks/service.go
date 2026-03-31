@@ -128,7 +128,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		"email", email,
 	)
 	s.logger.Security().AdminAction(identityID, "self_registration", "webhooks.Service.HandleRegistration", newTenant.ID)
-	
+
 	s.recordRegistrationMetric("webhook_registration_success")
 	return nil
 }
@@ -173,14 +173,14 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 
 	// Validate that the user is still an active member of the requested tenant.
 	_, err := s.storage.GetActiveMemberByTenantAndUserID(ctx, tenantID, userID)
+	if isNotFound(err) {
+		s.recordError(span, "token hook: user is not an active member of tenant", ErrNotMember,
+			"user_id", userID,
+			"tenant_id", tenantID,
+		)
+		return nil, ErrNotMember
+	}
 	if err != nil {
-		if isNotFound(err) {
-			s.recordError(span, "token hook: user is not an active member of tenant", ErrNotMember,
-				"user_id", userID,
-				"tenant_id", tenantID,
-			)
-			return nil, ErrNotMember
-		}
 		s.recordError(span, "token hook: failed to validate tenant membership", err,
 			"user_id", userID,
 			"tenant_id", tenantID,
