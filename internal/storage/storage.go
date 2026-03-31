@@ -327,25 +327,6 @@ func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID
 	return &m, nil
 }
 
-func (s *Storage) HasAnyMembership(ctx context.Context, identityID string) (bool, error) {
-	ctx, span := s.tracer.Start(ctx, "storage.HasAnyMembership")
-	defer span.End()
-
-	var count int
-	err := s.db.Statement(ctx).
-		Select("COUNT(*)").
-		From("memberships").
-		Where(sq.Eq{"kratos_identity_id": identityID}).
-		Limit(1).
-		QueryRowContext(ctx).
-		Scan(&count)
-
-	if err != nil {
-		return false, fmt.Errorf("failed to check membership existence: %v", err)
-	}
-
-	return count > 0, nil
-}
 
 func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) (string, error) {
 	ctx, span := s.tracer.Start(ctx, "storage.AddMember")

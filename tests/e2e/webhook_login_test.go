@@ -84,7 +84,7 @@ func TestWebhookLogin_ValidMember(t *testing.T) {
 	registerIdentity(ctx, t, identityID, email)
 
 	// We need the tenant ID the registration hook created.
-	// The login hook with an empty tenant_id (HasAnyMembership path) is easier to test
+	// The login hook with an empty tenant_id (the fallback path) is easier to test
 	// without knowing the exact tenant_id. See TestWebhookLogin_NoTenantID_HasMemberships.
 	// For this test, we use the no-tenant_id path to confirm the valid-member branch works.
 	resp, err := postWebhook(ctx, serviceBaseURL(), "/api/v0/webhooks/login", webhookLoginPayload{
@@ -129,9 +129,9 @@ func TestWebhookLogin_NoTenantID_HasMemberships(t *testing.T) {
 	}
 }
 
-func TestWebhookLogin_NoTenantID_OrphanedIdentity(t *testing.T) {
+func TestWebhookLogin_NoTenantID_Succeeds(t *testing.T) {
 	// Identity has never registered via the webhook — no shadow tenant exists.
-	// The login hook must lazily reconcile by creating a shadow tenant.
+	// The login hook should succeed without checking anything since no tenant_id is requested.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -150,7 +150,7 @@ func TestWebhookLogin_NoTenantID_OrphanedIdentity(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		t.Errorf("expected 200 (reconciliation should succeed), got %d: %s", resp.StatusCode, string(body))
+		t.Errorf("expected 200 , got %d: %s", resp.StatusCode, string(body))
 	}
 }
 

@@ -53,6 +53,13 @@ func (s *Service) recordError(span trace.Span, msg string, err error, keysAndVal
 	s.logger.Errorw(msg, append(keysAndValues, "error", err)...)
 }
 
+// recordRegistrationMetric safely increments the business operations counter.
+func (s *Service) recordRegistrationMetric(operation string) {
+	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation, "role": "system"}); err != nil {
+		s.logger.Errorw(fmt.Sprintf("failed to increment registration %s counter", operation), "error", err)
+	}
+}
+
 func (s *Service) HandleRegistration(ctx context.Context, identityID, email string) error {
 	ctx, span := s.tracer.Start(ctx, "webhooks.Service.HandleRegistration")
 	defer span.End()
@@ -63,6 +70,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		err := fmt.Errorf("identity ID is empty")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return err
 	}
 
@@ -88,6 +96,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 			"identity_id", identityID,
 			"email", email,
 		)
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return fmt.Errorf("failed to create tenant: %w", err)
 	}
 
@@ -98,6 +107,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 			"tenant_id", newTenant.ID,
 			"identity_id", identityID,
 		)
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return fmt.Errorf("failed to add member: %w", err)
 	}
 
@@ -108,6 +118,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 			"tenant_id", newTenant.ID,
 			"identity_id", identityID,
 		)
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return fmt.Errorf("failed to assign tenant owner in authz: %w", err)
 	}
 
@@ -117,6 +128,8 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		"email", email,
 	)
 	s.logger.Security().AdminAction(identityID, "self_registration", "webhooks.Service.HandleRegistration", newTenant.ID)
+	
+	s.recordRegistrationMetric("webhook_registration_success")
 	return nil
 }
 
@@ -152,7 +165,7 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 	}
 
 	if tenantID == "" {
-		// No tenant was selected (e.g. user logged in without tenant context, pending activation).
+		// No tenant was selected (e.g. user has no active tenants, pending activation).
 		// Return a valid response without a tenant_id claim.
 		s.logger.Debugw("token hook: no tenant_id in session, skipping tenant claim", "user_id", userID)
 		return &resp, nil
@@ -187,10 +200,8 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 // If tenantID is non-empty, it checks that the identity is an active member of
 // that tenant, returning ErrNotMember if not.
 //
-// If tenantID is empty, the hook performs orphaned-identity reconciliation: if
-// the identity has no memberships (registration webhook previously failed), it
-// re-runs the registration logic to create a disabled shadow tenant and assign
-// the user as owner. Login is always allowed when tenantID is absent.
+// If tenantID is empty, login is allowed. This handles users who do not yet
+// have an active tenant (pending activation).
 func (s *Service) HandleLoginHook(ctx context.Context, identityID, email, tenantID string) error {
 	ctx, span := s.tracer.Start(ctx, "webhooks.Service.HandleLoginHook")
 	defer span.End()
@@ -231,28 +242,7 @@ func (s *Service) HandleLoginHook(ctx context.Context, identityID, email, tenant
 		return nil
 	}
 
-	// No tenant selected — check for orphaned identity and reconcile if needed.
-	hasMembership, err := s.storage.HasAnyMembership(ctx, identityID)
-	if err != nil {
-		s.recordError(span, "login hook: failed to check membership existence", err, "identity_id", identityID)
-		return fmt.Errorf("failed to check membership: %w", err)
-	}
-
-	if !hasMembership {
-		s.logger.Infow("login hook: orphaned identity detected, running lazy reconciliation",
-			"identity_id", identityID,
-			"email", email,
-		)
-		if err := s.HandleRegistration(ctx, identityID, email); err != nil {
-			s.recordError(span, "login hook: lazy reconciliation failed", err, "identity_id", identityID)
-			if counterErr := s.monitor.IncrementCounter(map[string]string{"operation": "login_reconciliation_error", "identity_id": identityID}); counterErr != nil {
-				s.logger.Errorw("failed to increment reconciliation error counter", "error", counterErr)
-			}
-			return fmt.Errorf("failed to reconcile orphaned identity: %w", err)
-		}
-		s.logger.Infow("login hook: lazy reconciliation succeeded", "identity_id", identityID)
-	}
-
+	// Login is permitted when no specific tenant is requested (pending activation).
 	return nil
 }
 

@@ -16,7 +16,6 @@ type StorageInterface interface {
 	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
 	GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
-	HasAnyMembership(ctx context.Context, identityID string) (bool, error)
 }
 
 // AuthorizerInterface defines the authorization operations required by the webhooks package.

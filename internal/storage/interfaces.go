@@ -24,7 +24,5 @@ type StorageInterface interface {
 	// GetActiveMemberByTenantAndUserID returns the membership only when the tenant is enabled.
 	// Returns ErrNotFound if the membership does not exist or the tenant is disabled.
 	GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
-	// HasAnyMembership reports whether the identity has at least one membership row,
 	// regardless of tenant enabled status. Used for orphaned-identity detection.
-	HasAnyMembership(ctx context.Context, identityID string) (bool, error)
 }

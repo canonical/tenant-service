@@ -74,6 +74,10 @@ func NewRouter(
 	// See ADR 0008 for security trade-offs. Rate limiting should be enforced at the proxy/gateway layer.
 
 	// Protected routes — lookup is excluded so the Login UI can call it without a Bearer token.
+	// We create a separate authRouter to apply the authentication middleware exclusively
+	// to the gRPC Gateway endpoints. We then mount this authRouter onto the main router.
+	// This ensures that the webhook endpoints (registered above on the main router)
+	// completely bypass the authentication middleware.
 	authRouter := chi.NewRouter()
 	authRouter.Use(authMiddleware.AuthenticateExcluding("/api/v0/tenants/lookup"))
 	authRouter.Mount("/", gRPCGatewayMux)
