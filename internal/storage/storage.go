@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/canonical/tenant-service/internal/db"
@@ -41,7 +42,19 @@ func NewStorage(c db.DBClientInterface, tracer tracing.TracingInterface, monitor
 	return s
 }
 
-func (s *Storage) CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error) {
+func (s *Storage) recordLatencyFor(operation string, start time.Time, err error) {
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	s.monitor.SetStorageResponseTimeMetric(map[string]string{
+		"operation": operation,
+		"status":    status,
+	}, time.Since(start).Seconds())
+}
+
+func (s *Storage) CreateTenant(ctx context.Context, t *types.Tenant) (tenant *types.Tenant, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("CreateTenant", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.CreateTenant")
 	defer span.End()
 
@@ -66,12 +79,13 @@ func (s *Storage) CreateTenant(ctx context.Context, t *types.Tenant) (*types.Ten
 	return &newTenant, nil
 }
 
-func (s *Storage) GetTenantByID(ctx context.Context, id string) (*types.Tenant, error) {
+func (s *Storage) GetTenantByID(ctx context.Context, id string) (tenant *types.Tenant, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("GetTenantByID", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.GetTenantByID")
 	defer span.End()
 
 	var t types.Tenant
-	err := s.db.Statement(ctx).
+	err = s.db.Statement(ctx).
 		Select("id", "name", "created_at", "enabled").
 		From("tenants").
 		Where(sq.Eq{"id": id}).
@@ -88,7 +102,8 @@ func (s *Storage) GetTenantByID(ctx context.Context, id string) (*types.Tenant, 
 	return &t, nil
 }
 
-func (s *Storage) ListTenants(ctx context.Context, options ...types.ListOption) ([]*types.Tenant, string, error) {
+func (s *Storage) ListTenants(ctx context.Context, options ...types.ListOption) (tenants []*types.Tenant, token string, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("ListTenants", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.ListTenants")
 	defer span.End()
 
@@ -114,7 +129,7 @@ func (s *Storage) ListTenants(ctx context.Context, options ...types.ListOption) 
 	}
 	defer rows.Close()
 
-	var tenants []*types.Tenant
+	tenants = make([]*types.Tenant, 0)
 	for rows.Next() {
 		var t types.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.Enabled); err != nil {
@@ -136,14 +151,16 @@ func (s *Storage) ListTenants(ctx context.Context, options ...types.ListOption) 
 	return tenants, nextPageToken, nil
 }
 
-func (s *Storage) ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error) {
+func (s *Storage) ListActiveTenantsByUserID(ctx context.Context, userID string) (tenants []*types.Tenant, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("ListActiveTenantsByUserID", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.ListActiveTenantsByUserID")
 	defer span.End()
 
 	return s.listTenantsByUserID(ctx, userID, false)
 }
 
-func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, options ...types.ListOption) ([]*types.Tenant, string, error) {
+func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, options ...types.ListOption) (tenants []*types.Tenant, token string, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("ListTenantsByUserID", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.ListTenantsByUserID")
 	defer span.End()
 
@@ -171,7 +188,7 @@ func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, option
 	}
 	defer rows.Close()
 
-	var tenants []*types.Tenant
+	tenants = make([]*types.Tenant, 0)
 	for rows.Next() {
 		var t types.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.Enabled); err != nil {
@@ -193,7 +210,8 @@ func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, option
 	return tenants, nextPageToken, nil
 }
 
-func (s *Storage) listTenantsByUserID(ctx context.Context, userID string, showDisabled bool) ([]*types.Tenant, error) {
+func (s *Storage) listTenantsByUserID(ctx context.Context, userID string, showDisabled bool) (tenants []*types.Tenant, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("listTenantsByUserID", start, err) }(time.Now())
 	query := s.db.Statement(ctx).
 		Select("t.id", "t.name", "t.created_at", "t.enabled").
 		From("tenants t").
@@ -210,7 +228,7 @@ func (s *Storage) listTenantsByUserID(ctx context.Context, userID string, showDi
 	}
 	defer rows.Close()
 
-	var tenants []*types.Tenant
+	tenants = make([]*types.Tenant, 0)
 	for rows.Next() {
 		var t types.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.Enabled); err != nil {
@@ -226,7 +244,8 @@ func (s *Storage) listTenantsByUserID(ctx context.Context, userID string, showDi
 	return tenants, nil
 }
 
-func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, options ...types.ListOption) ([]*types.Membership, string, error) {
+func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, options ...types.ListOption) (memberships []*types.Membership, token string, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("ListMembersByTenantID", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.ListMembersByTenantID")
 	defer span.End()
 
@@ -275,12 +294,13 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 	return members, nextPageToken, nil
 }
 
-func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error) {
+func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (membership *types.Membership, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("GetMemberByTenantAndUserID", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.GetMemberByTenantAndUserID")
 	defer span.End()
 
 	var m types.Membership
-	err := s.db.Statement(ctx).
+	err = s.db.Statement(ctx).
 		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
 		From("memberships").
 		Where(sq.Eq{
@@ -300,12 +320,13 @@ func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, user
 	return &m, nil
 }
 
-func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error) {
+func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (membership *types.Membership, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("GetActiveMemberByTenantAndUserID", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.GetActiveMemberByTenantAndUserID")
 	defer span.End()
 
 	var m types.Membership
-	err := s.db.Statement(ctx).
+	err = s.db.Statement(ctx).
 		Select("m.id", "m.tenant_id", "m.kratos_identity_id", "m.role", "m.created_at").
 		From("memberships m").
 		Join("tenants t ON t.id = m.tenant_id").
@@ -327,8 +348,8 @@ func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID
 	return &m, nil
 }
 
-
-func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) (string, error) {
+func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) (membershipID string, err error) {
+	defer func(start time.Time) { s.recordLatencyFor("AddMember", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.AddMember")
 	defer span.End()
 
@@ -356,7 +377,8 @@ func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) 
 	return id.String(), nil
 }
 
-func (s *Storage) UpdateMember(ctx context.Context, tenantID, userID, role string) error {
+func (s *Storage) UpdateMember(ctx context.Context, tenantID, userID, role string) (err error) {
+	defer func(start time.Time) { s.recordLatencyFor("UpdateMember", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.UpdateMember")
 	defer span.End()
 
@@ -389,7 +411,8 @@ func (s *Storage) UpdateMember(ctx context.Context, tenantID, userID, role strin
 // Here we follow typical PATCH semantics: update only what's in paths.
 // If paths contains "name", update name.
 // If paths contains "enabled", update enabled status.
-func (s *Storage) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) error {
+func (s *Storage) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) (err error) {
+	defer func(start time.Time) { s.recordLatencyFor("UpdateTenant", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.UpdateTenant")
 	defer span.End()
 
@@ -416,7 +439,7 @@ func (s *Storage) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths 
 		SetMap(updateMap).
 		Where(sq.Eq{"id": tenant.ID})
 
-	_, err := query.ExecContext(ctx)
+	_, err = query.ExecContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update tenant: %w", err)
 	}
@@ -424,11 +447,12 @@ func (s *Storage) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths 
 	return nil
 }
 
-func (s *Storage) DeleteTenant(ctx context.Context, id string) error {
+func (s *Storage) DeleteTenant(ctx context.Context, id string) (err error) {
+	defer func(start time.Time) { s.recordLatencyFor("DeleteTenant", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.DeleteTenant")
 	defer span.End()
 
-	_, err := s.db.Statement(ctx).
+	_, err = s.db.Statement(ctx).
 		Delete("tenants").
 		Where(sq.Eq{"id": id}).
 		ExecContext(ctx)
