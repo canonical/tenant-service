@@ -24,7 +24,7 @@ http:
       rule: "Path(`/api/device`)"
       service: login-ui-public-api-service
 
-    # /api/v0/tenants
+    # /api/v0/tenants (tenant lookup by email)
     login-ui-public-api-router-api-tenants:
       entryPoints:
         - web
@@ -32,21 +32,12 @@ http:
       rule: "PathPrefix(`/api/v0/tenants`)"
       service: login-ui-public-api-service
 
-    # /api/v0/tenants
-    login-ui-public-api-router-api-tenant-redirect:
+    # /api/v0/auth/tenant (tenant selection)
+    login-ui-public-api-router-api-auth-tenant:
       entryPoints:
         - web
         - websecure
-      rule: "PathPrefix(`/api/v0/login/challenge/tenant-redirect`)"
-      service: login-ui-public-api-service
-
-
-    # /api/v0/login/challenge/* (tenant redirect + tenant state)
-    login-ui-public-api-router-api-login-challenge:
-      entryPoints:
-        - web
-        - websecure
-      rule: "PathPrefix(`/api/v0/login`)"
+      rule: "Path(`/api/v0/auth/tenant`)"
       service: login-ui-public-api-service
 
     # /api/consent
