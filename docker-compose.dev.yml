@@ -252,5 +252,18 @@ services:
       - intranet
     labels:
       - "traefik.enable=false"
+  dex:
+    image: dexidp/dex:v2.41.1
+    command: dex serve /etc/dex/config.yml
+    volumes:
+      - type: bind
+        source: ./docker/dex
+        target: /etc/dex
+    ports:
+      - "5556:5556"
+    networks:
+      - intranet
+    labels:
+      - "traefik.enable=false"
 networks:
   intranet:
