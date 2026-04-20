@@ -25,7 +25,7 @@ type webhookLoginPayload struct {
 
 // webhookRegistrationPayload mirrors the Kratos identity payload used by the registration hook.
 type webhookRegistrationPayload struct {
-	ID    string `json:"user_id"`
+	ID    string `json:"identity_id"`
 	Email string `json:"email"`
 }
 

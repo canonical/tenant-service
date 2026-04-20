@@ -195,7 +195,10 @@ message TenantUser {
 }
 
 message LookupTenantsByEmailRequest {
-    string email = 1 [(buf.validate.field).string.email = true];
+    // Exactly one of email or identity_id must be provided.
+    // When identity_id is set, the Kratos email-to-identity lookup is skipped.
+    string email = 1;
+    string identity_id = 2;
 }
 
 message LookupTenantsByEmailResponse {

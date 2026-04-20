@@ -11,7 +11,7 @@ import (
 
 // KratosIdentity represents a user identity from Kratos.
 type KratosIdentity struct {
-	ID    string                 `json:"user_id"`
+	ID    string                 `json:"identity_id"`
 	Email string                 `json:"email"`
 	Extra map[string]interface{} `json:"-"`
 }
@@ -20,7 +20,7 @@ func (k *KratosIdentity) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &k.Extra); err != nil {
 		return err
 	}
-	if v, ok := k.Extra["user_id"].(string); ok {
+	if v, ok := k.Extra["identity_id"].(string); ok {
 		k.ID = v
 	}
 	if v, ok := k.Extra["email"].(string); ok {

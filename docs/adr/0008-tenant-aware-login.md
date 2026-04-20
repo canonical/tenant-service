@@ -84,16 +84,24 @@ When the login hook receives a request with an empty `tenant_id`, the hook simpl
 
 ### Tenant lookup endpoint design
 
-- **Endpoint**: `GET /api/v0/tenants/lookup?email=<email>` — registered in the **unprotected**
-  zone of the chi router. The Login UI calls this before the user authenticates.
+- **Endpoint**: `GET /api/v0/tenants/lookup` — registered in the **unprotected** zone of the
+  chi router. Accepts **exactly one** of two query parameters:
+  - `?email=<email>` — resolves email → Kratos identity ID → active tenant memberships.
+  - `?identity_id=<kratos_uuid>` — skips the Kratos lookup, queries active tenant
+    memberships directly. This is faster (one fewer network hop) and works for callers
+    that already know the identity ID (e.g., hook-service during the Hydra token hook,
+    or Login UI when an active Kratos session is available).
+
+  Providing both or neither returns `400 InvalidArgument`.
 - **Authentication**: none at present. The Login UI does not yet have a service-account token at
   this point in the flow. See security trade-offs below.
 - **Behaviour**:
-  - Resolve `email` → Kratos identity ID via Kratos Admin API.
-  - If identity not found, return an empty list (no enumeration leak in the response to the
+  - When `email` is provided: resolve `email` → Kratos identity ID via Kratos Admin API.
+    If identity not found, return an empty list (no enumeration leak in the response to the
     unauthenticated caller; however, response timing may still be used to infer existence — tracked
     in TODO).
-  - Query `memberships JOIN tenants WHERE enabled = true` for that identity.
+  - When `identity_id` is provided: use it directly (skip Kratos resolution).
+  - Query `memberships JOIN tenants WHERE enabled = true` for the resolved identity.
   - Return `[{id, name}]` for enabled tenants only.
 
 ### Tenant selection mechanism

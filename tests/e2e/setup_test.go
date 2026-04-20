@@ -151,6 +151,13 @@ func setupTestEnvironment() (*TestEnvironment, error) {
 		return nil, fmt.Errorf("failed to setup hydra client: %w", err)
 	}
 
+	// The service uses Hydra's public OIDC discovery endpoint on startup.
+	// Wait for it explicitly to avoid flaking on transient EOF responses.
+	if err := waitForHTTP(ctx, "http://localhost:4444/.well-known/openid-configuration"); err != nil {
+		cleanup()
+		return nil, fmt.Errorf("hydra public oidc endpoint not ready: %w", err)
+	}
+
 	// Start the service with authentication enabled
 	envVars := map[string]string{
 		"WEBHOOKS_API_TOKEN": "secret_api_key",
