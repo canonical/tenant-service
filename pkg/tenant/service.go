@@ -555,3 +555,22 @@ func (s *Service) LookupTenantsByEmail(ctx context.Context, email string) ([]*ty
 	s.logger.Debugw("lookup: tenants found", "count", len(tenants))
 	return tenants, nil
 }
+
+// LookupTenantsByIdentityID returns the enabled tenants that the given Kratos identity belongs to.
+// This skips the Kratos email-to-identity resolution and queries the database directly.
+// It is used by privileged internal callers (hook-service, Login UI) that already know the identity ID.
+func (s *Service) LookupTenantsByIdentityID(ctx context.Context, identityID string) ([]*types.Tenant, error) {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.LookupTenantsByIdentityID")
+	defer span.End()
+
+	s.logger.Debugw("looking up tenants by identity ID")
+
+	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, identityID)
+	if err != nil {
+		s.recordError(span, "failed to list active tenants for identity", err, "identity_id", identityID)
+		return nil, fmt.Errorf("failed to list tenants: %w", err)
+	}
+
+	s.logger.Debugw("lookup: tenants found", "count", len(tenants))
+	return tenants, nil
+}

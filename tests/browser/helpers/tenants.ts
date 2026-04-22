@@ -105,8 +105,8 @@ export async function provisionUser(
   }
 }
 
-/** Lookup tenants for an email (unauthenticated). */
-export async function lookupTenantsByEmail(
+/** Lookup tenants by email or identity_id (unauthenticated). */
+export async function lookupTenants(
   email: string,
 ): Promise<Tenant[]> {
   const res = await fetch(
