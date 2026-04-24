@@ -173,7 +173,7 @@ sequenceDiagram
         Note over Backend: Skip MFA/WebAuthn checks
         Backend->>Plugin: (falls through to NeedsTenantSelection via handleUpdateFlow)
 
-        Plugin->>TenantAPI: GET /api/v0/tenants/lookup?email=alice@example.com
+        Plugin->>TenantAPI: GET /api/v0/tenants/lookup?identity_id={session.Identity.Id}
 
         alt 0 tenants
             TenantAPI-->>Plugin: {"tenants": []}
@@ -207,7 +207,7 @@ sequenceDiagram
         Hydra-->>Backend: Redirect to consent
 
     else Cookie has matching hash but no TenantID (needs selection)
-        Plugin->>TenantAPI: GET /api/v0/tenants/lookup?email=...
+        Plugin->>TenantAPI: GET /api/v0/tenants/lookup?identity_id={session.Identity.Id}
         TenantAPI-->>Plugin: 2+ tenants
         Plugin-->>Backend: {SelectTenant: true}
         Backend-->>Frontend: Redirect to /ui/select_tenant
@@ -519,7 +519,7 @@ sequenceDiagram
 
 | Gap | Affects Flow | Status | GitHub Issue |
 |---|---|---|---|
-| `GET /api/v0/tenants/lookup?email=...` — tenant discovery endpoint | Flow 2, Flow 6 | **Done** | [#15](https://github.com/canonical/tenant-service/issues/15) |
+| `GET /api/v0/tenants/lookup` — tenant discovery endpoint (supports `?email=` and `?identity_id=`) | Flow 2, Flow 6 | **Done** | [#15](https://github.com/canonical/tenant-service/issues/15) |
 | `POST /api/v0/webhooks/login` — login validation webhook | Flow 2, Flow 6 | **Done** | [#15](https://github.com/canonical/tenant-service/issues/15) |
 | Token hook injects single `tenant_id` (not a list) — reads from session, validates membership | Flow 3 | **Done** | — |
 | InterceptLogin plugin — backend-driven tenant resolution in `handleCreateFlow` | Flow 2 | **Done** | — |

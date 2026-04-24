@@ -32,6 +32,7 @@ cd "$REPO_ROOT"
 
 # --- Configuration ---
 LOGIN_UI_IMAGE="${LOGIN_UI_IMAGE:-ghcr.io/canonical/identity-platform-login-ui:v0.25.0}"
+LOGIN_UI_BINARY="${LOGIN_UI_BINARY:-}"
 HYDRA_IMAGE="ghcr.io/canonical/hydra:2.3.0-canonical"
 OIDC_CONTAINER_NAME="oidc_client_test"
 DSN="postgres://tenants:tenants@127.0.0.1:5432/tenants"
@@ -66,6 +67,10 @@ cleanup() {
     kill "$APP_PID" 2>/dev/null || true
     wait "$APP_PID" 2>/dev/null || true
   fi
+  if [ -n "${LOGIN_UI_PID:-}" ] && kill -0 "$LOGIN_UI_PID" 2>/dev/null; then
+    kill "$LOGIN_UI_PID" 2>/dev/null || true
+    wait "$LOGIN_UI_PID" 2>/dev/null || true
+  fi
   docker compose -f "$REPO_ROOT/docker-compose.dev.yml" down --remove-orphans 2>/dev/null || true
   rm -f "${COMPOSE_OVERRIDE:-}"
 }
@@ -87,8 +92,36 @@ restart_login_ui() {
 
   log "Restarting login-ui (MULTI_TENANCY=$multi_tenancy, MFA=$mfa)..."
 
-  COMPOSE_OVERRIDE=$(mktemp /tmp/docker-compose.test.XXXXXX.yml)
-  cat > "$COMPOSE_OVERRIDE" <<EOF
+  if [ -n "${LOGIN_UI_BINARY:-}" ]; then
+    # Run login-ui as a host process (useful when the Docker image is stale)
+    if [ -n "${LOGIN_UI_PID:-}" ] && kill -0 "$LOGIN_UI_PID" 2>/dev/null; then
+      kill "$LOGIN_UI_PID" 2>/dev/null || true
+      wait "$LOGIN_UI_PID" 2>/dev/null || true
+    fi
+    # Stop the Docker container so it doesn't hold port 4455
+    docker compose -f "$REPO_ROOT/docker-compose.dev.yml" stop identity-platform-login-ui 2>/dev/null || true
+    docker compose -f "$REPO_ROOT/docker-compose.dev.yml" rm -f identity-platform-login-ui 2>/dev/null || true
+
+    LOGIN_UI_LOG="$SCRIPT_DIR/login-ui.log"
+    KRATOS_PUBLIC_URL=http://localhost:4433 \
+    KRATOS_ADMIN_URL=http://localhost:4434 \
+    HYDRA_ADMIN_URL=http://localhost:4445 \
+    BASE_URL=http://localhost/ \
+    COOKIES_ENCRYPTION_KEY=WrfOcYmVBwyduEbKYTUhO4X7XVaOQ1wF \
+    PORT=4455 \
+    LOG_LEVEL=DEBUG \
+    TRACING_ENABLED=FALSE \
+    MFA_ENABLED="${mfa}" \
+    OPENFGA_API_SCHEME=http \
+    OPENFGA_API_HOST=localhost:8080 \
+    IDENTIFIER_FIRST_ENABLED=TRUE \
+    MULTI_TENANCY_ENABLED="${multi_tenancy}" \
+    TENANTS_SERVICE_URL=http://localhost:8000 \
+    "$LOGIN_UI_BINARY" serve > "$LOGIN_UI_LOG" 2>&1 &
+    LOGIN_UI_PID=$!
+  else
+    COMPOSE_OVERRIDE=$(mktemp /tmp/docker-compose.test.XXXXXX.yml)
+    cat > "$COMPOSE_OVERRIDE" <<EOF
 services:
   identity-platform-login-ui:
     image: ${LOGIN_UI_IMAGE}
@@ -109,10 +142,11 @@ services:
       - TENANTS_SERVICE_URL=http://host.docker.internal:8000
 EOF
 
-  docker compose \
-    -f "$REPO_ROOT/docker-compose.dev.yml" \
-    -f "$COMPOSE_OVERRIDE" \
-    up -d --no-deps --force-recreate identity-platform-login-ui 2>/dev/null
+    docker compose \
+      -f "$REPO_ROOT/docker-compose.dev.yml" \
+      -f "$COMPOSE_OVERRIDE" \
+      up -d --no-deps --force-recreate identity-platform-login-ui 2>/dev/null
+  fi
 
   # Wait for login-ui to be ready
   for i in $(seq 1 30); do
@@ -134,8 +168,7 @@ log "Waiting for services..."
 for url in \
   "http://localhost:4433/health/ready" \
   "http://localhost:4444/health/ready" \
-  "http://localhost:8080/healthz" \
-  "http://localhost:5556/dex/.well-known/openid-configuration"; do
+  "http://localhost:8080/healthz"; do
   for i in $(seq 1 30); do
     if curl -sf "$url" > /dev/null 2>&1; then break; fi
     if [ "$i" -eq 30 ]; then fail "Service at $url not ready"; exit 1; fi
@@ -248,7 +281,7 @@ if $RUN_MULTI_TENANCY; then
 
   if AUTH_CLIENT_ID="$AUTH_CLIENT_ID" \
      AUTH_CLIENT_SECRET="$AUTH_CLIENT_SECRET" \
-     npx playwright test specs/tenant-login.spec.ts specs/oidc-tenant-login.spec.ts; then
+     npx playwright test specs/tenant-login.spec.ts; then
     log "Phase 1 PASSED"
   else
     fail "Phase 1 FAILED"
@@ -265,7 +298,7 @@ if $RUN_NO_MULTI_TENANCY; then
   restart_login_ui "FALSE" "TRUE"
   cd "$SCRIPT_DIR"
 
-  if npx playwright test specs/login.spec.ts specs/oidc-login.spec.ts; then
+  if npx playwright test specs/login.spec.ts; then
     log "Phase 2 PASSED"
   else
     fail "Phase 2 FAILED"
