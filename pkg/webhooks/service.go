@@ -5,6 +5,7 @@ package webhooks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.opentelemetry.io/otel/codes"
@@ -12,11 +13,13 @@ import (
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
+	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/ory/hydra/v2/oauth2"
 )
 
+// Service provides webhook business logic.
 type Service struct {
 	storage StorageInterface
 	authz   AuthorizerInterface
@@ -25,6 +28,7 @@ type Service struct {
 	logger  logging.LoggerInterface
 }
 
+// NewService creates a new webhook service.
 func NewService(
 	storage StorageInterface,
 	authz AuthorizerInterface,
@@ -49,6 +53,13 @@ func (s *Service) recordError(span trace.Span, msg string, err error, keysAndVal
 	s.logger.Errorw(msg, append(keysAndValues, "error", err)...)
 }
 
+// recordRegistrationMetric safely increments the business operations counter.
+func (s *Service) recordRegistrationMetric(operation string) {
+	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation, "role": "system"}); err != nil {
+		s.logger.Errorw(fmt.Sprintf("failed to increment registration %s counter", operation), "error", err)
+	}
+}
+
 func (s *Service) HandleRegistration(ctx context.Context, identityID, email string) error {
 	ctx, span := s.tracer.Start(ctx, "webhooks.Service.HandleRegistration")
 	defer span.End()
@@ -59,14 +70,20 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		err := fmt.Errorf("identity ID is empty")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		s.recordRegistrationMetric("webhook_registration_failure")
+		return err
+	}
+
+	if email == "" {
+		err := fmt.Errorf("identity email is required")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return err
 	}
 
 	// 1. Create a tenant named '{Email}'s Org'
 	tenantName := fmt.Sprintf("%s's Org", email)
-	if email == "" {
-		tenantName = ""
-	}
 
 	tenant := &types.Tenant{
 		Name:    tenantName,
@@ -79,6 +96,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 			"identity_id", identityID,
 			"email", email,
 		)
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return fmt.Errorf("failed to create tenant: %w", err)
 	}
 
@@ -89,6 +107,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 			"tenant_id", newTenant.ID,
 			"identity_id", identityID,
 		)
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return fmt.Errorf("failed to add member: %w", err)
 	}
 
@@ -99,6 +118,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 			"tenant_id", newTenant.ID,
 			"identity_id", identityID,
 		)
+		s.recordRegistrationMetric("webhook_registration_failure")
 		return fmt.Errorf("failed to assign tenant owner in authz: %w", err)
 	}
 
@@ -108,6 +128,8 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		"email", email,
 	)
 	s.logger.Security().AdminAction(identityID, "self_registration", "webhooks.Service.HandleRegistration", newTenant.ID)
+
+	s.recordRegistrationMetric("webhook_registration_success")
 	return nil
 }
 
@@ -129,20 +151,8 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 		return nil, err
 	}
 
-	// Fetch Tenants
-	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, userID)
-	if err != nil {
-		s.recordError(span, "failed to list tenants for token hook", err, "user_id", userID)
-		return nil, fmt.Errorf("failed to list tenants: %w", err)
-	}
-
-	// Format Response
-	tenantList := make([]string, 0, len(tenants))
-	for _, t := range tenants {
-		tenantList = append(tenantList, t.ID)
-	}
-
-	s.logger.Debugw("token hook tenants resolved", "user_id", userID, "tenant_count", len(tenantList))
+	// Extract the tenant_id the Login UI placed in the session at the consent step.
+	tenantID := s.extractTenantIDFromSession(req)
 
 	resp := TokenHookResponse{
 		Session: struct {
@@ -154,10 +164,104 @@ func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequ
 		},
 	}
 
-	if len(tenantList) > 0 {
-		resp.Session.IDToken["tenants"] = tenantList
-		resp.Session.AccessToken["tenants"] = tenantList
+	if tenantID == "" {
+		// No tenant was selected (e.g. user has no active tenants, pending activation).
+		// Return a valid response without a tenant_id claim.
+		s.logger.Debugw("token hook: no tenant_id in session, skipping tenant claim", "user_id", userID)
+		return &resp, nil
 	}
 
+	// Validate that the user is still an active member of the requested tenant.
+	_, err := s.storage.GetActiveMemberByTenantAndUserID(ctx, tenantID, userID)
+	if isNotFound(err) {
+		s.recordError(span, "token hook: user is not an active member of tenant", ErrNotMember,
+			"user_id", userID,
+			"tenant_id", tenantID,
+		)
+		return nil, ErrNotMember
+	}
+	if err != nil {
+		s.recordError(span, "token hook: failed to validate tenant membership", err,
+			"user_id", userID,
+			"tenant_id", tenantID,
+		)
+		return nil, fmt.Errorf("failed to validate tenant membership: %w", err)
+	}
+
+	s.logger.Debugw("token hook: injecting tenant_id claim", "user_id", userID, "tenant_id", tenantID)
+	resp.Session.IDToken["tenant_id"] = tenantID
+	resp.Session.AccessToken["tenant_id"] = tenantID
+
 	return &resp, nil
+}
+
+// HandleLoginHook validates that the given identity is permitted to log in.
+//
+// If tenantID is non-empty, it checks that the identity is an active member of
+// that tenant, returning ErrNotMember if not.
+//
+// If tenantID is empty, login is allowed. This handles users who do not yet
+// have an active tenant (pending activation).
+func (s *Service) HandleLoginHook(ctx context.Context, identityID, email, tenantID string) error {
+	ctx, span := s.tracer.Start(ctx, "webhooks.Service.HandleLoginHook")
+	defer span.End()
+
+	s.logger.Debugw("handling login hook",
+		"identity_id", identityID,
+		"tenant_id", tenantID,
+	)
+
+	if identityID == "" {
+		// Empty identity_id means Kratos fired the hook for an intermediate authentication
+		// step (before all factors are satisfied, flow.state != "passed_challenge"). The
+		// Jsonnet template returns {} in that case. Treat this as a no-op.
+		s.logger.Debugw("login hook: empty identity_id, skipping (intermediate auth step)")
+		return nil
+	}
+
+	if tenantID != "" {
+		// Verify active membership.
+		_, err := s.storage.GetActiveMemberByTenantAndUserID(ctx, tenantID, identityID)
+		if err != nil {
+			if isNotFound(err) {
+				s.recordError(span, "login hook: user is not an active member of tenant", ErrNotMember,
+					"identity_id", identityID,
+					"tenant_id", tenantID,
+				)
+				return ErrNotMember
+			}
+			s.recordError(span, "login hook: failed to check tenant membership", err,
+				"identity_id", identityID,
+				"tenant_id", tenantID,
+			)
+			return fmt.Errorf("failed to check tenant membership: %w", err)
+		}
+
+		s.logger.Debugw("login hook: membership verified", "identity_id", identityID, "tenant_id", tenantID)
+		s.logger.Security().AdminAction(identityID, "login_with_tenant", "webhooks.Service.HandleLoginHook", tenantID)
+		return nil
+	}
+
+	// Login is permitted when no specific tenant is requested (pending activation).
+	return nil
+}
+
+// isNotFound reports whether err is a storage "not found" sentinel.
+func isNotFound(err error) bool {
+	return errors.Is(err, storage.ErrNotFound)
+}
+
+// extractTenantIDFromSession retrieves the tenant_id safely from the OAuth2 session extra payload.
+//
+// The Login UI guarantees that the "_none" sentinel (cookies.NoTenantAvailable)
+// is never forwarded to the consent session. If it were to arrive here, the
+// membership check would fail (no tenant with id "_none" exists), resulting
+// in a 403 — correct fail-closed behavior.
+func (s *Service) extractTenantIDFromSession(req *oauth2.TokenHookRequest) string {
+	if req.Session != nil && req.Session.Extra != nil {
+		if v, ok := req.Session.Extra["_tenant_id"].(string); ok {
+			return v
+		}
+	}
+	return ""
 }

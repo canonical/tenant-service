@@ -106,6 +106,13 @@ components:
                         $ref: '#/components/schemas/tenantTenant'
                     type: array
             type: object
+        tenantLookupTenantsByEmailResponse:
+            properties:
+                tenants:
+                    items:
+                        $ref: '#/components/schemas/tenantTenant'
+                    type: array
+            type: object
         tenantProvisionUserResponse:
             properties:
                 status:
@@ -350,6 +357,23 @@ paths:
                             $ref: '#/components/schemas/TenantServiceUpdateTenantUserBody'
                 required: true
                 x-originalParamName: body
+            responses:
+                default:
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/rpcStatus'
+                    description: An unexpected error response.
+            tags:
+                - TenantService
+    /api/v0/tenants/lookup:
+        get:
+            operationId: TenantService_LookupTenantsByEmail
+            parameters:
+                - in: query
+                  name: email
+                  schema:
+                    type: string
             responses:
                 default:
                     content:

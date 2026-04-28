@@ -186,3 +186,7 @@ func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenan
 func (c *httpTenantClient) UpdateTenantUser(ctx context.Context, in *v0.UpdateTenantUserRequest, opts ...grpc.CallOption) (*v0.UpdateTenantUserResponse, error) {
 	return nil, fmt.Errorf("method UpdateTenantUser not implemented in HTTP client")
 }
+
+func (c *httpTenantClient) LookupTenants(ctx context.Context, in *v0.LookupTenantsRequest, opts ...grpc.CallOption) (*v0.LookupTenantsResponse, error) {
+	return nil, fmt.Errorf("method LookupTenants not implemented in HTTP client")
+}

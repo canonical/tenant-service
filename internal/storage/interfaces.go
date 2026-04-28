@@ -21,4 +21,8 @@ type StorageInterface interface {
 	UpdateMember(ctx context.Context, tenantID, userID, role string) error
 	GetMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
 	ListMembersByTenantID(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.Membership, string, error)
+	// GetActiveMemberByTenantAndUserID returns the membership only when the tenant is enabled.
+	// Returns ErrNotFound if the membership does not exist or the tenant is disabled.
+	GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
+	// regardless of tenant enabled status. Used for orphaned-identity detection.
 }

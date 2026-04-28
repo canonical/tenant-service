@@ -51,6 +51,7 @@ The service is configured using environment variables.
 | `DEBUG` | Enable Debug Mode | `false` | No |
 | `PORT` | HTTP Server Port | `8080` | No |
 | `GRPC_PORT` | gRPC Server Port | `50051` | No |
+| `WEBHOOKS_API_TOKEN` | API token required to protect webhook endpoints | | No |
 | `DSN` | PostgreSQL Connection String | | Yes |
 | `DB_MAX_CONNS` | Maximum open DB connections | `25` | No |
 | `DB_MIN_CONNS` | Minimum open DB connections | `2` | No |

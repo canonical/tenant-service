@@ -333,6 +333,37 @@
           "TenantService"
         ]
       }
+    },
+    "/api/v0/tenants/lookup": {
+      "get": {
+        "operationId": "TenantService_LookupTenants",
+        "responses": {
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "email",
+            "description": "Exactly one of email or identity_id must be provided.\nWhen identity_id is set, the Kratos email-to-identity lookup is skipped.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "identity_id",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "TenantService"
+        ]
+      }
     }
   },
   "definitions": {
@@ -503,6 +534,18 @@
         },
         "next_page_token": {
           "type": "string"
+        }
+      }
+    },
+    "tenantLookupTenantsResponse": {
+      "type": "object",
+      "properties": {
+        "tenants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/tenantTenant"
+          }
         }
       }
     },

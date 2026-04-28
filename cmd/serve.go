@@ -55,7 +55,8 @@ func serve() error {
 	}
 
 	logger := logging.NewLogger(specs.LogLevel)
-	logger.Debugf("env vars: %v", specs)
+	logger.Debugf("env vars: port=%d, grpc_port=%d, log_level=%s, debug=%v, tracing_enabled=%v, authorization_enabled=%v, authentication_enabled=%v",
+		specs.Port, specs.GRPCPort, specs.LogLevel, specs.Debug, specs.TracingEnabled, specs.AuthorizationEnabled, specs.AuthenticationEnabled)
 	defer logger.Sync()
 
 	monitor := prometheus.NewMonitor("tenant-service", logger)
@@ -140,7 +141,7 @@ func serve() error {
 			return fmt.Errorf("failed to setup JWT authenticator: %v", err)
 		}
 	} else {
-		logger.Info("JWT authentication is disabled")
+		logger.Warn("WARNING: JWT authentication is DISABLED — this should only be used in development/debug mode")
 		jwtVerifier = authentication.NewNoopVerifier()
 	}
 
@@ -190,6 +191,7 @@ func serve() error {
 	}()
 
 	router := web.NewRouter(
+		specs.WebhooksAPIToken,
 		tenantHandler,
 		authMiddleware,
 		s,
@@ -241,4 +243,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-

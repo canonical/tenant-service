@@ -2,6 +2,9 @@
 
 # dependencies
 /ui/node_modules
+/tests/browser/node_modules
+/tests/browser/test-results
+/test-results/
 /.pnp
 .pnp.js
 .next

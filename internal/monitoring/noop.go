@@ -26,6 +26,9 @@ func (m *NoopMonitor) GetService() string {
 func (m *NoopMonitor) SetResponseTimeMetric(map[string]string, float64) error {
 	return nil
 }
+func (m *NoopMonitor) SetStorageResponseTimeMetric(map[string]string, float64) error {
+	return nil
+}
 func (m *NoopMonitor) SetDependencyAvailability(map[string]string, float64) error {
 	return nil
 }

@@ -15,7 +15,7 @@ import (
 type StorageInterface interface {
 	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
-	ListActiveTenantsByUserID(ctx context.Context, userID string) ([]*types.Tenant, error)
+	GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
 }
 
 // AuthorizerInterface defines the authorization operations required by the webhooks package.
@@ -28,4 +28,5 @@ type AuthorizerInterface interface {
 type ServiceInterface interface {
 	HandleRegistration(ctx context.Context, identityID, email string) error
 	HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequest) (*TokenHookResponse, error)
+	HandleLoginHook(ctx context.Context, identityID, email, tenantID string) error
 }

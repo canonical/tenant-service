@@ -883,3 +883,129 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 		})
 	}
 }
+
+func TestHandler_LookupTenants(t *testing.T) {
+	t.Parallel()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	service := NewMockServiceInterface(mockCtrl)
+	tracer := NewMockTracingInterface(mockCtrl)
+	monitor := NewMockMonitorInterface(mockCtrl)
+	logger := NewMockLoggerInterface(mockCtrl)
+	setupLoggerMock(mockCtrl, logger)
+	logger.EXPECT().Errorw(gomock.Any(), gomock.Any()).AnyTimes()
+	logger.EXPECT().Errorw(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+
+	h := NewHandler(service, testValidator, tracer, monitor, logger)
+	tracer.EXPECT().Start(gomock.Any(), gomock.Any()).DoAndReturn(func(c context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+		return c, trace.SpanFromContext(c)
+	}).AnyTimes()
+	ctx := context.Background()
+
+	t.Run("success - by email", func(t *testing.T) {
+		req := &v0.LookupTenantsRequest{Email: "test@example.com"}
+		tenants := []*types.Tenant{{ID: "t1", Name: "Tenant 1"}, {ID: "t2", Name: "Tenant 2"}}
+		service.EXPECT().LookupTenantsByEmail(ctx, req.Email).Return(tenants, nil)
+
+		res, err := h.LookupTenants(ctx, req)
+		if err != nil {
+			t.Fatalf("expected no error, got: %v", err)
+		}
+		if len(res.Tenants) != 2 || res.Tenants[0].Id != "t1" {
+			t.Fatalf("unexpected result: %v", res.Tenants)
+		}
+	})
+
+	t.Run("service error", func(t *testing.T) {
+		req := &v0.LookupTenantsRequest{Email: "error@example.com"}
+		service.EXPECT().LookupTenantsByEmail(ctx, req.Email).Return(nil, errors.New("something went wrong"))
+
+		_, err := h.LookupTenants(ctx, req)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("success - by identity_id", func(t *testing.T) {
+		identityID := "550e8400-e29b-41d4-a716-446655440000"
+		req := &v0.LookupTenantsRequest{IdentityId: identityID}
+		tenants := []*types.Tenant{{ID: "t1", Name: "Tenant 1"}}
+		service.EXPECT().LookupTenantsByIdentityID(ctx, identityID).Return(tenants, nil)
+
+		res, err := h.LookupTenants(ctx, req)
+		if err != nil {
+			t.Fatalf("expected no error, got: %v", err)
+		}
+		if len(res.Tenants) != 1 || res.Tenants[0].Id != "t1" {
+			t.Fatalf("unexpected result: %v", res.Tenants)
+		}
+	})
+
+	t.Run("invalid - both email and identity_id", func(t *testing.T) {
+		req := &v0.LookupTenantsRequest{
+			Email:      "test@example.com",
+			IdentityId: "550e8400-e29b-41d4-a716-446655440000",
+		}
+
+		_, err := h.LookupTenants(ctx, req)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		st, ok := status.FromError(err)
+		if !ok {
+			t.Fatalf("expected gRPC status error, got: %v", err)
+		}
+		if st.Code() != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument, got %v", st.Code())
+		}
+	})
+
+	t.Run("invalid - neither email nor identity_id", func(t *testing.T) {
+		req := &v0.LookupTenantsRequest{}
+
+		_, err := h.LookupTenants(ctx, req)
+		if err == nil {
+			t.Fatal("expected validation error, got nil")
+		}
+		st, ok := status.FromError(err)
+		if !ok {
+			t.Fatalf("expected gRPC status error, got: %v", err)
+		}
+		if st.Code() != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument, got %v", st.Code())
+		}
+	})
+
+	t.Run("invalid email - malformed", func(t *testing.T) {
+		req := &v0.LookupTenantsRequest{Email: "not-an-email"}
+
+		_, err := h.LookupTenants(ctx, req)
+		if err == nil {
+			t.Fatal("expected validation error, got nil")
+		}
+		st, ok := status.FromError(err)
+		if !ok {
+			t.Fatalf("expected gRPC status error, got: %v", err)
+		}
+		if st.Code() != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument, got %v", st.Code())
+		}
+	})
+
+	t.Run("invalid identity_id - not a UUID", func(t *testing.T) {
+		req := &v0.LookupTenantsRequest{IdentityId: "not-a-uuid"}
+
+		_, err := h.LookupTenants(ctx, req)
+		if err == nil {
+			t.Fatal("expected validation error, got nil")
+		}
+		st, ok := status.FromError(err)
+		if !ok {
+			t.Fatalf("expected gRPC status error, got: %v", err)
+		}
+		if st.Code() != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument, got %v", st.Code())
+		}
+	})
+}

@@ -89,7 +89,7 @@ func TestAPI_TokenHook(t *testing.T) {
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 
-			api := NewAPI(mockService, mockLogger)
+			api := NewAPI(mockService, nil, mockLogger)
 
 			var body []byte
 			var err error
@@ -103,6 +103,119 @@ func TestAPI_TokenHook(t *testing.T) {
 			}
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v0/webhooks/token", bytes.NewBuffer(body))
+			w := httptest.NewRecorder()
+
+			tt.setupMocks(mockService, mockLogger)
+
+			mux := chi.NewMux()
+			api.RegisterEndpoints(mux)
+			mux.ServeHTTP(w, req)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			if res.StatusCode != tt.expectedStatus {
+				body, _ := io.ReadAll(res.Body)
+				t.Errorf("expected status %d, got %d. Body: %s", tt.expectedStatus, res.StatusCode, string(body))
+			}
+
+			if tt.validateResp != nil {
+				tt.validateResp(t, res)
+			}
+		})
+	}
+}
+
+func TestAPI_LoginHook(t *testing.T) {
+	tests := []struct {
+		name           string
+		requestBody    interface{}
+		setupMocks     func(*MockServiceInterface, *MockLoggerInterface)
+		expectedStatus int
+		validateResp   func(*testing.T, *http.Response)
+	}{
+		{
+			name: "success",
+			requestBody: KratosLoginPayload{
+				IdentityID: "identity-abc",
+				Email:      "user@example.com",
+				TenantID:   "tenant-xyz",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().HandleLoginHook(gomock.Any(), "identity-abc", "user@example.com", "tenant-xyz").Return(nil)
+			},
+			expectedStatus: http.StatusOK,
+			validateResp: func(t *testing.T, resp *http.Response) {
+				var result map[string]interface{}
+				if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+					t.Errorf("failed to decode response: %v", err)
+				}
+			},
+		},
+		{
+			name:           "invalid request body",
+			requestBody:    "not-json",
+			setupMocks:     func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name: "not a member - returns 403",
+			requestBody: KratosLoginPayload{
+				IdentityID: "identity-abc",
+				Email:      "user@example.com",
+				TenantID:   "tenant-xyz",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().HandleLoginHook(gomock.Any(), "identity-abc", "user@example.com", "tenant-xyz").Return(ErrNotMember)
+			},
+			expectedStatus: http.StatusForbidden,
+			validateResp: func(t *testing.T, resp *http.Response) {
+				var result map[string]interface{}
+				if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+					t.Errorf("failed to decode response: %v", err)
+				}
+				if result["error"] == nil {
+					t.Error("expected error field in response")
+				}
+			},
+		},
+		{
+			name: "service error - returns 500",
+			requestBody: KratosLoginPayload{
+				IdentityID: "identity-abc",
+				Email:      "user@example.com",
+				TenantID:   "tenant-xyz",
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().HandleLoginHook(gomock.Any(), "identity-abc", "user@example.com", "tenant-xyz").Return(errors.New("internal error"))
+			},
+			expectedStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockService := NewMockServiceInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+
+			api := NewAPI(mockService, nil, mockLogger)
+
+			var body []byte
+			var err error
+			if str, ok := tt.requestBody.(string); ok {
+				body = []byte(str)
+			} else {
+				body, err = json.Marshal(tt.requestBody)
+				if err != nil {
+					t.Fatalf("failed to marshal request: %v", err)
+				}
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v0/webhooks/login", bytes.NewBuffer(body))
 			w := httptest.NewRecorder()
 
 			tt.setupMocks(mockService, mockLogger)
@@ -172,7 +285,7 @@ func TestAPI_Registration(t *testing.T) {
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 
-			api := NewAPI(mockService, mockLogger)
+			api := NewAPI(mockService, nil, mockLogger)
 
 			var body []byte
 			var err error

@@ -34,6 +34,79 @@ selfservice:
             ui_url: http://localhost/ui/error
         login:
             ui_url: http://localhost/ui/login
+            style: identifier_first
+            after:
+                # Explicit per-method hooks. Kratos falls back to the global after.hooks only if a
+                # method has no explicit entry; because we enumerate all active methods here the
+                # global catch-all is intentionally omitted to avoid silent ordering surprises when
+                # a new method-specific section is added later.
+                #
+                # Jsonnet template: always sends identity_id and email (ctx.identity is always
+                # populated when PostLoginHook fires). tenant_id is included when login-ui has
+                # injected it into ctx.flow.transient_payload; otherwise it is "".
+                # NOTE: ctx.flow.state == "passed_challenge" is NOT used because Kratos sets that
+                # state *after* the post-login hooks complete, so the condition would never be true.
+                # The service handles duplicate/intermediate calls gracefully.
+                password:
+                    hooks:
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/login
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKICB0ZW5hbnRfaWQ6IGlmIHN0ZC5vYmplY3RIYXMoY3R4LCAiZmxvdyIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3csICJ0cmFuc2llbnRfcGF5bG9hZCIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3cudHJhbnNpZW50X3BheWxvYWQsICJ0ZW5hbnRfaWQiKSB0aGVuIGN0eC5mbG93LnRyYW5zaWVudF9wYXlsb2FkLnRlbmFudF9pZCBlbHNlICIiLAp9
+                            response:
+                                ignore: false
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
+                oidc:
+                    hooks:
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/login
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKICB0ZW5hbnRfaWQ6IGlmIHN0ZC5vYmplY3RIYXMoY3R4LCAiZmxvdyIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3csICJ0cmFuc2llbnRfcGF5bG9hZCIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3cudHJhbnNpZW50X3BheWxvYWQsICJ0ZW5hbnRfaWQiKSB0aGVuIGN0eC5mbG93LnRyYW5zaWVudF9wYXlsb2FkLnRlbmFudF9pZCBlbHNlICIiLAp9
+                            response:
+                                ignore: false
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
+                webauthn:
+                    hooks:
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/login
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKICB0ZW5hbnRfaWQ6IGlmIHN0ZC5vYmplY3RIYXMoY3R4LCAiZmxvdyIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3csICJ0cmFuc2llbnRfcGF5bG9hZCIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3cudHJhbnNpZW50X3BheWxvYWQsICJ0ZW5hbnRfaWQiKSB0aGVuIGN0eC5mbG93LnRyYW5zaWVudF9wYXlsb2FkLnRlbmFudF9pZCBlbHNlICIiLAp9
+                            response:
+                                ignore: false
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
+                code:
+                    hooks:
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/login
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKICB0ZW5hbnRfaWQ6IGlmIHN0ZC5vYmplY3RIYXMoY3R4LCAiZmxvdyIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3csICJ0cmFuc2llbnRfcGF5bG9hZCIpICYmIHN0ZC5vYmplY3RIYXMoY3R4LmZsb3cudHJhbnNpZW50X3BheWxvYWQsICJ0ZW5hbnRfaWQiKSB0aGVuIGN0eC5mbG93LnRyYW5zaWVudF9wYXlsb2FkLnRlbmFudF9pZCBlbHNlICIiLAp9
+                            response:
+                                ignore: false
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
         recovery:
             enabled: True
             ui_url: http://localhost/ui/reset_email
@@ -52,44 +125,75 @@ selfservice:
         registration:
             ui_url: http://localhost:8080/some/path/ui/registration_error
             after:
-                hooks:
-                    - hook: web_hook
-                      config:
-                        url: http://host.docker.internal:8000/api/v0/webhooks/registration
-                        method: POST
-                        body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgdXNlcl9pZDogY3R4LmlkZW50aXR5LmlkLAogIGVtYWlsOiBjdHguaWRlbnRpdHkudHJhaXRzLmVtYWlsLAp9
-                        response:
-                           ignore: false
+                # Tenant-service registration webhook: fires asynchronously (response.ignore: true)
+                # for all enabled methods. Shadow tenant creation is best-effort; if it fails the
+                # identity already exists in Kratos and an admin can create the tenant manually.
+                # Jsonnet body sends identity_id and email. Field name is identity_id to match
+                # the KratosIdentity struct in the tenant-service.
                 password:
                     hooks:
-                    - hook: web_hook
-                      config:
-                        url: http://host.docker.internal:8000/api/v0/webhooks/registration
-                        method: POST
-                        body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgdXNlcl9pZDogY3R4LmlkZW50aXR5LmlkLAogIGVtYWlsOiBjdHguaWRlbnRpdHkudHJhaXRzLmVtYWlsLAp9
-                        response:
-                           ignore: false
-                    - hook: session
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/registration
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKfQ==
+                            response:
+                                ignore: true
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
+                        - hook: session
                 oidc:
                     hooks:
-                    - hook: web_hook
-                      config:
-                        url: http://host.docker.internal:8000/api/v0/webhooks/registration
-                        method: POST
-                        body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgdXNlcl9pZDogY3R4LmlkZW50aXR5LmlkLAogIGVtYWlsOiBjdHguaWRlbnRpdHkudHJhaXRzLmVtYWlsLAp9
-                        response:
-                           ignore: false
-                    - hook: session
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/registration
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKfQ==
+                            response:
+                                ignore: true
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
+                        - hook: session
                 webauthn:
                     hooks:
-                    - hook: web_hook
-                      config:
-                        url: http://host.docker.internal:8000/api/v0/webhooks/registration
-                        method: POST
-                        body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgdXNlcl9pZDogY3R4LmlkZW50aXR5LmlkLAogIGVtYWlsOiBjdHguaWRlbnRpdHkudHJhaXRzLmVtYWlsLAp9
-                        response:
-                           ignore: false
-                    - hook: session
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/registration
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKfQ==
+                            response:
+                                ignore: true
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
+                        - hook: session
+                code:
+                    hooks:
+                        - hook: web_hook
+                          config:
+                            url: http://host.docker.internal:8000/api/v0/webhooks/registration
+                            method: POST
+                            body: base64://ZnVuY3Rpb24oY3R4KSB7CiAgaWRlbnRpdHlfaWQ6IGN0eC5pZGVudGl0eS5pZCwKICBlbWFpbDogY3R4LmlkZW50aXR5LnRyYWl0cy5lbWFpbCwKfQ==
+                            response:
+                                ignore: true
+                            auth:
+                                type: api_key
+                                config:
+                                    name: Authorization
+                                    value: secret_api_key
+                                    in: header
+                        - hook: session
     methods:
         totp:
             enabled: true
@@ -106,7 +210,7 @@ selfservice:
         webauthn:
             enabled: True
             config:
-                passwordless: True
+                passwordless: False
                 rp:
                     # Set 'id' to the top-level domain.
                     id: localhost
@@ -123,6 +227,17 @@ selfservice:
                   mapper_url: "file:///etc/config/kratos/schema.jsonnet"
                   scope: ["user:email"]
                   label: Github
+                - id: "dex"
+                  provider: "generic"
+                  client_id: "kratos"
+                  client_secret: "dex-client-secret"
+                  issuer_url: "http://dex:5556/dex"
+                  mapper_url: "file:///etc/config/kratos/schema.jsonnet"
+                  scope:
+                    - openid
+                    - email
+                    - profile
+                  label: "Dex"
 courier:
     smtp:
         connection_uri: smtps://test:test@mailslurper:1025/?skip_ssl_verify=true

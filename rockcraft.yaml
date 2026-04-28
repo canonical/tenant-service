@@ -17,6 +17,11 @@ services:
     startup: enabled
 parts:
   go-build:
+    permissions:
+      - path: etc/ssl/certs
+        owner: 584792
+        group: 584792
+        mode: '755'
     plugin: go
     source: .
     source-type: local
@@ -31,6 +36,7 @@ parts:
     organize:
       opt/tenant-service/bin/app: usr/bin/tenant-service
     stage-packages:
+      - ca-certificates_data
       - base-files_var
       - base-files_chisel
   deb-security-manifest:

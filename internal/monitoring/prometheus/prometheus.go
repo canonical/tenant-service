@@ -14,6 +14,7 @@ type Monitor struct {
 	service string
 
 	responseTime           *prometheus.HistogramVec
+	storageResponseTime    *prometheus.HistogramVec
 	dependencyAvailability *prometheus.GaugeVec
 	operationsTotal        *prometheus.CounterVec
 
@@ -30,6 +31,16 @@ func (m *Monitor) SetResponseTimeMetric(tags map[string]string, value float64) e
 	}
 
 	m.responseTime.With(tags).Observe(value)
+
+	return nil
+}
+
+func (m *Monitor) SetStorageResponseTimeMetric(tags map[string]string, value float64) error {
+	if m.storageResponseTime == nil {
+		return fmt.Errorf("metric not instantiated")
+	}
+
+	m.storageResponseTime.With(tags).Observe(value)
 
 	return nil
 }
@@ -70,7 +81,16 @@ func (m *Monitor) registerHistograms() {
 		[]string{"route", "status"},
 	)
 
-	histograms = append(histograms, m.responseTime)
+	m.storageResponseTime = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:        "storage_query_duration_seconds",
+			Help:        "storage_query_duration_seconds records the duration of database queries",
+			ConstLabels: labels,
+		},
+		[]string{"operation", "status"},
+	)
+
+	histograms = append(histograms, m.responseTime, m.storageResponseTime)
 
 	for _, histogram := range histograms {
 		err := prometheus.Register(histogram)

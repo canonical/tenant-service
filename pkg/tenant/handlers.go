@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"errors"
+	"net/mail"
 
 	"buf.build/go/protovalidate"
 	"github.com/canonical/tenant-service/internal/logging"
@@ -15,11 +16,13 @@ import (
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
 	v0 "github.com/canonical/tenant-service/v0"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// Handler implements the gRPC and HTTP API endpoints.
 type Handler struct {
 	v0.UnimplementedTenantServiceServer
 	service   ServiceInterface
@@ -29,6 +32,7 @@ type Handler struct {
 	validator protovalidate.Validator
 }
 
+// NewHandler creates a new tenant API handler.
 func NewHandler(
 	service ServiceInterface,
 	validator protovalidate.Validator,
@@ -333,5 +337,55 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 	return &v0.ListTenantUsersResponse{
 		Users:         pbUsers,
 		NextPageToken: nextPageToken,
+	}, nil
+}
+
+func (h *Handler) LookupTenants(ctx context.Context, req *v0.LookupTenantsRequest) (*v0.LookupTenantsResponse, error) {
+	ctx, span := h.tracer.Start(ctx, "tenant.Handler.LookupTenants")
+	defer span.End()
+
+	if req.Email != "" && req.IdentityId != "" {
+		return nil, status.Errorf(codes.InvalidArgument, "exactly one of email or identity_id must be provided")
+	}
+	if req.Email == "" && req.IdentityId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "one of email or identity_id must be provided")
+	}
+	if req.Email != "" {
+		if _, err := mail.ParseAddress(req.Email); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid email: %v", err)
+		}
+	}
+	if req.IdentityId != "" {
+		if _, err := uuid.Parse(req.IdentityId); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid identity_id: must be a valid UUID")
+		}
+	}
+
+	var (
+		tenants []*types.Tenant
+		err     error
+	)
+	if req.IdentityId != "" {
+		tenants, err = h.service.LookupTenantsByIdentityID(ctx, req.IdentityId)
+	} else {
+		tenants, err = h.service.LookupTenantsByEmail(ctx, req.Email)
+	}
+	if err != nil {
+		h.logger.Errorw("failed to look up tenants", "error", err)
+		return nil, status.Errorf(codes.Internal, "failed to look up tenants")
+	}
+
+	pbTenants := make([]*v0.Tenant, len(tenants))
+	for i, t := range tenants {
+		pbTenants[i] = &v0.Tenant{
+			Id:        t.ID,
+			Name:      t.Name,
+			CreatedAt: t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Enabled:   t.Enabled,
+		}
+	}
+
+	return &v0.LookupTenantsResponse{
+		Tenants: pbTenants,
 	}, nil
 }

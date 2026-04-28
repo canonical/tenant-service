@@ -76,6 +76,12 @@ service TenantService {
         body: "*"
     };
   }
+
+  rpc LookupTenants(LookupTenantsRequest) returns (LookupTenantsResponse) {
+    option (google.api.http) = {
+      get: "/api/v0/tenants/lookup"
+    };
+  }
 }
 
 // Messages
@@ -186,4 +192,15 @@ message TenantUser {
     string user_id = 1;
     string email = 2;
     string role = 3;
+}
+
+message LookupTenantsRequest {
+    // Exactly one of email or identity_id must be provided.
+    // When identity_id is set, the Kratos email-to-identity lookup is skipped.
+    string email = 1;
+    string identity_id = 2;
+}
+
+message LookupTenantsResponse {
+    repeated Tenant tenants = 1;
 }

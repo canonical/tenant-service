@@ -30,6 +30,7 @@ const (
 	TenantService_DeleteTenant_FullMethodName     = "/identity.platform.api.tenant.TenantService/DeleteTenant"
 	TenantService_ProvisionUser_FullMethodName    = "/identity.platform.api.tenant.TenantService/ProvisionUser"
 	TenantService_UpdateTenantUser_FullMethodName = "/identity.platform.api.tenant.TenantService/UpdateTenantUser"
+	TenantService_LookupTenants_FullMethodName    = "/identity.platform.api.tenant.TenantService/LookupTenants"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -48,6 +49,7 @@ type TenantServiceClient interface {
 	DeleteTenant(ctx context.Context, in *DeleteTenantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ProvisionUser(ctx context.Context, in *ProvisionUserRequest, opts ...grpc.CallOption) (*ProvisionUserResponse, error)
 	UpdateTenantUser(ctx context.Context, in *UpdateTenantUserRequest, opts ...grpc.CallOption) (*UpdateTenantUserResponse, error)
+	LookupTenants(ctx context.Context, in *LookupTenantsRequest, opts ...grpc.CallOption) (*LookupTenantsResponse, error)
 }
 
 type tenantServiceClient struct {
@@ -148,6 +150,15 @@ func (c *tenantServiceClient) UpdateTenantUser(ctx context.Context, in *UpdateTe
 	return out, nil
 }
 
+func (c *tenantServiceClient) LookupTenants(ctx context.Context, in *LookupTenantsRequest, opts ...grpc.CallOption) (*LookupTenantsResponse, error) {
+	out := new(LookupTenantsResponse)
+	err := c.cc.Invoke(ctx, TenantService_LookupTenants_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility
@@ -164,6 +175,7 @@ type TenantServiceServer interface {
 	DeleteTenant(context.Context, *DeleteTenantRequest) (*emptypb.Empty, error)
 	ProvisionUser(context.Context, *ProvisionUserRequest) (*ProvisionUserResponse, error)
 	UpdateTenantUser(context.Context, *UpdateTenantUserRequest) (*UpdateTenantUserResponse, error)
+	LookupTenants(context.Context, *LookupTenantsRequest) (*LookupTenantsResponse, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -200,6 +212,9 @@ func (UnimplementedTenantServiceServer) ProvisionUser(context.Context, *Provisio
 }
 func (UnimplementedTenantServiceServer) UpdateTenantUser(context.Context, *UpdateTenantUserRequest) (*UpdateTenantUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateTenantUser not implemented")
+}
+func (UnimplementedTenantServiceServer) LookupTenants(context.Context, *LookupTenantsRequest) (*LookupTenantsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LookupTenants not implemented")
 }
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 
@@ -394,6 +409,24 @@ func _TenantService_UpdateTenantUser_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_LookupTenants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LookupTenantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).LookupTenants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_LookupTenants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).LookupTenants(ctx, req.(*LookupTenantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -440,6 +473,10 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateTenantUser",
 			Handler:    _TenantService_UpdateTenantUser_Handler,
+		},
+		{
+			MethodName: "LookupTenants",
+			Handler:    _TenantService_LookupTenants_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

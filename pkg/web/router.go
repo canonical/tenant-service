@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/tenant-service/pkg/authentication"
 	"github.com/canonical/tenant-service/pkg/metrics"
 	"github.com/canonical/tenant-service/pkg/status"
+	"github.com/canonical/tenant-service/pkg/tenant"
 	"github.com/canonical/tenant-service/pkg/webhooks"
 	v0 "github.com/canonical/tenant-service/v0"
 	chi "github.com/go-chi/chi/v5"
@@ -26,7 +27,8 @@ import (
 )
 
 func NewRouter(
-	tenantHandler v0.TenantServiceServer,
+	token string,
+	tenantHandler *tenant.Handler,
 	authMiddleware *authentication.Middleware,
 	s storage.StorageInterface,
 	dbClient db.DBClientInterface,
@@ -50,6 +52,11 @@ func NewRouter(
 		middlewares = append(middlewares, db.TransactionMiddleware(dbClient, logger))
 	}
 
+	var webhookAuthMiddleware *webhooks.APITokenAuthMiddleware = nil
+	if token != "" {
+		webhookAuthMiddleware = webhooks.NewAuthMiddleware(token, tracer, logger)
+	}
+
 	gRPCGatewayMux := runtime.NewServeMux(
 		runtime.WithForwardResponseRewriter(types.ForwardErrorResponseRewriter),
 		runtime.WithDisablePathLengthFallback(),
@@ -67,11 +74,18 @@ func NewRouter(
 
 	metrics.NewAPI(logger).RegisterEndpoints(router)
 	status.NewAPI(tracer, monitor, logger).RegisterEndpoints(router)
-	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger), logger).RegisterEndpoints(router)
+	webhooks.NewAPI(webhooks.NewService(s, authz, tracer, monitor, logger), webhookAuthMiddleware, logger).RegisterEndpoints(router)
 
-	// Protected routes
+	// Unauthenticated tenant lookup — used by the Login UI before the user has a token.
+	// See ADR 0008 for security trade-offs. Rate limiting should be enforced at the proxy/gateway layer.
+
+	// Protected routes — lookup is excluded so the Login UI can call it without a Bearer token.
+	// We create a separate authRouter to apply the authentication middleware exclusively
+	// to the gRPC Gateway endpoints. We then mount this authRouter onto the main router.
+	// This ensures that the webhook endpoints (registered above on the main router)
+	// completely bypass the authentication middleware.
 	authRouter := chi.NewRouter()
-	authRouter.Use(authMiddleware.Authenticate())
+	authRouter.Use(authMiddleware.AuthenticateExcluding("/api/v0/tenants/lookup"))
 	authRouter.Mount("/", gRPCGatewayMux)
 
 	router.Mount("/", authRouter)

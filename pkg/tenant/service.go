@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/tenant-service/pkg/authentication"
 )
 
+// Service provides tenant business logic.
 type Service struct {
 	storage            StorageInterface
 	authz              AuthzInterface
@@ -29,6 +30,7 @@ type Service struct {
 	logger             logging.LoggerInterface
 }
 
+// NewService creates a new tenant service.
 func NewService(
 	storage StorageInterface,
 	authz AuthzInterface,
@@ -137,11 +139,13 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 
 	// 3. Assign Role in OpenFGA (Authorization)
 	// Map 'role' string to specific authz method
-	if role == "owner" {
+	switch role {
+	case "owner":
 		err = s.authz.AssignTenantOwner(ctx, tenantID, identityID)
-	} else {
-		// Default to member for 'member' and 'admin' roles, as OpenFGA model might not distinguish them yet
+	case "member", "admin":
 		err = s.authz.AssignTenantMember(ctx, tenantID, identityID)
+	default:
+		return "", "", fmt.Errorf("invalid role: %s", role)
 	}
 
 	if err != nil {
@@ -519,4 +523,54 @@ func (s *Service) incrementCounter(operation, role string) {
 	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation, "role": role}); err != nil {
 		s.logger.Warnf("failed to increment counter %s: %v", operation, err)
 	}
+}
+
+// LookupTenantsByEmail returns the enabled tenants that the given email belongs to.
+// If the email is not known to Kratos, an empty slice is returned (no error).
+// This method is called by the unauthenticated tenant lookup endpoint used by the Login UI.
+func (s *Service) LookupTenantsByEmail(ctx context.Context, email string) ([]*types.Tenant, error) {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.LookupTenantsByEmail")
+	defer span.End()
+
+	s.logger.Debugw("looking up tenants by email")
+
+	identityID, err := s.kratos.GetIdentityIDByEmail(ctx, email)
+	if err != nil {
+		s.recordError(span, "failed to look up identity by email", err, "email", email)
+		return nil, fmt.Errorf("failed to look up identity: %w", err)
+	}
+
+	if identityID == "" {
+		// Unknown email — return empty list; do not reveal whether the email is registered.
+		s.logger.Debugw("lookup: email not found in Kratos")
+		return []*types.Tenant{}, nil
+	}
+
+	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, identityID)
+	if err != nil {
+		s.recordError(span, "failed to list active tenants for identity", err, "email", email, "identity_id", identityID)
+		return nil, fmt.Errorf("failed to list tenants: %w", err)
+	}
+
+	s.logger.Debugw("lookup: tenants found", "count", len(tenants))
+	return tenants, nil
+}
+
+// LookupTenantsByIdentityID returns the enabled tenants that the given Kratos identity belongs to.
+// This skips the Kratos email-to-identity resolution and queries the database directly.
+// It is used by privileged internal callers (hook-service, Login UI) that already know the identity ID.
+func (s *Service) LookupTenantsByIdentityID(ctx context.Context, identityID string) ([]*types.Tenant, error) {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.LookupTenantsByIdentityID")
+	defer span.End()
+
+	s.logger.Debugw("looking up tenants by identity ID")
+
+	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, identityID)
+	if err != nil {
+		s.recordError(span, "failed to list active tenants for identity", err, "identity_id", identityID)
+		return nil, fmt.Errorf("failed to list tenants: %w", err)
+	}
+
+	s.logger.Debugw("lookup: tenants found", "count", len(tenants))
+	return tenants, nil
 }
