@@ -1,7 +1,7 @@
 name: tenant-service
 base: bare
 build-base: ubuntu@22.04
-version: 0.1.0
+version: 0.2.0
 summary: Canonical Identity Platform Hook Service
 description: >
   This is the Canonical Identity Platform Hook Service used for handling Hydra
