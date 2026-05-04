@@ -330,6 +330,13 @@ paths:
                   name: identity_id
                   schema:
                     type: string
+                - description: |-
+                    When true, the response includes email addresses fetched from Kratos.
+                    When false (default), the email field is omitted and the Kratos call is skipped.
+                  in: query
+                  name: include_emails
+                  schema:
+                    type: boolean
             responses:
                 default:
                     content:

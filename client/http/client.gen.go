@@ -101,6 +101,10 @@ type TenantServiceListTenantUsersParams struct {
 
 	// IdentityId Exact match on Kratos identity ID. Takes precedence over email when both are set.
 	IdentityId *string `form:"identity_id,omitempty" json:"identity_id,omitempty"`
+
+	// IncludeEmails When true, the response includes email addresses fetched from Kratos.
+	// When false (default), the email field is omitted and the Kratos call is skipped.
+	IncludeEmails *bool `form:"include_emails,omitempty" json:"include_emails,omitempty"`
 }
 
 // TenantServiceListUserTenantsParams defines parameters for TenantServiceListUserTenants.
@@ -995,6 +999,22 @@ func NewTenantServiceListTenantUsersRequest(server string, tenantId string, para
 		if params.IdentityId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "identity_id", runtime.ParamLocationQuery, *params.IdentityId); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeEmails != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "include_emails", runtime.ParamLocationQuery, *params.IncludeEmails); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

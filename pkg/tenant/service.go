@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
+	ory "github.com/ory/client-go"
 )
 
 // Service provides tenant business logic.
@@ -329,7 +330,7 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	return nil
 }
 
-func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.TenantUser, string, error) {
+func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, includeEmails bool, opts ...types.ListOption) ([]*types.TenantUser, string, error) {
 	ctx, span := s.tracer.Start(ctx, "admin.ListTenantUsers")
 	defer span.End()
 
@@ -357,22 +358,21 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, opts ...
 		return nil, "", fmt.Errorf("failed to list members: %w", err)
 	}
 
-	// Batch-fetch all identities in a single Kratos call.
-	ids := make([]string, len(members))
-	for i, m := range members {
-		ids[i] = m.KratosIdentityID
-	}
-	identityMap, err := s.kratos.GetIdentities(ctx, ids)
-	if err != nil {
-		// Log warning but continue; member list is still valid without email
-		s.logger.Warnw("failed to batch-fetch identities; emails will be missing",
-			"tenant_id", tenantID,
-			"error", err,
-		)
-		identityMap = nil
+	var identityMap map[string]*ory.Identity
+	if includeEmails {
+		ids := make([]string, len(members))
+		for i, m := range members {
+			ids[i] = m.KratosIdentityID
+		}
+		var err error
+		identityMap, err = s.kratos.GetIdentities(ctx, ids)
+		if err != nil {
+			s.recordError(span, "failed to fetch identities", err, "tenant_id", tenantID)
+			return nil, "", fmt.Errorf("failed to fetch identities: %w", err)
+		}
 	}
 
-	var users []*types.TenantUser
+	users := make([]*types.TenantUser, 0, len(members))
 	for _, m := range members {
 		email := ""
 		if identity, ok := identityMap[m.KratosIdentityID]; ok {
@@ -494,19 +494,15 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 
 	// 4. Return updated user
 	identity, err := s.kratos.GetIdentity(ctx, userID)
+	if err != nil {
+		s.recordError(span, "failed to fetch identity after role update", err, "tenant_id", tenantID, "user_id", userID)
+		return nil, fmt.Errorf("failed to fetch identity: %w", err)
+	}
 	email := ""
-	if err == nil {
-		if traits, ok := identity.Traits.(map[string]interface{}); ok {
-			if e, ok := traits["email"].(string); ok {
-				email = e
-			}
+	if traits, ok := identity.Traits.(map[string]interface{}); ok {
+		if e, ok := traits["email"].(string); ok {
+			email = e
 		}
-	} else {
-		s.logger.Warnw("failed to fetch identity email after role update; returning empty",
-			"tenant_id", tenantID,
-			"user_id", userID,
-			"error", err,
-		)
 	}
 
 	s.logger.Infow("tenant user role updated",

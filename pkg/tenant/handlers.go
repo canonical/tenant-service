@@ -315,7 +315,7 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 	} else if req.Email != nil {
 		opts = append(opts, types.WithEmail(*req.Email))
 	}
-	users, nextPageToken, err := h.service.ListTenantUsers(ctx, req.TenantId, opts...)
+	users, nextPageToken, err := h.service.ListTenantUsers(ctx, req.TenantId, req.GetIncludeEmails(), opts...)
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidPageToken) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")

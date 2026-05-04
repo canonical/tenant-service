@@ -197,6 +197,9 @@ message ListTenantUsersRequest {
     optional string email = 5 [(buf.validate.field).string.email = true];
     // Exact match on Kratos identity ID. Takes precedence over email when both are set.
     optional string identity_id = 6 [(buf.validate.field).string.uuid = true];
+    // When true, the response includes email addresses fetched from Kratos.
+    // When false (default), the email field is omitted and the Kratos call is skipped.
+    bool include_emails = 7;
 }
 
 message ListTenantUsersResponse {

@@ -20,7 +20,7 @@ type ServiceInterface interface {
 	UpdateTenantUser(ctx context.Context, tenantID, userID, role string) (*types.TenantUser, error)
 	ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error)
 	ListTenants(ctx context.Context, opts ...types.ListOption) ([]*types.Tenant, string, error)
-	ListTenantUsers(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.TenantUser, string, error)
+	ListTenantUsers(ctx context.Context, tenantID string, includeEmails bool, opts ...types.ListOption) ([]*types.TenantUser, string, error)
 	LookupTenantsByEmail(ctx context.Context, email string) ([]*types.Tenant, error)
 	LookupTenantsByIdentityID(ctx context.Context, identityID string) ([]*types.Tenant, error)
 }

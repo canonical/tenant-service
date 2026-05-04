@@ -636,12 +636,15 @@ func TestService_ListTenantUsers(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name        string
-		setupMocks  func(*MockStorageInterface, *MockKratosClientInterface, *MockLoggerInterface)
-		expectedErr bool
+		name          string
+		includeEmails bool
+		setupMocks    func(*MockStorageInterface, *MockKratosClientInterface, *MockLoggerInterface)
+		expectedErr   bool
+		checkResult   func(t *testing.T, users []*types.TenantUser)
 	}{
 		{
-			name: "success",
+			name:          "success with emails",
+			includeEmails: true,
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(members, "", nil)
 				mockKratos.EXPECT().GetIdentities(gomock.Any(), []string{identityID1, identityID2}).Return(map[string]*ory.Identity{
@@ -650,17 +653,43 @@ func TestService_ListTenantUsers(t *testing.T) {
 				}, nil)
 			},
 			expectedErr: false,
+			checkResult: func(t *testing.T, users []*types.TenantUser) {
+				if users[0].Email != "user1@example.com" {
+					t.Errorf("expected email user1@example.com, got %s", users[0].Email)
+				}
+				if users[1].Email != "user2@example.com" {
+					t.Errorf("expected email user2@example.com, got %s", users[1].Email)
+				}
+			},
 		},
 		{
-			name: "success - kratos error handled",
+			name:          "include_emails true - kratos error fails",
+			includeEmails: true,
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(members, "", nil)
 				mockKratos.EXPECT().GetIdentities(gomock.Any(), gomock.Any()).Return(nil, errors.New("kratos error"))
 			},
-			expectedErr: false,
+			expectedErr: true,
 		},
 		{
-			name: "storage error",
+			name:          "include_emails false - skips kratos",
+			includeEmails: false,
+			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(members, "", nil)
+				// No Kratos call expected
+			},
+			expectedErr: false,
+			checkResult: func(t *testing.T, users []*types.TenantUser) {
+				for _, u := range users {
+					if u.Email != "" {
+						t.Errorf("expected empty email with include_emails=false, got %s", u.Email)
+					}
+				}
+			},
+		},
+		{
+			name:          "storage error",
+			includeEmails: false,
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(nil, "", errors.New("storage error"))
 			},
@@ -686,7 +715,7 @@ func TestService_ListTenantUsers(t *testing.T) {
 			mockTracer.EXPECT().Start(gomock.Any(), "admin.ListTenantUsers").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage, mockKratos, mockLogger)
 
-			users, _, err := s.ListTenantUsers(context.Background(), tenantID)
+			users, _, err := s.ListTenantUsers(context.Background(), tenantID, tc.includeEmails)
 
 			if tc.expectedErr {
 				if err == nil {
@@ -696,6 +725,8 @@ func TestService_ListTenantUsers(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			} else if users == nil {
 				t.Error("expected users but got nil")
+			} else if tc.checkResult != nil {
+				tc.checkResult(t, users)
 			}
 		})
 	}
@@ -747,6 +778,18 @@ func TestService_UpdateTenantUser(t *testing.T) {
 			newRole: "superadmin",
 			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
+			},
+			expectedErr: true,
+		},
+		{
+			name:    "error - kratos identity fetch fails",
+			newRole: "owner",
+			setupMocks: func(mockStorage *MockStorageInterface, mockAuthz *MockAuthzInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
+				mockStorage.EXPECT().GetMemberByTenantAndUserID(gomock.Any(), tenantID, userID).Return(&types.Membership{KratosIdentityID: userID, Role: "member"}, nil)
+				mockAuthz.EXPECT().AssignTenantOwner(gomock.Any(), tenantID, userID).Return(nil)
+				mockAuthz.EXPECT().RemoveTenantMember(gomock.Any(), tenantID, userID).Return(nil)
+				mockStorage.EXPECT().UpdateMember(gomock.Any(), tenantID, userID, "owner").Return(nil)
+				mockKratos.EXPECT().GetIdentity(gomock.Any(), userID).Return(nil, errors.New("kratos unavailable"))
 			},
 			expectedErr: true,
 		},
@@ -963,7 +1006,6 @@ func TestService_ListTenantUsers_EmailFilter(t *testing.T) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, optionsMatcher{check: func(o types.ListOptions) bool {
 					return o.IdentityID == identityID && o.Email == ""
 				}}).Return(members, "", nil)
-				mockKratos.EXPECT().GetIdentities(gomock.Any(), []string{identityID}).Return(nil, errors.New("not found"))
 			},
 			expectedLen: 1,
 		},
@@ -988,7 +1030,6 @@ func TestService_ListTenantUsers_EmailFilter(t *testing.T) {
 			opts: []types.ListOption{types.WithRole("owner")},
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(members, "", nil)
-				mockKratos.EXPECT().GetIdentities(gomock.Any(), []string{identityID}).Return(nil, errors.New("not found"))
 			},
 			expectedLen: 1,
 		},
@@ -1013,7 +1054,7 @@ func TestService_ListTenantUsers_EmailFilter(t *testing.T) {
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage, mockKratos)
 
-			users, _, err := s.ListTenantUsers(context.Background(), tenantID, tc.opts...)
+			users, _, err := s.ListTenantUsers(context.Background(), tenantID, false, tc.opts...)
 
 			if tc.expectedErr {
 				if err == nil {

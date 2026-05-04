@@ -245,6 +245,13 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "include_emails",
+            "description": "When true, the response includes email addresses fetched from Kratos.\nWhen false (default), the email field is omitted and the Kratos call is skipped.",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
           }
         ],
         "tags": [

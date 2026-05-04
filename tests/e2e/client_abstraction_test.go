@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -233,7 +232,7 @@ func (c *HTTPTenantClient) ListTenants(ctx context.Context) ([]Tenant, error) {
 		return nil, err
 	}
 
-	resp, err := c.client.TenantServiceListTenants(ctx, authEditor)
+	resp, err := c.client.TenantServiceListTenants(ctx, &httpclient.TenantServiceListTenantsParams{}, authEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +273,7 @@ func (c *HTTPTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 	updateMask := "name"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
 		Tenant: &struct {
-			CreatedAt *string `json:"createdAt,omitempty"`
+			CreatedAt *string `json:"created_at,omitempty"`
 			Enabled   *bool   `json:"enabled,omitempty"`
 			Name      *string `json:"name,omitempty"`
 		}{
@@ -333,7 +332,7 @@ func (c *HTTPTenantClient) DisableTenant(ctx context.Context, id string) error {
 	updateMask := "enabled"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
 		Tenant: &struct {
-			CreatedAt *string `json:"createdAt,omitempty"`
+			CreatedAt *string `json:"created_at,omitempty"`
 			Enabled   *bool   `json:"enabled,omitempty"`
 			Name      *string `json:"name,omitempty"`
 		}{
@@ -358,29 +357,20 @@ func (c *HTTPTenantClient) DisableTenant(ctx context.Context, id string) error {
 	return nil
 }
 
-// paginationQueryEditor returns a RequestEditorFn that appends page_size and
-// page_token to the request URL query string.
-func paginationQueryEditor(pageToken string, pageSize int32) httpclient.RequestEditorFn {
-	return func(ctx context.Context, req *http.Request) error {
-		q := req.URL.Query()
-		if pageSize > 0 {
-			q.Set("page_size", strconv.Itoa(int(pageSize)))
-		}
-		if pageToken != "" {
-			q.Set("page_token", pageToken)
-		}
-		req.URL.RawQuery = q.Encode()
-		return nil
-	}
-}
-
 func (c *HTTPTenantClient) ListTenantsPaged(ctx context.Context, pageToken string, pageSize int32) ([]Tenant, string, error) {
 	authEditor, err := c.authEditor(ctx)
 	if err != nil {
 		return nil, "", err
 	}
 
-	resp, err := c.client.TenantServiceListTenants(ctx, authEditor, paginationQueryEditor(pageToken, pageSize))
+	params := &httpclient.TenantServiceListTenantsParams{}
+	if pageSize > 0 {
+		params.PageSize = &pageSize
+	}
+	if pageToken != "" {
+		params.PageToken = &pageToken
+	}
+	resp, err := c.client.TenantServiceListTenants(ctx, params, authEditor)
 	if err != nil {
 		return nil, "", err
 	}
@@ -418,7 +408,15 @@ func (c *HTTPTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 		return nil, "", err
 	}
 
-	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, authEditor, paginationQueryEditor(pageToken, pageSize))
+	includeEmails := true
+	params := &httpclient.TenantServiceListTenantUsersParams{IncludeEmails: &includeEmails}
+	if pageSize > 0 {
+		params.PageSize = &pageSize
+	}
+	if pageToken != "" {
+		params.PageToken = &pageToken
+	}
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, params, authEditor)
 	if err != nil {
 		return nil, "", err
 	}
@@ -451,47 +449,13 @@ func (c *HTTPTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 	return users, result.NextPageToken, nil
 }
 
-// filterQueryEditor appends tenant filter fields to the request URL as flat
-// query parameters (?enabled=true, etc.).
-func filterQueryEditor(f TenantFilterOptions) httpclient.RequestEditorFn {
-	return func(ctx context.Context, req *http.Request) error {
-		q := req.URL.Query()
-		if f.Enabled != nil {
-			if *f.Enabled {
-				q.Set("enabled", "true")
-			} else {
-				q.Set("enabled", "false")
-			}
-		}
-		req.URL.RawQuery = q.Encode()
-		return nil
-	}
-}
-
-// userFilterQueryEditor appends tenant-user filter fields to the request URL.
-func userFilterQueryEditor(f TenantUserFilterOptions) httpclient.RequestEditorFn {
-	return func(ctx context.Context, req *http.Request) error {
-		q := req.URL.Query()
-		if f.Role != "" {
-			q.Set("role", f.Role)
-		}
-		if f.IdentityID != "" {
-			q.Set("identity_id", f.IdentityID)
-		} else if f.Email != "" {
-			q.Set("email", f.Email)
-		}
-		req.URL.RawQuery = q.Encode()
-		return nil
-	}
-}
-
 func (c *HTTPTenantClient) ListTenantsFiltered(ctx context.Context, f TenantFilterOptions) ([]Tenant, error) {
 	authEditor, err := c.authEditor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := c.client.TenantServiceListTenants(ctx, authEditor, filterQueryEditor(f))
+	resp, err := c.client.TenantServiceListTenants(ctx, &httpclient.TenantServiceListTenantsParams{Enabled: f.Enabled}, authEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +493,17 @@ func (c *HTTPTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID
 		return nil, err
 	}
 
-	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, authEditor, userFilterQueryEditor(f))
+	includeEmails := true
+	params := &httpclient.TenantServiceListTenantUsersParams{IncludeEmails: &includeEmails}
+	if f.Role != "" {
+		params.Role = &f.Role
+	}
+	if f.IdentityID != "" {
+		params.IdentityId = &f.IdentityID
+	} else if f.Email != "" {
+		params.Email = &f.Email
+	}
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, params, authEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -695,9 +669,10 @@ func (c *GRPCTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 	}
 
 	resp, err := c.client.ListTenantUsers(authCtx, &v0.ListTenantUsersRequest{
-		TenantId:  tenantID,
-		PageToken: pageToken,
-		PageSize:  pageSize,
+		TenantId:     tenantID,
+		PageToken:    pageToken,
+		PageSize:     pageSize,
+		IncludeEmails: true,
 	})
 	if err != nil {
 		return nil, "", err
@@ -740,7 +715,7 @@ func (c *GRPCTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID
 		return nil, err
 	}
 
-	req := &v0.ListTenantUsersRequest{TenantId: tenantID}
+	req := &v0.ListTenantUsersRequest{TenantId: tenantID, IncludeEmails: true}
 	if f.Role != "" {
 		v := f.Role
 		req.Role = &v

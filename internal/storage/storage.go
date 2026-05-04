@@ -232,8 +232,6 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 	if opts.IdentityID != "" {
 		query = query.Where(sq.Eq{"kratos_identity_id": opts.IdentityID})
 	}
-	// Note: opts.Email is intentionally not consumed here; it is resolved to an
-	// IdentityID by the service layer before this storage call is made.
 
 	rows, err := query.QueryContext(ctx)
 	if err != nil {

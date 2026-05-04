@@ -830,7 +830,7 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			name:    "success",
 			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", gomock.Any()).Return(users, "", nil)
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, gomock.Any()).Return(users, "", nil)
 			},
 			wantErr: false,
 		},
@@ -838,7 +838,7 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			name:    "success with next page token",
 			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", gomock.Any()).Return(users, "next-token-tu", nil)
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, gomock.Any()).Return(users, "next-token-tu", nil)
 			},
 			wantErr:           false,
 			wantNextPageToken: "next-token-tu",
@@ -847,7 +847,7 @@ func TestHandler_ListTenantUsers(t *testing.T) {
 			name:    "service error",
 			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", gomock.Any()).Return(nil, "", errors.New("service error"))
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr: true,
 		},
@@ -1123,7 +1123,7 @@ func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
 			name:    "filter by role",
 			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111", Role: &role},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, optionsMatcher{check: func(o types.ListOptions) bool {
 					return o.Role == "owner"
 				}}).Return(users, "", nil)
 			},
@@ -1133,7 +1133,7 @@ func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
 			name:    "filter by email",
 			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111", Email: &email},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, optionsMatcher{check: func(o types.ListOptions) bool {
 					return o.Email == "owner@example.com"
 				}}).Return(users, "", nil)
 			},
@@ -1152,7 +1152,7 @@ func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
 				IdentityId: func() *string { s := "22222222-2222-2222-2222-222222222222"; return &s }(),
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, optionsMatcher{check: func(o types.ListOptions) bool {
 					return o.IdentityID == "22222222-2222-2222-2222-222222222222"
 				}}).Return(users, "", nil)
 			},
@@ -1166,7 +1166,7 @@ func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
 				Email:      func() *string { s := "ignored@example.com"; return &s }(),
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, optionsMatcher{check: func(o types.ListOptions) bool {
 					return o.IdentityID == "22222222-2222-2222-2222-222222222222" && o.Email == ""
 				}}).Return(users, "", nil)
 			},
