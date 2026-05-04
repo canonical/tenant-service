@@ -101,6 +101,24 @@ type TenantUser struct {
 	Role   string
 }
 
+// TenantFilterOptions holds optional query filters for tenant listing.
+type TenantFilterOptions struct {
+	// Enabled, when non-nil, restricts results to tenants whose enabled flag matches.
+	Enabled *bool
+}
+
+// TenantUserFilterOptions holds optional query filters for tenant-user listing.
+type TenantUserFilterOptions struct {
+	// Role, when non-empty, restricts results to members with the exact role.
+	Role string
+	// Email, when non-empty, restricts results to the member with that email.
+	// The service layer resolves it to an identity_id via Kratos.
+	Email string
+	// IdentityID, when non-empty, restricts results to the member with that Kratos ID.
+	// Takes precedence over Email when both are set, avoiding the Kratos lookup.
+	IdentityID string
+}
+
 // TenantClient abstracts tenant operations across HTTP and gRPC protocols.
 // Implementations must handle authentication and protocol-specific details.
 type TenantClient interface {
@@ -116,14 +134,23 @@ type TenantClient interface {
 	// Returns the items, the next-page cursor (empty string on last page), and any error.
 	ListTenantsPaged(ctx context.Context, pageToken string, pageSize int32) ([]Tenant, string, error)
 
+	// ListTenantsFiltered retrieves all tenants matching the given filter.
+	ListTenantsFiltered(ctx context.Context, f TenantFilterOptions) ([]Tenant, error)
+
 	// ListTenantUsersPaged retrieves a single page of users for the given tenant.
 	ListTenantUsersPaged(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]TenantUser, string, error)
+
+	// ListTenantUsersFiltered retrieves all users in a tenant matching the given filter.
+	ListTenantUsersFiltered(ctx context.Context, tenantID string, f TenantUserFilterOptions) ([]TenantUser, error)
 
 	// ProvisionTenantUser adds a user (by email) to a tenant with the given role.
 	ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error
 
 	// UpdateTenant modifies the tenant with the given ID.
 	UpdateTenant(ctx context.Context, id, name string) error
+
+	// DisableTenant sets enabled=false on the tenant with the given ID.
+	DisableTenant(ctx context.Context, id string) error
 
 	// DeleteTenant removes the tenant with the given ID.
 	// Implementations should be idempotent per project conventions.
@@ -296,6 +323,41 @@ func (c *HTTPTenantClient) DeleteTenant(ctx context.Context, id string) error {
 	return nil
 }
 
+func (c *HTTPTenantClient) DisableTenant(ctx context.Context, id string) error {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return err
+	}
+
+	falseVal := false
+	updateMask := "enabled"
+	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
+		Tenant: &struct {
+			CreatedAt *string `json:"createdAt,omitempty"`
+			Enabled   *bool   `json:"enabled,omitempty"`
+			Name      *string `json:"name,omitempty"`
+		}{
+			Enabled: &falseVal,
+		},
+		UpdateMask: &updateMask,
+	}
+
+	resp, err := c.client.TenantServiceUpdateTenant(ctx, id, updateReq, authEditor)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 // paginationQueryEditor returns a RequestEditorFn that appends page_size and
 // page_token to the request URL query string.
 func paginationQueryEditor(pageToken string, pageSize int32) httpclient.RequestEditorFn {
@@ -387,6 +449,116 @@ func (c *HTTPTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 		users[i] = TenantUser{UserID: u.UserID, Email: u.Email, Role: u.Role}
 	}
 	return users, result.NextPageToken, nil
+}
+
+// filterQueryEditor appends tenant filter fields to the request URL as flat
+// query parameters (?enabled=true, etc.).
+func filterQueryEditor(f TenantFilterOptions) httpclient.RequestEditorFn {
+	return func(ctx context.Context, req *http.Request) error {
+		q := req.URL.Query()
+		if f.Enabled != nil {
+			if *f.Enabled {
+				q.Set("enabled", "true")
+			} else {
+				q.Set("enabled", "false")
+			}
+		}
+		req.URL.RawQuery = q.Encode()
+		return nil
+	}
+}
+
+// userFilterQueryEditor appends tenant-user filter fields to the request URL.
+func userFilterQueryEditor(f TenantUserFilterOptions) httpclient.RequestEditorFn {
+	return func(ctx context.Context, req *http.Request) error {
+		q := req.URL.Query()
+		if f.Role != "" {
+			q.Set("role", f.Role)
+		}
+		if f.IdentityID != "" {
+			q.Set("identity_id", f.IdentityID)
+		} else if f.Email != "" {
+			q.Set("email", f.Email)
+		}
+		req.URL.RawQuery = q.Encode()
+		return nil
+	}
+}
+
+func (c *HTTPTenantClient) ListTenantsFiltered(ctx context.Context, f TenantFilterOptions) ([]Tenant, error) {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.TenantServiceListTenants(ctx, authEditor, filterQueryEditor(f))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Tenants []struct {
+			ID      string `json:"id"`
+			Name    string `json:"name"`
+			Enabled bool   `json:"enabled"`
+		} `json:"tenants"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	tenants := make([]Tenant, len(result.Tenants))
+	for i, t := range result.Tenants {
+		tenants[i] = Tenant{ID: t.ID, Name: t.Name}
+	}
+	return tenants, nil
+}
+
+func (c *HTTPTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID string, f TenantUserFilterOptions) ([]TenantUser, error) {
+	authEditor, err := c.authEditor(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, tenantID, authEditor, userFilterQueryEditor(f))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("unexpected status %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Users []struct {
+			UserID string `json:"user_id"`
+			Email  string `json:"email"`
+			Role   string `json:"role"`
+		} `json:"users"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	users := make([]TenantUser, len(result.Users))
+	for i, u := range result.Users {
+		users[i] = TenantUser{UserID: u.UserID, Email: u.Email, Role: u.Role}
+	}
+	return users, nil
 }
 
 func (c *HTTPTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error {
@@ -538,6 +710,61 @@ func (c *GRPCTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 	return users, resp.NextPageToken, nil
 }
 
+func (c *GRPCTenantClient) ListTenantsFiltered(ctx context.Context, f TenantFilterOptions) ([]Tenant, error) {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &v0.ListTenantsRequest{}
+	if f.Enabled != nil {
+		v := *f.Enabled
+		req.Enabled = &v
+	}
+
+	resp, err := c.client.ListTenants(authCtx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	tenants := make([]Tenant, len(resp.Tenants))
+	for i, t := range resp.Tenants {
+		tenants[i] = Tenant{ID: t.Id, Name: t.Name}
+	}
+	return tenants, nil
+}
+
+func (c *GRPCTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID string, f TenantUserFilterOptions) ([]TenantUser, error) {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &v0.ListTenantUsersRequest{TenantId: tenantID}
+	if f.Role != "" {
+		v := f.Role
+		req.Role = &v
+	}
+	if f.IdentityID != "" {
+		v := f.IdentityID
+		req.IdentityId = &v
+	} else if f.Email != "" {
+		v := f.Email
+		req.Email = &v
+	}
+
+	resp, err := c.client.ListTenantUsers(authCtx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]TenantUser, len(resp.Users))
+	for i, u := range resp.Users {
+		users[i] = TenantUser{UserID: u.UserId, Email: u.Email, Role: u.Role}
+	}
+	return users, nil
+}
+
 func (c *GRPCTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error {
 	authCtx, err := c.authContext(ctx)
 	if err != nil {
@@ -576,6 +803,20 @@ func (c *GRPCTenantClient) DeleteTenant(ctx context.Context, id string) error {
 
 	_, err = c.client.DeleteTenant(authCtx, &v0.DeleteTenantRequest{
 		TenantId: id,
+	})
+	return err
+}
+
+func (c *GRPCTenantClient) DisableTenant(ctx context.Context, id string) error {
+	authCtx, err := c.authContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	falseVal := false
+	_, err = c.client.UpdateTenant(authCtx, &v0.UpdateTenantRequest{
+		Tenant:     &v0.Tenant{Id: id, Enabled: falseVal},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
 	})
 	return err
 }

@@ -28,6 +28,24 @@ var testValidator = func() protovalidate.Validator {
 	return v
 }()
 
+// optionsMatcher is a gomock.Matcher that materialises a variadic []types.ListOption
+// slice and asserts the resulting ListOptions satisfy a predicate.
+type optionsMatcher struct {
+	check func(types.ListOptions) bool
+}
+
+func (m optionsMatcher) Matches(x interface{}) bool {
+	opts, ok := x.([]types.ListOption)
+	if !ok {
+		return false
+	}
+	return m.check(types.ApplyOptions(opts...))
+}
+
+func (m optionsMatcher) String() string {
+	return "matches list options"
+}
+
 //go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_tenant.go -source=./interfaces.go
 //go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_logger.go -source=../../internal/logging/interfaces.go
 //go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_monitor.go -source=../../internal/monitoring/interfaces.go
@@ -723,7 +741,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			name:    "success",
 			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "", nil)
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "", nil)
 			},
 			wantErr: false,
 		},
@@ -731,7 +749,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			name:    "success with next page token",
 			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "next-token-usr", nil)
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "next-token-usr", nil)
 			},
 			wantErr:           false,
 			wantNextPageToken: "next-token-usr",
@@ -740,7 +758,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 			name:    "service error",
 			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListUserTenants(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(nil, "", errors.New("service error"))
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(nil, "", errors.New("service error"))
 			},
 			wantErr: true,
 		},
@@ -1008,4 +1026,188 @@ func TestHandler_LookupTenants(t *testing.T) {
 			t.Errorf("expected InvalidArgument, got %v", st.Code())
 		}
 	})
+}
+
+func TestHandler_ListTenants_WithFilter(t *testing.T) {
+	now := time.Now()
+	tenants := []*types.Tenant{
+		{ID: "11111111-1111-1111-1111-111111111111", Name: "Acme", CreatedAt: now, Enabled: true},
+	}
+
+	trueVal := true
+	falseVal := false
+
+	tests := []struct {
+		name       string
+		request    *v0.ListTenantsRequest
+		setupMocks func(*MockServiceInterface)
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name:    "filter enabled=true",
+			request: &v0.ListTenantsRequest{Enabled: &trueVal},
+			setupMocks: func(mockSvc *MockServiceInterface) {
+				mockSvc.EXPECT().ListTenants(gomock.Any(), optionsMatcher{check: func(o types.ListOptions) bool {
+					return o.Enabled != nil && *o.Enabled == true
+				}}).Return(tenants, "", nil)
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "filter enabled=false",
+			request: &v0.ListTenantsRequest{Enabled: &falseVal},
+			setupMocks: func(mockSvc *MockServiceInterface) {
+				mockSvc.EXPECT().ListTenants(gomock.Any(), optionsMatcher{check: func(o types.ListOptions) bool {
+					return o.Enabled != nil && *o.Enabled == false
+				}}).Return(tenants, "", nil)
+			},
+			wantLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockSvc := NewMockServiceInterface(ctrl)
+			mockTracer := NewMockTracingInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+			mockMonitor := NewMockMonitorInterface(ctrl)
+
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
+
+			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.ListTenants").
+				Return(context.Background(), trace.SpanFromContext(context.Background())).AnyTimes()
+			tt.setupMocks(mockSvc)
+
+			resp, err := h.ListTenants(context.Background(), tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if resp == nil {
+					t.Fatal("expected response but got nil")
+				}
+				if len(resp.Tenants) != tt.wantLen {
+					t.Errorf("expected %d tenants, got %d", tt.wantLen, len(resp.Tenants))
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
+	users := []*types.TenantUser{
+		{UserID: "user-1", Email: "owner@example.com", Role: "owner"},
+	}
+
+	role := "owner"
+	email := "owner@example.com"
+
+	tests := []struct {
+		name       string
+		request    *v0.ListTenantUsersRequest
+		setupMocks func(*MockServiceInterface)
+		wantErr    bool
+		wantLen    int
+	}{
+		{
+			name:    "filter by role",
+			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111", Role: &role},
+			setupMocks: func(mockSvc *MockServiceInterface) {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+					return o.Role == "owner"
+				}}).Return(users, "", nil)
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "filter by email",
+			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111", Email: &email},
+			setupMocks: func(mockSvc *MockServiceInterface) {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+					return o.Email == "owner@example.com"
+				}}).Return(users, "", nil)
+			},
+			wantLen: 1,
+		},
+		{
+			name:       "invalid email rejected by validator",
+			request:    &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111", Email: func() *string { s := "not-an-email"; return &s }()},
+			setupMocks: func(mockSvc *MockServiceInterface) {},
+			wantErr:    true,
+		},
+		{
+			name: "filter by identity_id",
+			request: &v0.ListTenantUsersRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				IdentityId: func() *string { s := "22222222-2222-2222-2222-222222222222"; return &s }(),
+			},
+			setupMocks: func(mockSvc *MockServiceInterface) {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+					return o.IdentityID == "22222222-2222-2222-2222-222222222222"
+				}}).Return(users, "", nil)
+			},
+			wantLen: 1,
+		},
+		{
+			name: "identity_id takes precedence over email",
+			request: &v0.ListTenantUsersRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				IdentityId: func() *string { s := "22222222-2222-2222-2222-222222222222"; return &s }(),
+				Email:      func() *string { s := "ignored@example.com"; return &s }(),
+			},
+			setupMocks: func(mockSvc *MockServiceInterface) {
+				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", optionsMatcher{check: func(o types.ListOptions) bool {
+					return o.IdentityID == "22222222-2222-2222-2222-222222222222" && o.Email == ""
+				}}).Return(users, "", nil)
+			},
+			wantLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockSvc := NewMockServiceInterface(ctrl)
+			mockTracer := NewMockTracingInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+			mockMonitor := NewMockMonitorInterface(ctrl)
+
+			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
+
+			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.ListTenantUsers").
+				Return(context.Background(), trace.SpanFromContext(context.Background())).AnyTimes()
+			tt.setupMocks(mockSvc)
+
+			resp, err := h.ListTenantUsers(context.Background(), tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if resp == nil {
+					t.Fatal("expected response but got nil")
+				}
+				if len(resp.Users) != tt.wantLen {
+					t.Errorf("expected %d users, got %d", tt.wantLen, len(resp.Users))
+				}
+			}
+		})
+	}
 }

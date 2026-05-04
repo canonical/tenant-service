@@ -620,70 +620,6 @@ func TestService_ProvisionUser(t *testing.T) {
 	}
 }
 
-func TestService_ListUserTenants(t *testing.T) {
-	userID := "user-123"
-	expectedTenants := []*types.Tenant{
-		{ID: "tenant-1", Name: "Tenant 1"},
-		{ID: "tenant-2", Name: "Tenant 2"},
-	}
-
-	testCases := []struct {
-		name        string
-		setupMocks  func(*MockStorageInterface)
-		expectedErr bool
-	}{
-		{
-			name: "success",
-			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return(expectedTenants, "", nil)
-			},
-			expectedErr: false,
-		},
-		{
-			name: "storage error",
-			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return(nil, "", errors.New("storage error"))
-			},
-			expectedErr: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockStorage := NewMockStorageInterface(ctrl)
-			mockAuthz := NewMockAuthzInterface(ctrl)
-			mockKratos := NewMockKratosClientInterface(ctrl)
-			mockTracer := NewMockTracingInterface(ctrl)
-			mockLogger := NewMockLoggerInterface(ctrl)
-			setupLoggerMock(ctrl, mockLogger)
-			mockMonitor := NewMockMonitorInterface(ctrl)
-
-			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
-
-			mockTracer.EXPECT().Start(gomock.Any(), "admin.ListUserTenants").Return(context.Background(), trace.SpanFromContext(context.Background()))
-			tc.setupMocks(mockStorage)
-
-			tenants, _, err := s.ListUserTenants(context.Background(), userID)
-
-			if tc.expectedErr {
-				if err == nil {
-					t.Error("expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				if len(tenants) != len(expectedTenants) {
-					t.Errorf("expected %d tenants, got %d", len(expectedTenants), len(tenants))
-				}
-			}
-		})
-	}
-}
-
 func TestService_ListTenantUsers(t *testing.T) {
 	tenantID := "tenant-123"
 	identityID1 := "identity-1"
@@ -708,8 +644,10 @@ func TestService_ListTenantUsers(t *testing.T) {
 			name: "success",
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(members, "", nil)
-				mockKratos.EXPECT().GetIdentity(gomock.Any(), identityID1).Return(identity1, nil)
-				mockKratos.EXPECT().GetIdentity(gomock.Any(), identityID2).Return(identity2, nil)
+				mockKratos.EXPECT().GetIdentities(gomock.Any(), []string{identityID1, identityID2}).Return(map[string]*ory.Identity{
+					identityID1: identity1,
+					identityID2: identity2,
+				}, nil)
 			},
 			expectedErr: false,
 		},
@@ -717,8 +655,7 @@ func TestService_ListTenantUsers(t *testing.T) {
 			name: "success - kratos error handled",
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface, mockLogger *MockLoggerInterface) {
 				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(members, "", nil)
-				mockKratos.EXPECT().GetIdentity(gomock.Any(), identityID1).Return(nil, errors.New("kratos error"))
-				mockKratos.EXPECT().GetIdentity(gomock.Any(), identityID2).Return(identity2, nil)
+				mockKratos.EXPECT().GetIdentities(gomock.Any(), gomock.Any()).Return(nil, errors.New("kratos error"))
 			},
 			expectedErr: false,
 		},
@@ -867,7 +804,7 @@ func TestService_LookupTenantsByEmail(t *testing.T) {
 			name: "success - email found with active tenants",
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
-				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), identityID).Return(expectedTenants, nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(expectedTenants, "", nil)
 			},
 			expectedLen: 1,
 		},
@@ -889,7 +826,7 @@ func TestService_LookupTenantsByEmail(t *testing.T) {
 			name: "error - storage error on list active tenants",
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
-				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), identityID).Return(nil, errors.New("db error"))
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(nil, "", errors.New("db error"))
 			},
 			expectedErr: true,
 		},
@@ -946,21 +883,21 @@ func TestService_LookupTenantsByIdentityID(t *testing.T) {
 		{
 			name: "success - active tenants found",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), identityID).Return(expectedTenants, nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(expectedTenants, "", nil)
 			},
 			expectedLen: 1,
 		},
 		{
 			name: "success - no tenants",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), identityID).Return([]*types.Tenant{}, nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return([]*types.Tenant{}, "", nil)
 			},
 			expectedLen: 0,
 		},
 		{
 			name: "error - storage failure",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListActiveTenantsByUserID(gomock.Any(), identityID).Return(nil, errors.New("db error"))
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(nil, "", errors.New("db error"))
 			},
 			expectedErr: true,
 		},
@@ -997,6 +934,97 @@ func TestService_LookupTenantsByIdentityID(t *testing.T) {
 				}
 				if len(tenants) != tc.expectedLen {
 					t.Errorf("expected %d tenants, got %d", tc.expectedLen, len(tenants))
+				}
+			}
+		})
+	}
+}
+
+func TestService_ListTenantUsers_EmailFilter(t *testing.T) {
+	tenantID := "11111111-1111-1111-1111-111111111111"
+	email := "alice@example.com"
+	identityID := "22222222-2222-2222-2222-222222222222"
+	members := []*types.Membership{
+		{ID: "m-1", TenantID: tenantID, KratosIdentityID: identityID, Role: "member"},
+	}
+
+	testCases := []struct {
+		name        string
+		opts        []types.ListOption
+		setupMocks  func(*MockStorageInterface, *MockKratosClientInterface)
+		expectedLen int
+		expectedErr bool
+	}{
+		{
+			name: "email filter resolved to identity_id",
+			opts: []types.ListOption{types.WithEmail(email)},
+			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
+				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
+				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, optionsMatcher{check: func(o types.ListOptions) bool {
+					return o.IdentityID == identityID && o.Email == ""
+				}}).Return(members, "", nil)
+				mockKratos.EXPECT().GetIdentities(gomock.Any(), []string{identityID}).Return(nil, errors.New("not found"))
+			},
+			expectedLen: 1,
+		},
+		{
+			name: "email unknown in kratos returns empty",
+			opts: []types.ListOption{types.WithEmail(email)},
+			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
+				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", nil)
+			},
+			expectedLen: 0,
+		},
+		{
+			name: "kratos error on email resolution",
+			opts: []types.ListOption{types.WithEmail(email)},
+			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
+				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return("", errors.New("kratos error"))
+			},
+			expectedErr: true,
+		},
+		{
+			name: "role filter passed to storage",
+			opts: []types.ListOption{types.WithRole("owner")},
+			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
+				mockStorage.EXPECT().ListMembersByTenantID(gomock.Any(), tenantID, gomock.Any()).Return(members, "", nil)
+				mockKratos.EXPECT().GetIdentities(gomock.Any(), []string{identityID}).Return(nil, errors.New("not found"))
+			},
+			expectedLen: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockStorage := NewMockStorageInterface(ctrl)
+			mockAuthz := NewMockAuthzInterface(ctrl)
+			mockKratos := NewMockKratosClientInterface(ctrl)
+			mockTracer := NewMockTracingInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+			mockMonitor := NewMockMonitorInterface(ctrl)
+
+			s := NewService(mockStorage, mockAuthz, mockKratos, "1h", mockTracer, mockMonitor, mockLogger)
+
+			mockTracer.EXPECT().Start(gomock.Any(), "admin.ListTenantUsers").
+				Return(context.Background(), trace.SpanFromContext(context.Background()))
+			tc.setupMocks(mockStorage, mockKratos)
+
+			users, _, err := s.ListTenantUsers(context.Background(), tenantID, tc.opts...)
+
+			if tc.expectedErr {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if len(users) != tc.expectedLen {
+					t.Errorf("expected %d users, got %d", tc.expectedLen, len(users))
 				}
 			}
 		})
