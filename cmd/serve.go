@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
+	"github.com/canonical/tenant-service/internal/grpcutil"
 	"github.com/canonical/tenant-service/internal/kratos"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring/prometheus"
@@ -29,6 +30,7 @@ import (
 	"github.com/canonical/tenant-service/pkg/authentication"
 	"github.com/canonical/tenant-service/pkg/tenant"
 	"github.com/canonical/tenant-service/pkg/web"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -177,13 +179,31 @@ func serve() error {
 		logger.Fatalf("failed to listen on grpc port: %v", err)
 	}
 
+	readOnlyMethods, err := grpcutil.ReadOnlyMethods(v0.TenantService_ServiceDesc)
+	if err != nil {
+		logger.Fatalf("failed to resolve read-only gRPC methods: %v", err)
+	}
+
+	grpc_prometheus.EnableHandlingTimeHistogram()
+
 	grpcServer := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.UnaryInterceptor(authMiddleware.GRPCInterceptorExcluding(
-			"/identity.platform.api.tenant.TenantService/LookupTenants",
-		)),
+		grpc.ChainUnaryInterceptor(
+			logging.LoggingUnaryInterceptor(logger),
+			grpc_prometheus.UnaryServerInterceptor,
+			authMiddleware.GRPCInterceptorExcluding(
+				"/identity.platform.api.tenant.TenantService/LookupTenants",
+			),
+			db.TransactionUnaryInterceptor(dbClient, readOnlyMethods, logger),
+		),
+		grpc.ChainStreamInterceptor(
+			logging.LoggingStreamInterceptor(logger),
+			grpc_prometheus.StreamServerInterceptor,
+			authMiddleware.GRPCStreamInterceptor,
+		),
 	)
 	v0.RegisterTenantServiceServer(grpcServer, tenantHandler)
+	grpc_prometheus.Register(grpcServer)
 
 	go func() {
 		logger.Infof("Starting gRPC server on port %v", specs.GRPCPort)
