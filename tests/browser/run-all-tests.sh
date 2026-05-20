@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Canonical Ltd.
-# SPDX-License-Identifier: AGPL-3.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Run Playwright browser tests for the Identity Platform login flows.
 #

@@ -59,7 +59,7 @@ This is the Tenant Service for the Identity Platform, providing authorization-aw
 All files must start with:
 ```go
 // Copyright 2026 Canonical Ltd.
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 ```
 
 ### Error Handling
