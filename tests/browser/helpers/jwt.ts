@@ -1,5 +1,5 @@
 // Copyright 2026 Canonical Ltd.
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * JWT decoding helpers for extracting claims from access and ID tokens.

@@ -1,5 +1,5 @@
 // Copyright 2026 Canonical Ltd.
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // TODO: Go convention prefers black-box tests (package types_test); using white-box here to match project convention.
 package types

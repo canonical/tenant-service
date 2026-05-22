@@ -1,5 +1,5 @@
 # Copyright 2025 Canonical Ltd.
-# SPDX-License-Identifier: AGPL-3.0
+# SPDX-License-Identifier: AGPL-3.0-only
 
 # For details on buf.yaml configuration, visit
 # https://buf.build/docs/configuration/v2/buf-gen-yaml/

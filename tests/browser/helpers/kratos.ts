@@ -1,5 +1,5 @@
 // Copyright 2026 Canonical Ltd.
-// SPDX-License-Identifier: AGPL-3.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * Manage Kratos identities via the admin API (localhost:4434).
