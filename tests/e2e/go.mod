@@ -1,6 +1,6 @@
 module github.com/canonical/tenant-service/tests/e2e
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/canonical/tenant-service v0.0.0-00010101000000-000000000000
