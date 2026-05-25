@@ -83,7 +83,7 @@ func (c *httpTenantClient) handleRequest(resp *http.Response, err error, out pro
 
 func (c *httpTenantClient) ListMyTenants(ctx context.Context, in *v0.ListMyTenantsRequest, opts ...grpc.CallOption) (*v0.ListMyTenantsResponse, error) {
 	out := new(v0.ListMyTenantsResponse)
-	resp, err := c.client.TenantServiceListMyTenants(ctx)
+	resp, err := c.client.TenantServiceListMyTenants(ctx, &httpclient.TenantServiceListMyTenantsParams{})
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (c *httpTenantClient) ListMyTenants(ctx context.Context, in *v0.ListMyTenan
 
 func (c *httpTenantClient) ListTenants(ctx context.Context, in *v0.ListTenantsRequest, opts ...grpc.CallOption) (*v0.ListTenantsResponse, error) {
 	out := new(v0.ListTenantsResponse)
-	resp, err := c.client.TenantServiceListTenants(ctx)
+	resp, err := c.client.TenantServiceListTenants(ctx, &httpclient.TenantServiceListTenantsParams{})
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (c *httpTenantClient) InviteMember(ctx context.Context, in *v0.InviteMember
 
 func (c *httpTenantClient) ListUserTenants(ctx context.Context, in *v0.ListUserTenantsRequest, opts ...grpc.CallOption) (*v0.ListUserTenantsResponse, error) {
 	out := new(v0.ListUserTenantsResponse)
-	resp, err := c.client.TenantServiceListUserTenants(ctx, in.UserId)
+	resp, err := c.client.TenantServiceListUserTenants(ctx, in.UserId, &httpclient.TenantServiceListUserTenantsParams{})
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (c *httpTenantClient) ProvisionUser(ctx context.Context, in *v0.ProvisionUs
 
 func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenantUsersRequest, opts ...grpc.CallOption) (*v0.ListTenantUsersResponse, error) {
 	out := new(v0.ListTenantUsersResponse)
-	resp, err := c.client.TenantServiceListTenantUsers(ctx, in.TenantId)
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, in.TenantId, &httpclient.TenantServiceListTenantUsersParams{})
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}

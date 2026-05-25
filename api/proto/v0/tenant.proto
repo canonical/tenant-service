@@ -102,6 +102,8 @@ message UpdateTenantUserResponse {
 message ListMyTenantsRequest {
     string page_token = 1;
     int32 page_size = 2 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+    // If set, only return tenants whose enabled status matches this value.
+    optional bool enabled = 3;
 }
 
 message ListMyTenantsResponse {
@@ -112,6 +114,8 @@ message ListMyTenantsResponse {
 message ListTenantsRequest {
     string page_token = 1;
     int32 page_size = 2 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+    // If set, only return tenants whose enabled status matches this value.
+    optional bool enabled = 3;
 }
 
 message ListTenantsResponse {
@@ -142,6 +146,8 @@ message ListUserTenantsRequest {
     string user_id = 1 [(buf.validate.field).string.uuid = true];
     string page_token = 2;
     int32 page_size = 3 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+    // If set, only return tenants whose enabled status matches this value.
+    optional bool enabled = 4;
 }
 
 message ListUserTenantsResponse {
@@ -184,6 +190,16 @@ message ListTenantUsersRequest {
     string tenant_id = 1 [(buf.validate.field).string.uuid = true];
     string page_token = 2;
     int32 page_size = 3 [(buf.validate.field).int32 = {gte: 0, lte: 100}];
+    // Exact match on membership role.
+    optional string role = 4 [(buf.validate.field).string.min_len = 1];
+    // Exact match on user email. Resolved to identity_id in the service layer.
+    // Use identity_id instead when the caller already knows it, to skip the Kratos lookup.
+    optional string email = 5 [(buf.validate.field).string.email = true];
+    // Exact match on Kratos identity ID. Takes precedence over email when both are set.
+    optional string identity_id = 6 [(buf.validate.field).string.uuid = true];
+    // When true, the response includes email addresses fetched from Kratos.
+    // When false (default), the email field is omitted and the Kratos call is skipped.
+    bool include_emails = 7;
 }
 
 message ListTenantUsersResponse {

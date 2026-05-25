@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
+	ory "github.com/ory/client-go"
 )
 
 // Service provides tenant business logic.
@@ -68,8 +69,9 @@ func (s *Service) ListTenantsByUserID(ctx context.Context, userID string, opts .
 	tenants, nextPageToken, err := s.storage.ListTenantsByUserID(ctx, userID, opts...)
 	if err != nil {
 		s.recordError(span, "failed to list tenants for user", err, "user_id", userID)
+		return nil, "", err
 	}
-	return tenants, nextPageToken, err
+	return tenants, nextPageToken, nil
 }
 
 func (s *Service) ListTenants(ctx context.Context, opts ...types.ListOption) ([]*types.Tenant, string, error) {
@@ -328,55 +330,58 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	return nil
 }
 
-func (s *Service) ListUserTenants(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error) {
-	ctx, span := s.tracer.Start(ctx, "admin.ListUserTenants")
-	defer span.End()
-
-	s.logger.Debugw("listing tenants for user (admin)", "user_id", userID)
-
-	tenants, nextPageToken, err := s.storage.ListTenantsByUserID(ctx, userID, opts...)
-	if err != nil {
-		s.recordError(span, "failed to list tenants for user", err, "user_id", userID)
-		return nil, "", fmt.Errorf("failed to list tenants for user: %w", err)
-	}
-
-	return tenants, nextPageToken, nil
-}
-
-func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, opts ...types.ListOption) ([]*types.TenantUser, string, error) {
+func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, includeEmails bool, opts ...types.ListOption) ([]*types.TenantUser, string, error) {
 	ctx, span := s.tracer.Start(ctx, "admin.ListTenantUsers")
 	defer span.End()
 
 	s.logger.Debugw("listing members for tenant", "tenant_id", tenantID)
 
-	members, nextPageToken, err := s.storage.ListMembersByTenantID(ctx, tenantID, opts...)
+	// Resolve email filter to identity_id, if provided.
+	listOpts := types.ApplyOptions(opts...)
+	if listOpts.Email != "" {
+		identityID, err := s.kratos.GetIdentityIDByEmail(ctx, listOpts.Email)
+		if err != nil {
+			s.recordError(span, "failed to resolve email to identity", err, "tenant_id", tenantID)
+			return nil, "", fmt.Errorf("failed to resolve email: %w", err)
+		}
+		if identityID == "" {
+			// Unknown email — return empty result set.
+			return []*types.TenantUser{}, "", nil
+		}
+		listOpts.Email = ""
+		listOpts.IdentityID = identityID
+	}
+
+	members, nextPageToken, err := s.storage.ListMembersByTenantID(ctx, tenantID, types.WithListOptions(listOpts))
 	if err != nil {
 		s.recordError(span, "failed to list members", err, "tenant_id", tenantID)
 		return nil, "", fmt.Errorf("failed to list members: %w", err)
 	}
 
-	var users []*types.TenantUser
+	var identityMap map[string]*ory.Identity
+	if includeEmails {
+		ids := make([]string, len(members))
+		for i, m := range members {
+			ids[i] = m.KratosIdentityID
+		}
+		var err error
+		identityMap, err = s.kratos.GetIdentities(ctx, ids)
+		if err != nil {
+			s.recordError(span, "failed to fetch identities", err, "tenant_id", tenantID)
+			return nil, "", fmt.Errorf("failed to fetch identities: %w", err)
+		}
+	}
+
+	users := make([]*types.TenantUser, 0, len(members))
 	for _, m := range members {
 		email := ""
-		// Fetch identity details from Kratos to get email
-		identity, err := s.kratos.GetIdentity(ctx, m.KratosIdentityID)
-		if err != nil {
-			// Log error but continue, user might have been deleted from Kratos but not from our DB
-			s.logger.Warnw("failed to get identity for user; continuing with unknown email",
-				"tenant_id", tenantID,
-				"user_id", m.KratosIdentityID,
-				"error", err,
-			)
-			email = "unknown"
-		} else {
-			// Extract email from traits
+		if identity, ok := identityMap[m.KratosIdentityID]; ok {
 			if traits, ok := identity.Traits.(map[string]interface{}); ok {
 				if e, ok := traits["email"].(string); ok {
 					email = e
 				}
 			}
 		}
-
 		users = append(users, &types.TenantUser{
 			UserID: m.KratosIdentityID,
 			Email:  email,
@@ -489,19 +494,15 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 
 	// 4. Return updated user
 	identity, err := s.kratos.GetIdentity(ctx, userID)
+	if err != nil {
+		s.recordError(span, "failed to fetch identity after role update", err, "tenant_id", tenantID, "user_id", userID)
+		return nil, fmt.Errorf("failed to fetch identity: %w", err)
+	}
 	email := ""
-	if err == nil {
-		if traits, ok := identity.Traits.(map[string]interface{}); ok {
-			if e, ok := traits["email"].(string); ok {
-				email = e
-			}
+	if traits, ok := identity.Traits.(map[string]interface{}); ok {
+		if e, ok := traits["email"].(string); ok {
+			email = e
 		}
-	} else {
-		s.logger.Warnw("failed to fetch identity email after role update; returning empty",
-			"tenant_id", tenantID,
-			"user_id", userID,
-			"error", err,
-		)
 	}
 
 	s.logger.Infow("tenant user role updated",
@@ -546,7 +547,7 @@ func (s *Service) LookupTenantsByEmail(ctx context.Context, email string) ([]*ty
 		return []*types.Tenant{}, nil
 	}
 
-	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, identityID)
+	tenants, _, err := s.storage.ListTenantsByUserID(ctx, identityID, types.WithEnabled(true))
 	if err != nil {
 		s.recordError(span, "failed to list active tenants for identity", err, "email", email, "identity_id", identityID)
 		return nil, fmt.Errorf("failed to list tenants: %w", err)
@@ -565,7 +566,7 @@ func (s *Service) LookupTenantsByIdentityID(ctx context.Context, identityID stri
 
 	s.logger.Debugw("looking up tenants by identity ID")
 
-	tenants, err := s.storage.ListActiveTenantsByUserID(ctx, identityID)
+	tenants, _, err := s.storage.ListTenantsByUserID(ctx, identityID, types.WithEnabled(true))
 	if err != nil {
 		s.recordError(span, "failed to list active tenants for identity", err, "identity_id", identityID)
 		return nil, fmt.Errorf("failed to list tenants: %w", err)

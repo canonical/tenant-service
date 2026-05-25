@@ -18,6 +18,7 @@ type ClientInterface interface {
 	GetIdentityIDByEmail(ctx context.Context, email string) (string, error)
 	CreateIdentity(ctx context.Context, email string) (string, error)
 	GetIdentity(ctx context.Context, id string) (*ory.Identity, error)
+	GetIdentities(ctx context.Context, ids []string) (map[string]*ory.Identity, error)
 	CreateRecoveryLink(ctx context.Context, identityID string, expiresIn string) (string, string, error)
 }
 
@@ -96,6 +97,27 @@ func (c *Client) GetIdentity(ctx context.Context, id string) (*ory.Identity, err
 	}
 
 	return identity, nil
+}
+
+func (c *Client) GetIdentities(ctx context.Context, ids []string) (map[string]*ory.Identity, error) {
+	ctx, span := c.tracer.Start(ctx, "kratos.GetIdentities")
+	defer span.End()
+
+	if len(ids) == 0 {
+		return map[string]*ory.Identity{}, nil
+	}
+
+	// NOTE: empty page token is set because of https://github.com/ory/sdk/issues/461
+	identities, _, err := c.client.IdentityAPI.ListIdentities(ctx).Ids(ids).PageToken("").Execute()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list identities by ids: %w", err)
+	}
+
+	result := make(map[string]*ory.Identity, len(identities))
+	for i := range identities {
+		result[identities[i].Id] = &identities[i]
+	}
+	return result, nil
 }
 
 func (c *Client) CreateRecoveryLink(ctx context.Context, identityID string, expiresIn string) (string, string, error) {

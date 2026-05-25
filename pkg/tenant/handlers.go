@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/mail"
+	"time"
 
 	"buf.build/go/protovalidate"
 	"github.com/canonical/tenant-service/internal/logging"
@@ -21,6 +22,23 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+func tenantToProto(t *types.Tenant) *v0.Tenant {
+	return &v0.Tenant{
+		Id:        t.ID,
+		Name:      t.Name,
+		CreatedAt: t.CreatedAt.Format(time.RFC3339),
+		Enabled:   t.Enabled,
+	}
+}
+
+func tenantsToProto(tenants []*types.Tenant) []*v0.Tenant {
+	pb := make([]*v0.Tenant, len(tenants))
+	for i, t := range tenants {
+		pb[i] = tenantToProto(t)
+	}
+	return pb
+}
 
 // Handler implements the gRPC and HTTP API endpoints.
 type Handler struct {
@@ -90,7 +108,11 @@ func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsReques
 		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 	}
 
-	tenants, nextPageToken, err := h.service.ListTenantsByUserID(ctx, userID, types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize))
+	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
+	if req.Enabled != nil {
+		opts = append(opts, types.WithEnabled(*req.Enabled))
+	}
+	tenants, nextPageToken, err := h.service.ListTenantsByUserID(ctx, userID, opts...)
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidPageToken) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
@@ -99,18 +121,8 @@ func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsReques
 		return nil, status.Errorf(codes.Internal, "failed to list tenants: %v", err)
 	}
 
-	pbTenants := make([]*v0.Tenant, len(tenants))
-	for i, t := range tenants {
-		pbTenants[i] = &v0.Tenant{
-			Id:        t.ID,
-			Name:      t.Name,
-			CreatedAt: t.CreatedAt.String(),
-			Enabled:   t.Enabled,
-		}
-	}
-
 	return &v0.ListMyTenantsResponse{
-		Tenants:       pbTenants,
+		Tenants:       tenantsToProto(tenants),
 		NextPageToken: nextPageToken,
 	}, nil
 }
@@ -123,7 +135,11 @@ func (h *Handler) ListTenants(ctx context.Context, req *v0.ListTenantsRequest) (
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
 
-	tenants, nextPageToken, err := h.service.ListTenants(ctx, types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize))
+	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
+	if req.Enabled != nil {
+		opts = append(opts, types.WithEnabled(*req.Enabled))
+	}
+	tenants, nextPageToken, err := h.service.ListTenants(ctx, opts...)
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidPageToken) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
@@ -132,18 +148,8 @@ func (h *Handler) ListTenants(ctx context.Context, req *v0.ListTenantsRequest) (
 		return nil, status.Errorf(codes.Internal, "failed to list all tenants: %v", err)
 	}
 
-	pbTenants := make([]*v0.Tenant, len(tenants))
-	for i, t := range tenants {
-		pbTenants[i] = &v0.Tenant{
-			Id:        t.ID,
-			Name:      t.Name,
-			CreatedAt: t.CreatedAt.String(),
-			Enabled:   t.Enabled,
-		}
-	}
-
 	return &v0.ListTenantsResponse{
-		Tenants:       pbTenants,
+		Tenants:       tenantsToProto(tenants),
 		NextPageToken: nextPageToken,
 	}, nil
 }
@@ -163,12 +169,7 @@ func (h *Handler) CreateTenant(ctx context.Context, req *v0.CreateTenantRequest)
 	}
 
 	return &v0.CreateTenantResponse{
-		Tenant: &v0.Tenant{
-			Id:        tenant.ID,
-			Name:      tenant.Name,
-			CreatedAt: tenant.CreatedAt.String(),
-			Enabled:   tenant.Enabled,
-		},
+		Tenant: tenantToProto(tenant),
 	}, nil
 }
 
@@ -199,12 +200,7 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 	}
 
 	return &v0.UpdateTenantResponse{
-		Tenant: &v0.Tenant{
-			Id:        tenant.ID,
-			Name:      tenant.Name,
-			CreatedAt: tenant.CreatedAt.String(),
-			Enabled:   tenant.Enabled,
-		},
+		Tenant: tenantToProto(tenant),
 	}, nil
 }
 
@@ -283,7 +279,11 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
 
-	tenants, nextPageToken, err := h.service.ListUserTenants(ctx, req.UserId, types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize))
+	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
+	if req.Enabled != nil {
+		opts = append(opts, types.WithEnabled(*req.Enabled))
+	}
+	tenants, nextPageToken, err := h.service.ListTenantsByUserID(ctx, req.UserId, opts...)
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidPageToken) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
@@ -292,18 +292,8 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 		return nil, status.Errorf(codes.Internal, "failed to list user tenants: %v", err)
 	}
 
-	pbTenants := make([]*v0.Tenant, len(tenants))
-	for i, t := range tenants {
-		pbTenants[i] = &v0.Tenant{
-			Id:        t.ID,
-			Name:      t.Name,
-			CreatedAt: t.CreatedAt.String(),
-			Enabled:   t.Enabled,
-		}
-	}
-
 	return &v0.ListUserTenantsResponse{
-		Tenants:       pbTenants,
+		Tenants:       tenantsToProto(tenants),
 		NextPageToken: nextPageToken,
 	}, nil
 }
@@ -316,7 +306,16 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
 
-	users, nextPageToken, err := h.service.ListTenantUsers(ctx, req.TenantId, types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize))
+	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
+	if req.Role != nil {
+		opts = append(opts, types.WithRole(*req.Role))
+	}
+	if req.IdentityId != nil {
+		opts = append(opts, types.WithIdentityID(*req.IdentityId))
+	} else if req.Email != nil {
+		opts = append(opts, types.WithEmail(*req.Email))
+	}
+	users, nextPageToken, err := h.service.ListTenantUsers(ctx, req.TenantId, req.GetIncludeEmails(), opts...)
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidPageToken) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
@@ -375,17 +374,7 @@ func (h *Handler) LookupTenants(ctx context.Context, req *v0.LookupTenantsReques
 		return nil, status.Errorf(codes.Internal, "failed to look up tenants")
 	}
 
-	pbTenants := make([]*v0.Tenant, len(tenants))
-	for i, t := range tenants {
-		pbTenants[i] = &v0.Tenant{
-			Id:        t.ID,
-			Name:      t.Name,
-			CreatedAt: t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			Enabled:   t.Enabled,
-		}
-	}
-
 	return &v0.LookupTenantsResponse{
-		Tenants: pbTenants,
+		Tenants: tenantsToProto(tenants),
 	}, nil
 }

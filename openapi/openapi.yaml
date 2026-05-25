@@ -106,7 +106,7 @@ components:
                         $ref: '#/components/schemas/tenantTenant'
                     type: array
             type: object
-        tenantLookupTenantsByEmailResponse:
+        tenantLookupTenantsResponse:
             properties:
                 tenants:
                     items:
@@ -166,6 +166,11 @@ paths:
                   schema:
                     format: int32
                     type: integer
+                - description: If set, only return tenants whose enabled status matches this value.
+                  in: query
+                  name: enabled
+                  schema:
+                    type: boolean
             responses:
                 default:
                     content:
@@ -189,6 +194,11 @@ paths:
                   schema:
                     format: int32
                     type: integer
+                - description: If set, only return tenants whose enabled status matches this value.
+                  in: query
+                  name: enabled
+                  schema:
+                    type: boolean
             responses:
                 default:
                     content:
@@ -303,6 +313,30 @@ paths:
                   schema:
                     format: int32
                     type: integer
+                - description: Exact match on membership role.
+                  in: query
+                  name: role
+                  schema:
+                    type: string
+                - description: |-
+                    Exact match on user email. Resolved to identity_id in the service layer.
+                    Use identity_id instead when the caller already knows it, to skip the Kratos lookup.
+                  in: query
+                  name: email
+                  schema:
+                    type: string
+                - description: Exact match on Kratos identity ID. Takes precedence over email when both are set.
+                  in: query
+                  name: identity_id
+                  schema:
+                    type: string
+                - description: |-
+                    When true, the response includes email addresses fetched from Kratos.
+                    When false (default), the email field is omitted and the Kratos call is skipped.
+                  in: query
+                  name: include_emails
+                  schema:
+                    type: boolean
             responses:
                 default:
                     content:
@@ -368,10 +402,17 @@ paths:
                 - TenantService
     /api/v0/tenants/lookup:
         get:
-            operationId: TenantService_LookupTenantsByEmail
+            operationId: TenantService_LookupTenants
             parameters:
-                - in: query
+                - description: |-
+                    Exactly one of email or identity_id must be provided.
+                    When identity_id is set, the Kratos email-to-identity lookup is skipped.
+                  in: query
                   name: email
+                  schema:
+                    type: string
+                - in: query
+                  name: identity_id
                   schema:
                     type: string
             responses:
@@ -401,6 +442,11 @@ paths:
                   schema:
                     format: int32
                     type: integer
+                - description: If set, only return tenants whose enabled status matches this value.
+                  in: query
+                  name: enabled
+                  schema:
+                    type: boolean
             responses:
                 default:
                     content:
