@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/db"
 	"github.com/canonical/tenant-service/internal/http/types"
@@ -19,7 +20,6 @@ import (
 	"github.com/canonical/tenant-service/pkg/status"
 	"github.com/canonical/tenant-service/pkg/tenant"
 	"github.com/canonical/tenant-service/pkg/webhooks"
-	v0 "github.com/canonical/tenant-service/v0"
 	chi "github.com/go-chi/chi/v5"
 	middleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"

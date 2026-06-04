@@ -9,7 +9,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	v0 "github.com/canonical/tenant-service/v0"
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/spf13/cobra"
 )
 

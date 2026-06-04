@@ -153,6 +153,30 @@ func (m *Middleware) AuthenticateExcluding(paths ...string) func(http.Handler) h
 	}
 }
 
+// GRPCInterceptorExcluding is a unary interceptor for gRPC authentication
+func (m *Middleware) GRPCInterceptorExcluding(paths ...string) func(
+	ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	excluded := make(map[string]struct{}, len(paths))
+	for _, p := range paths {
+		excluded[p] = struct{}{}
+	}
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		if _, ok := excluded[info.FullMethod]; ok {
+			return handler(ctx, req)
+		}
+		return m.GRPCInterceptor(ctx, req, info, handler)
+	}
+}
+
 func NewMiddleware(verifier TokenVerifierInterface, tracer tracing.TracingInterface, monitor monitoring.MonitorInterface, logger logging.LoggerInterface) *Middleware {
 	return &Middleware{
 		verifier: verifier,

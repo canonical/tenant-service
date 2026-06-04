@@ -9,7 +9,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	v0 "github.com/canonical/tenant-service/v0"
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -106,9 +106,9 @@ var activateTenantCmd = &cobra.Command{
 
 		ctx := getAuthenticatedContext(context.Background())
 		_, err = client.UpdateTenant(ctx, &v0.UpdateTenantRequest{
-			Tenant: &v0.Tenant{
-				Id:      args[0],
-				Enabled: true,
+			TenantId: args[0],
+			Tenant: &v0.TenantInput{
+				Enabled: new(true),
 			},
 			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
 		})
@@ -134,9 +134,9 @@ var deactivateTenantCmd = &cobra.Command{
 
 		ctx := getAuthenticatedContext(context.Background())
 		_, err = client.UpdateTenant(ctx, &v0.UpdateTenantRequest{
-			Tenant: &v0.Tenant{
-				Id:      args[0],
-				Enabled: false,
+			TenantId: args[0],
+			Tenant: &v0.TenantInput{
+				Enabled: new(false),
 			},
 			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
 		})
@@ -162,8 +162,8 @@ var updateTenantCmd = &cobra.Command{
 
 		ctx := getAuthenticatedContext(context.Background())
 		_, err = client.UpdateTenant(ctx, &v0.UpdateTenantRequest{
-			Tenant: &v0.Tenant{
-				Id:   args[0],
+			TenantId: args[0],
+			Tenant: &v0.TenantInput{
 				Name: args[1],
 			},
 			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},

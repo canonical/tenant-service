@@ -11,12 +11,11 @@ import (
 	"net/http"
 	"strings"
 
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	httpclient "github.com/canonical/tenant-service/client/http"
-	v0 "github.com/canonical/tenant-service/v0"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type httpTenantClient struct {
@@ -140,20 +139,18 @@ func (c *httpTenantClient) UpdateTenant(ctx context.Context, in *v0.UpdateTenant
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	// Assuming in.Tenant is not nil. If it is, this will panic or we should check.
-	// The generated client expects tenant.id from the path parameter.
 	if in.Tenant == nil {
 		return nil, fmt.Errorf("tenant is required")
 	}
-	resp, err := c.client.TenantServiceUpdateTenantWithBody(ctx, in.Tenant.Id, "application/json", bytes.NewReader(bodyBytes))
+	resp, err := c.client.TenantServiceUpdateTenantWithBody(ctx, in.TenantId, "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *httpTenantClient) DeleteTenant(ctx context.Context, in *v0.DeleteTenantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *httpTenantClient) DeleteTenant(ctx context.Context, in *v0.DeleteTenantRequest, opts ...grpc.CallOption) (*v0.DeleteTenantResponse, error) {
+	out := new(v0.DeleteTenantResponse)
 	resp, err := c.client.TenantServiceDeleteTenant(ctx, in.TenantId)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err

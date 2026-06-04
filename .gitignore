@@ -68,3 +68,10 @@ test_source.json
 # go binary name
 app
 log.txt
+
+/.github/agents/
+/.github/prompts/
+/.github/skills/
+
+# OpenSpec archives only
+openspec/changes/archive/

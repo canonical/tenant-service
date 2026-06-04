@@ -31,7 +31,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # --- Configuration ---
-LOGIN_UI_IMAGE="${LOGIN_UI_IMAGE:-ghcr.io/canonical/identity-platform-login-ui:v0.25.0}"
+LOGIN_UI_IMAGE="${LOGIN_UI_IMAGE:-identity-platform-login-ui:dev}"
 LOGIN_UI_BINARY="${LOGIN_UI_BINARY:-}"
 HYDRA_IMAGE="ghcr.io/canonical/hydra:2.3.0-canonical"
 OIDC_CONTAINER_NAME="oidc_client_test"
@@ -116,7 +116,7 @@ restart_login_ui() {
     OPENFGA_API_HOST=localhost:8080 \
     IDENTIFIER_FIRST_ENABLED=TRUE \
     MULTI_TENANCY_ENABLED="${multi_tenancy}" \
-    TENANTS_SERVICE_URL=http://localhost:8000 \
+    TENANT_SERVICE_GRPC_ADDRESS=host.docker.internal:50051 \
     "$LOGIN_UI_BINARY" serve > "$LOGIN_UI_LOG" 2>&1 &
     LOGIN_UI_PID=$!
   else
@@ -139,7 +139,7 @@ services:
       - OPENFGA_API_HOST=openfga:8080
       - IDENTIFIER_FIRST_ENABLED=TRUE
       - MULTI_TENANCY_ENABLED=${multi_tenancy}
-      - TENANTS_SERVICE_URL=http://host.docker.internal:8000
+      - TENANT_SERVICE_GRPC_ADDRESS=host.docker.internal:50051
 EOF
 
     docker compose \

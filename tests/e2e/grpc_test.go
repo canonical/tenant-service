@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	v0 "github.com/canonical/tenant-service/v0"
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"

@@ -17,7 +17,7 @@ services:
     networks:
       - intranet
   identity-platform-login-ui:
-    image: ghcr.io/canonical/identity-platform-login-ui:v0.25.0
+    image: identity-platform-login-ui:dev
     environment:
       - KRATOS_PUBLIC_URL=http://kratos:4433
       - KRATOS_ADMIN_URL=http://kratos:4434
@@ -32,7 +32,7 @@ services:
       - OPENFGA_API_HOST=openfga:8080
       - IDENTIFIER_FIRST_ENABLED=TRUE
       - MULTI_TENANCY_ENABLED=TRUE
-      - TENANTS_SERVICE_URL=http://host.docker.internal:8000
+      - TENANT_SERVICE_GRPC_ADDRESS=host.docker.internal:50051
     ports:
       - "4455:4455"
     networks:
@@ -41,7 +41,7 @@ services:
       - "host.docker.internal:host-gateway"
     restart: on-failure
   hook-service-migrate:
-    image: ghcr.io/canonical/hook-service:multitenancy
+    image: hook-service:dev
     command: exec hook-service migrate --dsn "postgres://hooks:hooks@postgres:5432/hooks?sslmode=disable" up
     depends_on:
       postgres:
@@ -52,7 +52,7 @@ services:
     labels:
       - "traefik.enable=false"
   hook-service:
-    image: ghcr.io/canonical/hook-service:multitenancy
+    image: hook-service:dev
     environment:
       - DSN=postgres://hooks:hooks@postgres:5432/hooks?sslmode=disable
       - TRACING_ENABLED=false
@@ -60,7 +60,7 @@ services:
       - AUTHORIZATION_ENABLED=false
       - AUTHENTICATION_ENABLED=false
       - API_TOKEN=secret_api_key
-      - TENANT_SERVICE_URL=http://host.docker.internal:8000
+      - TENANT_SERVICE_ADDRESS=host.docker.internal:50051
     ports:
       - "8082:8080"
     depends_on:

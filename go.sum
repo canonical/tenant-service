@@ -43,8 +43,8 @@ github.com/bradleyjkemp/cupaloy/v2 v2.8.0 h1:any4BmKE+jGIaMpnU8YgH/I2LPiLBufr6oM
 github.com/bradleyjkemp/cupaloy/v2 v2.8.0/go.mod h1:bm7JXdkRd4BHJk9HpwqAI8BoAY1lps46Enkdqw6aRX0=
 github.com/brianvoe/gofakeit/v6 v6.28.0 h1:Xib46XXuQfmlLS2EXRuJpqcw8St6qSZz75OUo0tgAW4=
 github.com/brianvoe/gofakeit/v6 v6.28.0/go.mod h1:Xj58BMSnFqcn/fAQeSK+/PLtC5kSb7FJIq4JyGa8vEs=
-github.com/canonical/identity-platform-api v0.0.0-20251124101154-ab78e5ddfcd5 h1:R58R6PhSrViE9YLuobWyumRndfAtdmH1niJ4tsxLgVU=
-github.com/canonical/identity-platform-api v0.0.0-20251124101154-ab78e5ddfcd5/go.mod h1:xYUYXBF2qUwdvimZPIQzjE4ExVEpoYQCoFDWpR2RkRo=
+github.com/canonical/identity-platform-api v0.0.0-20260604174342-5c4a53fd0824 h1:iHDuMFRKE9pVZaYmyuUd2zJuQnOqQbSPqsWWAmazEd4=
+github.com/canonical/identity-platform-api v0.0.0-20260604174342-5c4a53fd0824/go.mod h1:xYUYXBF2qUwdvimZPIQzjE4ExVEpoYQCoFDWpR2RkRo=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=

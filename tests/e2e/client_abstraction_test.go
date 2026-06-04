@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	httpclient "github.com/canonical/tenant-service/client/http"
-	v0 "github.com/canonical/tenant-service/v0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"

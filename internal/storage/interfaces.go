@@ -13,7 +13,7 @@ type StorageInterface interface {
 	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
 	GetTenantByID(ctx context.Context, id string) (*types.Tenant, error)
 	ListTenants(ctx context.Context, opts ...types.ListOption) ([]*types.Tenant, string, error)
-	ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error)
+	ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, error)
 	UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) error
 	DeleteTenant(ctx context.Context, id string) error
 	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
