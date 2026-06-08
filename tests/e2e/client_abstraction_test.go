@@ -669,9 +669,9 @@ func (c *GRPCTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 	}
 
 	resp, err := c.client.ListTenantUsers(authCtx, &v0.ListTenantUsersRequest{
-		TenantId:     tenantID,
-		PageToken:    pageToken,
-		PageSize:     pageSize,
+		TenantId:      tenantID,
+		PageToken:     pageToken,
+		PageSize:      pageSize,
 		IncludeEmails: true,
 	})
 	if err != nil {
@@ -761,8 +761,8 @@ func (c *GRPCTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 	}
 
 	_, err = c.client.UpdateTenant(authCtx, &v0.UpdateTenantRequest{
-		Tenant: &v0.Tenant{
-			Id:   id,
+		TenantId: id,
+		Tenant: &v0.TenantInput{
 			Name: name,
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
@@ -788,9 +788,9 @@ func (c *GRPCTenantClient) DisableTenant(ctx context.Context, id string) error {
 		return err
 	}
 
-	falseVal := false
 	_, err = c.client.UpdateTenant(authCtx, &v0.UpdateTenantRequest{
-		Tenant:     &v0.Tenant{Id: id, Enabled: falseVal},
+		TenantId:   id,
+		Tenant:     &v0.TenantInput{Enabled: new(false)},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
 	})
 	return err

@@ -3,7 +3,7 @@ module github.com/canonical/tenant-service/tests/e2e
 go 1.26.0
 
 require (
-	github.com/canonical/identity-platform-api v0.0.0-20260604174342-5c4a53fd0824
+	github.com/canonical/identity-platform-api v0.0.0-20260604175640-4f3d7e2f8b30
 	github.com/canonical/tenant-service v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
