@@ -82,8 +82,8 @@ github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b h1:otBG+dV+YK+Soembj
 github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0BsqsP2LwDJ9aOkm/6J86V6lyAXCoQWGw3K50=
 github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0 h1:nvj0OLI3YqYXer/kZD8Ri1aaunCxIEsOst1BVJswV0o=
 github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
-github.com/canonical/identity-platform-api v0.0.0-20260609091826-05797452469c h1:D18HYYPbWw5h0Ny82rakNkbuntneA5fe3EnjvdFIVBo=
-github.com/canonical/identity-platform-api v0.0.0-20260609091826-05797452469c/go.mod h1:xYUYXBF2qUwdvimZPIQzjE4ExVEpoYQCoFDWpR2RkRo=
+github.com/canonical/identity-platform-api v0.0.0-20260609125125-fe6c4040a954 h1:/hJHofKveb25+hy5t0QBImKyAcccA+jRDo5ffk+Ki/0=
+github.com/canonical/identity-platform-api v0.0.0-20260609125125-fe6c4040a954/go.mod h1:xYUYXBF2qUwdvimZPIQzjE4ExVEpoYQCoFDWpR2RkRo=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=

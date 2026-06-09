@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/mail"
+	"slices"
 	"strings"
 	"time"
 
@@ -188,23 +189,31 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if req.Tenant == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "tenant is required")
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
-	// If update_mask is provided, use it. Otherwise, assume full update (or at least name and enabled).
-	var paths []string
-	if req.UpdateMask != nil {
-		paths = req.UpdateMask.Paths
+	for _, p := range req.UpdateMask.Paths {
+		if p != "name" && p != "enabled" {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid update_mask path: %s", p)
+		}
+	}
+	if slices.Contains(req.UpdateMask.Paths, "name") && strings.TrimSpace(req.Tenant.Name) == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "name is required when included in update_mask")
+	}
+	if slices.Contains(req.UpdateMask.Paths, "enabled") && req.Tenant.Enabled == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "enabled is required when included in update_mask")
 	}
 
 	updateData := &types.Tenant{
-		ID:      req.TenantId,
-		Name:    req.Tenant.Name,
-		Enabled: *req.Tenant.Enabled,
+		ID:   req.TenantId,
+		Name: req.Tenant.Name,
+	}
+	if req.Tenant.Enabled != nil {
+		updateData.Enabled = *req.Tenant.Enabled
 	}
 
-	tenant, err := h.service.UpdateTenant(ctx, updateData, paths)
+	tenant, err := h.service.UpdateTenant(ctx, updateData, req.UpdateMask.Paths)
 	if err != nil {
 		h.logger.Errorw("failed to update tenant", "tenant_id", req.TenantId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to update tenant: %v", err)

@@ -269,7 +269,6 @@ func (c *HTTPTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 		return err
 	}
 
-	// Create update request
 	updateMask := "name"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
 		Tenant: &httpclient.TenantTenantInput{
@@ -753,10 +752,8 @@ func (c *GRPCTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 	}
 
 	_, err = c.client.UpdateTenant(authCtx, &v0.UpdateTenantRequest{
-		TenantId: id,
-		Tenant: &v0.TenantInput{
-			Name: name,
-		},
+		TenantId:   id,
+		Tenant:     &v0.TenantInput{Name: name},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 	})
 	return err

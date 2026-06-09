@@ -413,6 +413,51 @@ func TestHandler_UpdateTenant(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "success enabled-only patch",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Enabled: new(false)},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().UpdateTenant(gomock.Any(), gomock.Any(), []string{"enabled"}).Return(tenant, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid mask path",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Name: "Updated", Enabled: new(true)},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"foo"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
+		},
+		{
+			name: "enabled missing when enabled in mask",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Name: "Updated"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
+		},
+		{
+			name: "name missing when name in mask",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Enabled: new(true)},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
+		},
+		{
 			name:       "missing tenant",
 			request:    &v0.UpdateTenantRequest{},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},

@@ -14,17 +14,17 @@ The branch `IAM-1998` in `identity-platform-api` adds the tenant service definit
 ## Goals / Non-Goals
 
 **Goals:**
-- Remove all locally generated gRPC/protobuf/OpenAPI files from the repository.
+- Remove locally generated gRPC/protobuf files from the repository.
 - Point `go.mod` (main module and e2e test module) at the upstream `identity-platform-api` library.
 - Update all Go import paths referencing `github.com/canonical/tenant-service/v0` to `github.com/canonical/identity-platform-api/v0/tenant`.
 - Update the e2e tests to use the upstream gRPC client types.
 - Remove build tooling (`buf.gen.yaml`, `buf.yaml`) that was only used to regenerate the local files.
+- Keep a locally generated OpenAPI HTTP client (`client/http/client.gen.go`) by fetching the upstream OpenAPI spec from GitHub at generation time, so the eventual upstream migration is a source swap, not a code rewrite.
 - Ensure `make test` and `make build` pass after migration.
 
 **Non-Goals:**
 - Changing the tenant service API contract or proto definitions.
 - Upgrading gRPC/protobuf library versions beyond what the upstream module requires.
-- Migrating the `convert/` module (separate Go module, already separate).
 
 ## Decisions
 
@@ -48,7 +48,21 @@ The branch `IAM-1998` in `identity-platform-api` adds the tenant service definit
 
 **Rationale**: Minimises diff noise; no logic changes required alongside the import path change. The upstream package name is `tenantv0` which matches the local one, so the alias keeps call-sites identical.
 
-### Decision: Update e2e `go.mod` to reference upstream library directly
+### Decision: Keep a locally generated HTTP client from upstream OpenAPI
+
+**Choice**: Generate `client/http/client.gen.go` locally with `oapi-codegen` by downloading `openapi/openapi.yaml` from `identity-platform-api` on GitHub inside the Make target; keep `cmd/client_http.go` and e2e HTTP tests using that generated package.
+
+**Rationale**: The upstream `identity-platform-api` library does not currently ship an HTTP client. Keeping a local generated client avoids handwritten REST plumbing while preserving a clean migration path: once upstream publishes the HTTP client, switching can be done by replacing the import source with minimal call-site changes. Fetching the spec from GitHub means we do not need to commit OpenAPI documents in this repository.
+
+**Alternative considered**: Rewrite the HTTP path as a plain `net/http` client. Rejected — it increases local maintenance and makes the future source swap harder.
+
+### Decision: Remove convert/ module and local OpenAPI files
+
+**Choice**: Remove `convert/convert.go` and its `go.mod`/`go.sum`.
+
+**Rationale**: The `convert/` tool existed solely to convert the local OpenAPI v2 swagger file to OpenAPI v3 YAML. We now fetch the v3 source from upstream during generation, so `convert/` and both local OpenAPI files are no longer needed.
+
+### Decision: Update e2e module to consume upstream v0 types
 
 **Choice**: Replace the `replace github.com/canonical/tenant-service => ../..` indirect dependency for `v0` types with a direct dependency on `github.com/canonical/identity-platform-api`.
 
@@ -66,8 +80,8 @@ The branch `IAM-1998` in `identity-platform-api` adds the tenant service definit
 2. Run `go mod tidy && go mod vendor` to update the vendor tree.
 3. Update all Go source import paths: `github.com/canonical/tenant-service/v0` → `github.com/canonical/identity-platform-api/v0/tenant`.
 4. Update the e2e `go.mod` similarly.
-5. Delete `v0/`, `api/proto/v0/`, `openapi/`, `buf.gen.yaml`, `buf.yaml`.
-6. Remove any Makefile targets that invoke `buf generate`.
+5. Delete `v0/`, `api/proto/v0/`, `openapi/openapi.swagger.json`, `openapi/openapi.yaml`, `convert/`, `buf.gen.yaml`, `buf.yaml`.
+6. Add/maintain a temporary local generation command for `client/http/client.gen.go` that fetches upstream `openapi/openapi.yaml` from GitHub.
 7. Run `make test` to verify unit tests pass.
 8. Run e2e tests against a local stack.
 
