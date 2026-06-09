@@ -7,6 +7,7 @@ MICROK8S_REGISTRY_FLAG?=SKAFFOLD_DEFAULT_REPO=localhost:32000
 SKAFFOLD?=skaffold
 CONFIGMAP?=deployments/kubectl/configMap.yaml
 DSN?=postgresql://tenants:tenants@localhost:5432/tenants?sslmode=disable
+OPENAPI_SPEC_URL?=https://raw.githubusercontent.com/canonical/identity-platform-api/main/openapi/openapi.yaml
 .EXPORT_ALL_VARIABLES:
 
 # Go related
@@ -35,6 +36,12 @@ vet:
 vendor:
 	$(GO) mod vendor
 .PHONY: vendor
+
+generate-http-client:
+	@mkdir -p openapi
+	curl -fsSL "$(OPENAPI_SPEC_URL)" -o openapi/openapi.yaml
+	oapi-codegen -include-tags TenantService -generate types,client -package httpclient -o client/http/client.gen.go openapi/openapi.yaml
+.PHONY: generate-http-client
 
 build:
 	$(GO) build -o $(GO_BIN) ./

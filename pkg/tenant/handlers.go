@@ -305,15 +305,12 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: must be a valid UUID")
 	}
 
-	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
+	opts := []types.ListOption{}
 	if req.Enabled != nil {
 		opts = append(opts, types.WithEnabled(*req.Enabled))
 	}
 	tenants, err := h.service.ListTenantsByUserID(ctx, req.UserId, opts...)
 	if err != nil {
-		if errors.Is(err, storage.ErrInvalidPageToken) {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
-		}
 		h.logger.Errorw("failed to list user tenants", "user_id", req.UserId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list user tenants: %v", err)
 	}

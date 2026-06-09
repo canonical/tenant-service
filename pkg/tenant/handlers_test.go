@@ -720,23 +720,14 @@ func TestHandler_ListUserTenants(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		request           *v0.ListUserTenantsRequest
-		setupMocks        func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr           bool
-		wantCode          codes.Code
-		wantNextPageToken string
+		name       string
+		request    *v0.ListUserTenantsRequest
+		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
+		wantErr    bool
+		wantCode   codes.Code
 	}{
 		{
 			name:    "success",
-			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, nil)
-			},
-			wantErr: false,
-		},
-		{
-			name:    "success with next page token",
 			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, nil)
@@ -793,9 +784,6 @@ func TestHandler_ListUserTenants(t *testing.T) {
 				}
 				if resp == nil {
 					t.Error("expected response but got nil")
-				}
-				if resp != nil && resp.NextPageToken != tt.wantNextPageToken {
-					t.Errorf("expected NextPageToken %q, got %q", tt.wantNextPageToken, resp.NextPageToken)
 				}
 			}
 		})

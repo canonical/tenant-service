@@ -30,12 +30,8 @@ type TenantServiceProvisionUserBody struct {
 
 // TenantServiceUpdateTenantBody defines model for TenantServiceUpdateTenantBody.
 type TenantServiceUpdateTenantBody struct {
-	Tenant *struct {
-		CreatedAt *string `json:"created_at,omitempty"`
-		Enabled   *bool   `json:"enabled,omitempty"`
-		Name      *string `json:"name,omitempty"`
-	} `json:"tenant,omitempty"`
-	UpdateMask *string `json:"update_mask,omitempty"`
+	Tenant     *TenantTenantInput `json:"tenant,omitempty"`
+	UpdateMask *string            `json:"updateMask,omitempty"`
 }
 
 // TenantServiceUpdateTenantUserBody defines model for TenantServiceUpdateTenantUserBody.
@@ -43,37 +39,107 @@ type TenantServiceUpdateTenantUserBody struct {
 	Role *string `json:"role,omitempty"`
 }
 
-// ProtobufAny defines model for protobufAny.
-type ProtobufAny struct {
-	Type                 *string                `json:"@type,omitempty"`
-	AdditionalProperties map[string]interface{} `json:"-"`
-}
-
-// RpcStatus defines model for rpcStatus.
-type RpcStatus struct {
-	Code    *int32         `json:"code,omitempty"`
-	Details *[]ProtobufAny `json:"details,omitempty"`
-	Message *string        `json:"message,omitempty"`
-}
-
 // TenantCreateTenantRequest defines model for tenantCreateTenantRequest.
 type TenantCreateTenantRequest struct {
 	Name *string `json:"name,omitempty"`
 }
 
+// TenantCreateTenantResponse defines model for tenantCreateTenantResponse.
+type TenantCreateTenantResponse struct {
+	Tenant *TenantTenant `json:"tenant,omitempty"`
+}
+
+// TenantDeleteTenantResponse defines model for tenantDeleteTenantResponse.
+type TenantDeleteTenantResponse struct {
+	Message *string `json:"message,omitempty"`
+	Status  *int32  `json:"status,omitempty"`
+}
+
+// TenantInviteMemberResponse defines model for tenantInviteMemberResponse.
+type TenantInviteMemberResponse struct {
+	Code   *string `json:"code,omitempty"`
+	Link   *string `json:"link,omitempty"`
+	Status *string `json:"status,omitempty"`
+}
+
+// TenantListMyTenantsResponse defines model for tenantListMyTenantsResponse.
+type TenantListMyTenantsResponse struct {
+	Tenants *[]TenantTenant `json:"tenants,omitempty"`
+}
+
+// TenantListTenantUsersResponse defines model for tenantListTenantUsersResponse.
+type TenantListTenantUsersResponse struct {
+	NextPageToken *string             `json:"nextPageToken,omitempty"`
+	Users         *[]TenantTenantUser `json:"users,omitempty"`
+}
+
+// TenantListTenantsResponse defines model for tenantListTenantsResponse.
+type TenantListTenantsResponse struct {
+	NextPageToken *string         `json:"nextPageToken,omitempty"`
+	Tenants       *[]TenantTenant `json:"tenants,omitempty"`
+}
+
+// TenantListUserTenantsResponse defines model for tenantListUserTenantsResponse.
+type TenantListUserTenantsResponse struct {
+	Tenants *[]TenantTenant `json:"tenants,omitempty"`
+}
+
+// TenantLookupTenantsResponse defines model for tenantLookupTenantsResponse.
+type TenantLookupTenantsResponse struct {
+	Tenants *[]TenantTenant `json:"tenants,omitempty"`
+}
+
+// TenantProvisionUserResponse defines model for tenantProvisionUserResponse.
+type TenantProvisionUserResponse struct {
+	Status *string `json:"status,omitempty"`
+}
+
+// TenantTenant defines model for tenantTenant.
+type TenantTenant struct {
+	CreatedAt *string `json:"createdAt,omitempty"`
+	Enabled   *bool   `json:"enabled,omitempty"`
+	Id        *string `json:"id,omitempty"`
+	Name      *string `json:"name,omitempty"`
+}
+
+// TenantTenantInput defines model for tenantTenantInput.
+type TenantTenantInput struct {
+	Enabled *bool   `json:"enabled,omitempty"`
+	Name    *string `json:"name,omitempty"`
+}
+
+// TenantTenantUser defines model for tenantTenantUser.
+type TenantTenantUser struct {
+	Email  *string `json:"email,omitempty"`
+	Role   *string `json:"role,omitempty"`
+	UserId *string `json:"userId,omitempty"`
+}
+
+// TenantUpdateTenantResponse defines model for tenantUpdateTenantResponse.
+type TenantUpdateTenantResponse struct {
+	Tenant *TenantTenant `json:"tenant,omitempty"`
+}
+
+// TenantUpdateTenantUserResponse defines model for tenantUpdateTenantUserResponse.
+type TenantUpdateTenantUserResponse struct {
+	User *TenantTenantUser `json:"user,omitempty"`
+}
+
+// TypesErrorResponse defines model for typesErrorResponse.
+type TypesErrorResponse struct {
+	Message *string `json:"message,omitempty"`
+	Status  *int32  `json:"status,omitempty"`
+}
+
 // TenantServiceListMyTenantsParams defines parameters for TenantServiceListMyTenants.
 type TenantServiceListMyTenantsParams struct {
-	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
-	PageSize  *int32  `form:"page_size,omitempty" json:"page_size,omitempty"`
-
-	// Enabled If set, only return tenants whose enabled status matches this value.
 	Enabled *bool `form:"enabled,omitempty" json:"enabled,omitempty"`
 }
 
 // TenantServiceListTenantsParams defines parameters for TenantServiceListTenants.
 type TenantServiceListTenantsParams struct {
-	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
-	PageSize  *int32  `form:"page_size,omitempty" json:"page_size,omitempty"`
+	PageToken *string `form:"pageToken,omitempty" json:"pageToken,omitempty"`
+	PageSize  *int32  `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 
 	// Enabled If set, only return tenants whose enabled status matches this value.
 	Enabled *bool `form:"enabled,omitempty" json:"enabled,omitempty"`
@@ -84,13 +150,13 @@ type TenantServiceLookupTenantsParams struct {
 	// Email Exactly one of email or identity_id must be provided.
 	// When identity_id is set, the Kratos email-to-identity lookup is skipped.
 	Email      *string `form:"email,omitempty" json:"email,omitempty"`
-	IdentityId *string `form:"identity_id,omitempty" json:"identity_id,omitempty"`
+	IdentityId *string `form:"identityId,omitempty" json:"identityId,omitempty"`
 }
 
 // TenantServiceListTenantUsersParams defines parameters for TenantServiceListTenantUsers.
 type TenantServiceListTenantUsersParams struct {
-	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
-	PageSize  *int32  `form:"page_size,omitempty" json:"page_size,omitempty"`
+	PageToken *string `form:"pageToken,omitempty" json:"pageToken,omitempty"`
+	PageSize  *int32  `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 
 	// Role Exact match on membership role.
 	Role *string `form:"role,omitempty" json:"role,omitempty"`
@@ -100,18 +166,15 @@ type TenantServiceListTenantUsersParams struct {
 	Email *string `form:"email,omitempty" json:"email,omitempty"`
 
 	// IdentityId Exact match on Kratos identity ID. Takes precedence over email when both are set.
-	IdentityId *string `form:"identity_id,omitempty" json:"identity_id,omitempty"`
+	IdentityId *string `form:"identityId,omitempty" json:"identityId,omitempty"`
 
 	// IncludeEmails When true, the response includes email addresses fetched from Kratos.
 	// When false (default), the email field is omitted and the Kratos call is skipped.
-	IncludeEmails *bool `form:"include_emails,omitempty" json:"include_emails,omitempty"`
+	IncludeEmails *bool `form:"includeEmails,omitempty" json:"includeEmails,omitempty"`
 }
 
 // TenantServiceListUserTenantsParams defines parameters for TenantServiceListUserTenants.
 type TenantServiceListUserTenantsParams struct {
-	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
-	PageSize  *int32  `form:"page_size,omitempty" json:"page_size,omitempty"`
-
 	// Enabled If set, only return tenants whose enabled status matches this value.
 	Enabled *bool `form:"enabled,omitempty" json:"enabled,omitempty"`
 }
@@ -130,74 +193,6 @@ type TenantServiceProvisionUserJSONRequestBody = TenantServiceProvisionUserBody
 
 // TenantServiceUpdateTenantUserJSONRequestBody defines body for TenantServiceUpdateTenantUser for application/json ContentType.
 type TenantServiceUpdateTenantUserJSONRequestBody = TenantServiceUpdateTenantUserBody
-
-// Getter for additional properties for ProtobufAny. Returns the specified
-// element and whether it was found
-func (a ProtobufAny) Get(fieldName string) (value interface{}, found bool) {
-	if a.AdditionalProperties != nil {
-		value, found = a.AdditionalProperties[fieldName]
-	}
-	return
-}
-
-// Setter for additional properties for ProtobufAny
-func (a *ProtobufAny) Set(fieldName string, value interface{}) {
-	if a.AdditionalProperties == nil {
-		a.AdditionalProperties = make(map[string]interface{})
-	}
-	a.AdditionalProperties[fieldName] = value
-}
-
-// Override default JSON handling for ProtobufAny to handle AdditionalProperties
-func (a *ProtobufAny) UnmarshalJSON(b []byte) error {
-	object := make(map[string]json.RawMessage)
-	err := json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["@type"]; found {
-		err = json.Unmarshal(raw, &a.Type)
-		if err != nil {
-			return fmt.Errorf("error reading '@type': %w", err)
-		}
-		delete(object, "@type")
-	}
-
-	if len(object) != 0 {
-		a.AdditionalProperties = make(map[string]interface{})
-		for fieldName, fieldBuf := range object {
-			var fieldVal interface{}
-			err := json.Unmarshal(fieldBuf, &fieldVal)
-			if err != nil {
-				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
-			}
-			a.AdditionalProperties[fieldName] = fieldVal
-		}
-	}
-	return nil
-}
-
-// Override default JSON handling for ProtobufAny to handle AdditionalProperties
-func (a ProtobufAny) MarshalJSON() ([]byte, error) {
-	var err error
-	object := make(map[string]json.RawMessage)
-
-	if a.Type != nil {
-		object["@type"], err = json.Marshal(a.Type)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '@type': %w", err)
-		}
-	}
-
-	for fieldName, field := range a.AdditionalProperties {
-		object[fieldName], err = json.Marshal(field)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
-		}
-	}
-	return json.Marshal(object)
-}
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -286,13 +281,13 @@ type ClientInterface interface {
 	// TenantServiceLookupTenants request
 	TenantServiceLookupTenants(ctx context.Context, params *TenantServiceLookupTenantsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// TenantServiceDeleteTenant request
+	TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// TenantServiceUpdateTenantWithBody request with any body
 	TenantServiceUpdateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	TenantServiceUpdateTenant(ctx context.Context, tenantId string, body TenantServiceUpdateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// TenantServiceDeleteTenant request
-	TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TenantServiceInviteMemberWithBody request with any body
 	TenantServiceInviteMemberWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -376,6 +371,18 @@ func (c *Client) TenantServiceLookupTenants(ctx context.Context, params *TenantS
 	return c.Client.Do(req)
 }
 
+func (c *Client) TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServiceDeleteTenantRequest(c.Server, tenantId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) TenantServiceUpdateTenantWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTenantServiceUpdateTenantRequestWithBody(c.Server, tenantId, contentType, body)
 	if err != nil {
@@ -390,18 +397,6 @@ func (c *Client) TenantServiceUpdateTenantWithBody(ctx context.Context, tenantId
 
 func (c *Client) TenantServiceUpdateTenant(ctx context.Context, tenantId string, body TenantServiceUpdateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTenantServiceUpdateTenantRequest(c.Server, tenantId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) TenantServiceDeleteTenant(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewTenantServiceDeleteTenantRequest(c.Server, tenantId)
 	if err != nil {
 		return nil, err
 	}
@@ -530,38 +525,6 @@ func NewTenantServiceListMyTenantsRequest(server string, params *TenantServiceLi
 	if params != nil {
 		queryValues := queryURL.Query()
 
-		if params.PageToken != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_token", runtime.ParamLocationQuery, *params.PageToken); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.PageSize != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_size", runtime.ParamLocationQuery, *params.PageSize); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
 		if params.Enabled != nil {
 
 			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "enabled", runtime.ParamLocationQuery, *params.Enabled); err != nil {
@@ -613,7 +576,7 @@ func NewTenantServiceListTenantsRequest(server string, params *TenantServiceList
 
 		if params.PageToken != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_token", runtime.ParamLocationQuery, *params.PageToken); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageToken", runtime.ParamLocationQuery, *params.PageToken); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -629,7 +592,7 @@ func NewTenantServiceListTenantsRequest(server string, params *TenantServiceList
 
 		if params.PageSize != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_size", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -750,7 +713,7 @@ func NewTenantServiceLookupTenantsRequest(server string, params *TenantServiceLo
 
 		if params.IdentityId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "identity_id", runtime.ParamLocationQuery, *params.IdentityId); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "identityId", runtime.ParamLocationQuery, *params.IdentityId); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -775,6 +738,40 @@ func NewTenantServiceLookupTenantsRequest(server string, params *TenantServiceLo
 	return req, nil
 }
 
+// NewTenantServiceDeleteTenantRequest generates requests for TenantServiceDeleteTenant
+func NewTenantServiceDeleteTenantRequest(server string, tenantId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewTenantServiceUpdateTenantRequest calls the generic TenantServiceUpdateTenant builder with application/json body
 func NewTenantServiceUpdateTenantRequest(server string, tenantId string, body TenantServiceUpdateTenantJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -792,7 +789,7 @@ func NewTenantServiceUpdateTenantRequestWithBody(server string, tenantId string,
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant.id", runtime.ParamLocationPath, tenantId)
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
 	if err != nil {
 		return nil, err
 	}
@@ -822,40 +819,6 @@ func NewTenantServiceUpdateTenantRequestWithBody(server string, tenantId string,
 	return req, nil
 }
 
-// NewTenantServiceDeleteTenantRequest generates requests for TenantServiceDeleteTenant
-func NewTenantServiceDeleteTenantRequest(server string, tenantId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v0/tenants/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewTenantServiceInviteMemberRequest calls the generic TenantServiceInviteMember builder with application/json body
 func NewTenantServiceInviteMemberRequest(server string, tenantId string, body TenantServiceInviteMemberJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -873,7 +836,7 @@ func NewTenantServiceInviteMemberRequestWithBody(server string, tenantId string,
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
 	if err != nil {
 		return nil, err
 	}
@@ -909,7 +872,7 @@ func NewTenantServiceListTenantUsersRequest(server string, tenantId string, para
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
 	if err != nil {
 		return nil, err
 	}
@@ -934,7 +897,7 @@ func NewTenantServiceListTenantUsersRequest(server string, tenantId string, para
 
 		if params.PageToken != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_token", runtime.ParamLocationQuery, *params.PageToken); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageToken", runtime.ParamLocationQuery, *params.PageToken); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -950,7 +913,7 @@ func NewTenantServiceListTenantUsersRequest(server string, tenantId string, para
 
 		if params.PageSize != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_size", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -998,7 +961,7 @@ func NewTenantServiceListTenantUsersRequest(server string, tenantId string, para
 
 		if params.IdentityId != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "identity_id", runtime.ParamLocationQuery, *params.IdentityId); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "identityId", runtime.ParamLocationQuery, *params.IdentityId); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -1014,7 +977,7 @@ func NewTenantServiceListTenantUsersRequest(server string, tenantId string, para
 
 		if params.IncludeEmails != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "include_emails", runtime.ParamLocationQuery, *params.IncludeEmails); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "includeEmails", runtime.ParamLocationQuery, *params.IncludeEmails); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -1056,7 +1019,7 @@ func NewTenantServiceProvisionUserRequestWithBody(server string, tenantId string
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
 	if err != nil {
 		return nil, err
 	}
@@ -1103,14 +1066,14 @@ func NewTenantServiceUpdateTenantUserRequestWithBody(server string, tenantId str
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenantId", runtime.ParamLocationPath, tenantId)
 	if err != nil {
 		return nil, err
 	}
 
 	var pathParam1 string
 
-	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "user_id", runtime.ParamLocationPath, userId)
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "userId", runtime.ParamLocationPath, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -1146,7 +1109,7 @@ func NewTenantServiceListUserTenantsRequest(server string, userId string, params
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "user_id", runtime.ParamLocationPath, userId)
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "userId", runtime.ParamLocationPath, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -1168,38 +1131,6 @@ func NewTenantServiceListUserTenantsRequest(server string, userId string, params
 
 	if params != nil {
 		queryValues := queryURL.Query()
-
-		if params.PageToken != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_token", runtime.ParamLocationQuery, *params.PageToken); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.PageSize != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_size", runtime.ParamLocationQuery, *params.PageSize); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
 
 		if params.Enabled != nil {
 
@@ -1285,13 +1216,13 @@ type ClientWithResponsesInterface interface {
 	// TenantServiceLookupTenantsWithResponse request
 	TenantServiceLookupTenantsWithResponse(ctx context.Context, params *TenantServiceLookupTenantsParams, reqEditors ...RequestEditorFn) (*TenantServiceLookupTenantsResponse, error)
 
+	// TenantServiceDeleteTenantWithResponse request
+	TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error)
+
 	// TenantServiceUpdateTenantWithBodyWithResponse request with any body
 	TenantServiceUpdateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantResponse, error)
 
 	TenantServiceUpdateTenantWithResponse(ctx context.Context, tenantId string, body TenantServiceUpdateTenantJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantResponse, error)
-
-	// TenantServiceDeleteTenantWithResponse request
-	TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error)
 
 	// TenantServiceInviteMemberWithBodyWithResponse request with any body
 	TenantServiceInviteMemberWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceInviteMemberResponse, error)
@@ -1318,7 +1249,10 @@ type ClientWithResponsesInterface interface {
 type TenantServiceListMyTenantsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON200      *TenantListMyTenantsResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1340,7 +1274,10 @@ func (r TenantServiceListMyTenantsResponse) StatusCode() int {
 type TenantServiceListTenantsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON200      *TenantListTenantsResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1362,7 +1299,11 @@ func (r TenantServiceListTenantsResponse) StatusCode() int {
 type TenantServiceCreateTenantResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON201      *TenantCreateTenantResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1384,7 +1325,11 @@ func (r TenantServiceCreateTenantResponse) StatusCode() int {
 type TenantServiceLookupTenantsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON200      *TenantLookupTenantsResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1403,32 +1348,15 @@ func (r TenantServiceLookupTenantsResponse) StatusCode() int {
 	return 0
 }
 
-type TenantServiceUpdateTenantResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
-}
-
-// Status returns HTTPResponse.Status
-func (r TenantServiceUpdateTenantResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r TenantServiceUpdateTenantResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type TenantServiceDeleteTenantResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON200      *TenantDeleteTenantResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSON404      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1447,10 +1375,41 @@ func (r TenantServiceDeleteTenantResponse) StatusCode() int {
 	return 0
 }
 
+type TenantServiceUpdateTenantResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TenantUpdateTenantResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSON404      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r TenantServiceUpdateTenantResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TenantServiceUpdateTenantResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type TenantServiceInviteMemberResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON201      *TenantInviteMemberResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1472,7 +1431,11 @@ func (r TenantServiceInviteMemberResponse) StatusCode() int {
 type TenantServiceListTenantUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON200      *TenantListTenantUsersResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1494,7 +1457,11 @@ func (r TenantServiceListTenantUsersResponse) StatusCode() int {
 type TenantServiceProvisionUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON201      *TenantProvisionUserResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1516,7 +1483,12 @@ func (r TenantServiceProvisionUserResponse) StatusCode() int {
 type TenantServiceUpdateTenantUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON200      *TenantUpdateTenantUserResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSON404      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1538,7 +1510,11 @@ func (r TenantServiceUpdateTenantUserResponse) StatusCode() int {
 type TenantServiceListUserTenantsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSONDefault  *RpcStatus
+	JSON200      *TenantListUserTenantsResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -1601,6 +1577,15 @@ func (c *ClientWithResponses) TenantServiceLookupTenantsWithResponse(ctx context
 	return ParseTenantServiceLookupTenantsResponse(rsp)
 }
 
+// TenantServiceDeleteTenantWithResponse request returning *TenantServiceDeleteTenantResponse
+func (c *ClientWithResponses) TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error) {
+	rsp, err := c.TenantServiceDeleteTenant(ctx, tenantId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTenantServiceDeleteTenantResponse(rsp)
+}
+
 // TenantServiceUpdateTenantWithBodyWithResponse request with arbitrary body returning *TenantServiceUpdateTenantResponse
 func (c *ClientWithResponses) TenantServiceUpdateTenantWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceUpdateTenantResponse, error) {
 	rsp, err := c.TenantServiceUpdateTenantWithBody(ctx, tenantId, contentType, body, reqEditors...)
@@ -1616,15 +1601,6 @@ func (c *ClientWithResponses) TenantServiceUpdateTenantWithResponse(ctx context.
 		return nil, err
 	}
 	return ParseTenantServiceUpdateTenantResponse(rsp)
-}
-
-// TenantServiceDeleteTenantWithResponse request returning *TenantServiceDeleteTenantResponse
-func (c *ClientWithResponses) TenantServiceDeleteTenantWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceDeleteTenantResponse, error) {
-	rsp, err := c.TenantServiceDeleteTenant(ctx, tenantId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseTenantServiceDeleteTenantResponse(rsp)
 }
 
 // TenantServiceInviteMemberWithBodyWithResponse request with arbitrary body returning *TenantServiceInviteMemberResponse
@@ -1710,8 +1686,29 @@ func ParseTenantServiceListMyTenantsResponse(rsp *http.Response) (*TenantService
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantListMyTenantsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1736,8 +1733,29 @@ func ParseTenantServiceListTenantsResponse(rsp *http.Response) (*TenantServiceLi
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantListTenantsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1762,8 +1780,36 @@ func ParseTenantServiceCreateTenantResponse(rsp *http.Response) (*TenantServiceC
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest TenantCreateTenantResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1788,34 +1834,36 @@ func ParseTenantServiceLookupTenantsResponse(rsp *http.Response) (*TenantService
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantLookupTenantsResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSONDefault = &dest
+		response.JSON200 = &dest
 
-	}
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
-	return response, nil
-}
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
-// ParseTenantServiceUpdateTenantResponse parses an HTTP response from a TenantServiceUpdateTenantWithResponse call
-func ParseTenantServiceUpdateTenantResponse(rsp *http.Response) (*TenantServiceUpdateTenantResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
-	response := &TenantServiceUpdateTenantResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1840,8 +1888,104 @@ func ParseTenantServiceDeleteTenantResponse(rsp *http.Response) (*TenantServiceD
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantDeleteTenantResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTenantServiceUpdateTenantResponse parses an HTTP response from a TenantServiceUpdateTenantWithResponse call
+func ParseTenantServiceUpdateTenantResponse(rsp *http.Response) (*TenantServiceUpdateTenantResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TenantServiceUpdateTenantResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantUpdateTenantResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1866,8 +2010,36 @@ func ParseTenantServiceInviteMemberResponse(rsp *http.Response) (*TenantServiceI
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest TenantInviteMemberResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1892,8 +2064,36 @@ func ParseTenantServiceListTenantUsersResponse(rsp *http.Response) (*TenantServi
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantListTenantUsersResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1918,8 +2118,36 @@ func ParseTenantServiceProvisionUserResponse(rsp *http.Response) (*TenantService
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest TenantProvisionUserResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1944,8 +2172,43 @@ func ParseTenantServiceUpdateTenantUserResponse(rsp *http.Response) (*TenantServ
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantUpdateTenantUserResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1970,8 +2233,36 @@ func ParseTenantServiceListUserTenantsResponse(rsp *http.Response) (*TenantServi
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantListUserTenantsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest RpcStatus
+		var dest TypesErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

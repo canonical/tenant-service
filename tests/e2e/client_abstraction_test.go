@@ -272,11 +272,7 @@ func (c *HTTPTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 	// Create update request
 	updateMask := "name"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
-		Tenant: &struct {
-			CreatedAt *string `json:"created_at,omitempty"`
-			Enabled   *bool   `json:"enabled,omitempty"`
-			Name      *string `json:"name,omitempty"`
-		}{
+		Tenant: &httpclient.TenantTenantInput{
 			Name: &name,
 		},
 		UpdateMask: &updateMask,
@@ -331,11 +327,7 @@ func (c *HTTPTenantClient) DisableTenant(ctx context.Context, id string) error {
 	falseVal := false
 	updateMask := "enabled"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
-		Tenant: &struct {
-			CreatedAt *string `json:"created_at,omitempty"`
-			Enabled   *bool   `json:"enabled,omitempty"`
-			Name      *string `json:"name,omitempty"`
-		}{
+		Tenant: &httpclient.TenantTenantInput{
 			Enabled: &falseVal,
 		},
 		UpdateMask: &updateMask,
