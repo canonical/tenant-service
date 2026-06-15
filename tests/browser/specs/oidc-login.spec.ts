@@ -115,7 +115,7 @@ test.describe("OIDC forced re-authentication (max_age=0)", () => {
 
     // Second login with max_age=0 — must re-authenticate
     await startOIDCFlowWithParams(page, { max_age: "0" });
-    await expect(page.getByText("Sign in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
     // Re-auth via Dex again — identifier-first requires email entry
     await enterEmail(page, DEX_USER_EMAIL);

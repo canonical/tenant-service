@@ -33,7 +33,7 @@ cd "$REPO_ROOT"
 # --- Configuration ---
 LOGIN_UI_IMAGE="${LOGIN_UI_IMAGE:-identity-platform-login-ui:dev}"
 LOGIN_UI_BINARY="${LOGIN_UI_BINARY:-}"
-HYDRA_IMAGE="ghcr.io/canonical/hydra:2.3.0-canonical"
+HYDRA_IMAGE="ghcr.io/canonical/hydra:25.4.0"
 OIDC_CONTAINER_NAME="oidc_client_test"
 DSN="postgres://tenants:tenants@127.0.0.1:5432/tenants"
 OPENFGA_API_TOKEN="42"
