@@ -11,12 +11,11 @@ import (
 	"net/http"
 	"strings"
 
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	httpclient "github.com/canonical/tenant-service/client/http"
-	v0 "github.com/canonical/tenant-service/v0"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type httpTenantClient struct {
@@ -30,7 +29,6 @@ func newHTTPTenantClient(endpoint string) v0.TenantServiceClient {
 	if !strings.HasPrefix(endpoint, "http") {
 		endpoint = "http://" + endpoint
 	}
-	// remove trailing slash
 	endpoint = strings.TrimSuffix(endpoint, "/")
 
 	opts := []httpclient.ClientOption{}
@@ -83,7 +81,13 @@ func (c *httpTenantClient) handleRequest(resp *http.Response, err error, out pro
 
 func (c *httpTenantClient) ListMyTenants(ctx context.Context, in *v0.ListMyTenantsRequest, opts ...grpc.CallOption) (*v0.ListMyTenantsResponse, error) {
 	out := new(v0.ListMyTenantsResponse)
-	resp, err := c.client.TenantServiceListMyTenants(ctx, &httpclient.TenantServiceListMyTenantsParams{})
+	params := &httpclient.TenantServiceListMyTenantsParams{}
+	if in != nil {
+		if in.Enabled != nil {
+			params.Enabled = in.Enabled
+		}
+	}
+	resp, err := c.client.TenantServiceListMyTenants(ctx, params)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -92,7 +96,21 @@ func (c *httpTenantClient) ListMyTenants(ctx context.Context, in *v0.ListMyTenan
 
 func (c *httpTenantClient) ListTenants(ctx context.Context, in *v0.ListTenantsRequest, opts ...grpc.CallOption) (*v0.ListTenantsResponse, error) {
 	out := new(v0.ListTenantsResponse)
-	resp, err := c.client.TenantServiceListTenants(ctx, &httpclient.TenantServiceListTenantsParams{})
+	params := &httpclient.TenantServiceListTenantsParams{}
+	if in != nil {
+		if in.PageToken != "" {
+			pageToken := in.PageToken
+			params.PageToken = &pageToken
+		}
+		if in.PageSize > 0 {
+			pageSize := in.PageSize
+			params.PageSize = &pageSize
+		}
+		if in.Enabled != nil {
+			params.Enabled = in.Enabled
+		}
+	}
+	resp, err := c.client.TenantServiceListTenants(ctx, params)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -105,7 +123,7 @@ func (c *httpTenantClient) InviteMember(ctx context.Context, in *v0.InviteMember
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	resp, err := c.client.TenantServiceInviteMemberWithBody(ctx, in.TenantId, "application/json", bytes.NewReader(bodyBytes))
+	resp, err := c.client.TenantServiceInviteMemberWithBody(ctx, in.GetTenantId(), "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -114,7 +132,13 @@ func (c *httpTenantClient) InviteMember(ctx context.Context, in *v0.InviteMember
 
 func (c *httpTenantClient) ListUserTenants(ctx context.Context, in *v0.ListUserTenantsRequest, opts ...grpc.CallOption) (*v0.ListUserTenantsResponse, error) {
 	out := new(v0.ListUserTenantsResponse)
-	resp, err := c.client.TenantServiceListUserTenants(ctx, in.UserId, &httpclient.TenantServiceListUserTenantsParams{})
+	params := &httpclient.TenantServiceListUserTenantsParams{}
+	if in != nil {
+		if in.Enabled != nil {
+			params.Enabled = in.Enabled
+		}
+	}
+	resp, err := c.client.TenantServiceListUserTenants(ctx, in.GetUserId(), params)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -136,25 +160,23 @@ func (c *httpTenantClient) CreateTenant(ctx context.Context, in *v0.CreateTenant
 
 func (c *httpTenantClient) UpdateTenant(ctx context.Context, in *v0.UpdateTenantRequest, opts ...grpc.CallOption) (*v0.UpdateTenantResponse, error) {
 	out := new(v0.UpdateTenantResponse)
+	if in.Tenant == nil {
+		return nil, fmt.Errorf("tenant is required")
+	}
 	bodyBytes, err := protojson.Marshal(in)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	// Assuming in.Tenant is not nil. If it is, this will panic or we should check.
-	// The generated client expects tenant.id from the path parameter.
-	if in.Tenant == nil {
-		return nil, fmt.Errorf("tenant is required")
-	}
-	resp, err := c.client.TenantServiceUpdateTenantWithBody(ctx, in.Tenant.Id, "application/json", bytes.NewReader(bodyBytes))
+	resp, err := c.client.TenantServiceUpdateTenantWithBody(ctx, in.GetTenantId(), "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *httpTenantClient) DeleteTenant(ctx context.Context, in *v0.DeleteTenantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
-	resp, err := c.client.TenantServiceDeleteTenant(ctx, in.TenantId)
+func (c *httpTenantClient) DeleteTenant(ctx context.Context, in *v0.DeleteTenantRequest, opts ...grpc.CallOption) (*v0.DeleteTenantResponse, error) {
+	out := new(v0.DeleteTenantResponse)
+	resp, err := c.client.TenantServiceDeleteTenant(ctx, in.GetTenantId())
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -167,7 +189,7 @@ func (c *httpTenantClient) ProvisionUser(ctx context.Context, in *v0.ProvisionUs
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	resp, err := c.client.TenantServiceProvisionUserWithBody(ctx, in.TenantId, "application/json", bytes.NewReader(bodyBytes))
+	resp, err := c.client.TenantServiceProvisionUserWithBody(ctx, in.GetTenantId(), "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -176,7 +198,31 @@ func (c *httpTenantClient) ProvisionUser(ctx context.Context, in *v0.ProvisionUs
 
 func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenantUsersRequest, opts ...grpc.CallOption) (*v0.ListTenantUsersResponse, error) {
 	out := new(v0.ListTenantUsersResponse)
-	resp, err := c.client.TenantServiceListTenantUsers(ctx, in.TenantId, &httpclient.TenantServiceListTenantUsersParams{})
+	params := &httpclient.TenantServiceListTenantUsersParams{}
+	if in != nil {
+		if in.PageToken != "" {
+			pageToken := in.PageToken
+			params.PageToken = &pageToken
+		}
+		if in.PageSize > 0 {
+			pageSize := in.PageSize
+			params.PageSize = &pageSize
+		}
+		if in.Role != nil {
+			params.Role = in.Role
+		}
+		if in.Email != nil {
+			params.Email = in.Email
+		}
+		if in.IdentityId != nil {
+			params.IdentityId = in.IdentityId
+		}
+		if in.IncludeEmails {
+			includeEmails := in.IncludeEmails
+			params.IncludeEmails = &includeEmails
+		}
+	}
+	resp, err := c.client.TenantServiceListTenantUsers(ctx, in.GetTenantId(), params)
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
@@ -184,9 +230,34 @@ func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenan
 }
 
 func (c *httpTenantClient) UpdateTenantUser(ctx context.Context, in *v0.UpdateTenantUserRequest, opts ...grpc.CallOption) (*v0.UpdateTenantUserResponse, error) {
-	return nil, fmt.Errorf("method UpdateTenantUser not implemented in HTTP client")
+	out := new(v0.UpdateTenantUserResponse)
+	bodyBytes, err := protojson.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+	resp, err := c.client.TenantServiceUpdateTenantUserWithBody(ctx, in.GetTenantId(), in.GetUserId(), "application/json", bytes.NewReader(bodyBytes))
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *httpTenantClient) LookupTenants(ctx context.Context, in *v0.LookupTenantsRequest, opts ...grpc.CallOption) (*v0.LookupTenantsResponse, error) {
-	return nil, fmt.Errorf("method LookupTenants not implemented in HTTP client")
+	out := new(v0.LookupTenantsResponse)
+	params := &httpclient.TenantServiceLookupTenantsParams{}
+	if in != nil {
+		if in.Email != "" {
+			email := in.Email
+			params.Email = &email
+		}
+		if in.IdentityId != "" {
+			identityID := in.IdentityId
+			params.IdentityId = &identityID
+		}
+	}
+	resp, err := c.client.TenantServiceLookupTenants(ctx, params)
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

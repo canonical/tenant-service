@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"buf.build/go/protovalidate"
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
@@ -28,7 +29,6 @@ import (
 	"github.com/canonical/tenant-service/pkg/authentication"
 	"github.com/canonical/tenant-service/pkg/tenant"
 	"github.com/canonical/tenant-service/pkg/web"
-	v0 "github.com/canonical/tenant-service/v0"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -179,7 +179,9 @@ func serve() error {
 
 	grpcServer := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.UnaryInterceptor(authMiddleware.GRPCInterceptor),
+		grpc.UnaryInterceptor(authMiddleware.GRPCInterceptorExcluding(
+			"/identity.platform.api.tenant.TenantService/LookupTenants",
+		)),
 	)
 	v0.RegisterTenantServiceServer(grpcServer, tenantHandler)
 

@@ -50,7 +50,7 @@ func TestService_ListTenantsByUserID(t *testing.T) {
 		{
 			name: "success",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return(expectedTenants, "", nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return(expectedTenants, nil)
 			},
 			expectedTenants: expectedTenants,
 			expectedErr:     nil,
@@ -58,7 +58,7 @@ func TestService_ListTenantsByUserID(t *testing.T) {
 		{
 			name: "empty result",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return([]*types.Tenant{}, "", nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return([]*types.Tenant{}, nil)
 			},
 			expectedTenants: []*types.Tenant{},
 			expectedErr:     nil,
@@ -66,7 +66,7 @@ func TestService_ListTenantsByUserID(t *testing.T) {
 		{
 			name: "storage error",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return(nil, "", dbErr)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), userID, gomock.Any()).Return(nil, dbErr)
 			},
 			expectedTenants: nil,
 			expectedErr:     dbErr,
@@ -91,7 +91,7 @@ func TestService_ListTenantsByUserID(t *testing.T) {
 			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Service.ListTenantsByUserID").Return(context.Background(), trace.SpanFromContext(context.Background()))
 			tc.setupMocks(mockStorage)
 
-			tenants, _, err := s.ListTenantsByUserID(context.Background(), userID)
+			tenants, err := s.ListTenantsByUserID(context.Background(), userID)
 
 			if tc.expectedErr != nil {
 				if !errors.Is(err, tc.expectedErr) {
@@ -847,7 +847,7 @@ func TestService_LookupTenantsByEmail(t *testing.T) {
 			name: "success - email found with active tenants",
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(expectedTenants, "", nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(expectedTenants, nil)
 			},
 			expectedLen: 1,
 		},
@@ -869,7 +869,7 @@ func TestService_LookupTenantsByEmail(t *testing.T) {
 			name: "error - storage error on list active tenants",
 			setupMocks: func(mockStorage *MockStorageInterface, mockKratos *MockKratosClientInterface) {
 				mockKratos.EXPECT().GetIdentityIDByEmail(gomock.Any(), email).Return(identityID, nil)
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(nil, "", errors.New("db error"))
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(nil, errors.New("db error"))
 			},
 			expectedErr: true,
 		},
@@ -926,21 +926,21 @@ func TestService_LookupTenantsByIdentityID(t *testing.T) {
 		{
 			name: "success - active tenants found",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(expectedTenants, "", nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(expectedTenants, nil)
 			},
 			expectedLen: 1,
 		},
 		{
 			name: "success - no tenants",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return([]*types.Tenant{}, "", nil)
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return([]*types.Tenant{}, nil)
 			},
 			expectedLen: 0,
 		},
 		{
 			name: "error - storage failure",
 			setupMocks: func(mockStorage *MockStorageInterface) {
-				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(nil, "", errors.New("db error"))
+				mockStorage.EXPECT().ListTenantsByUserID(gomock.Any(), identityID, gomock.Any()).Return(nil, errors.New("db error"))
 			},
 			expectedErr: true,
 		},

@@ -115,7 +115,7 @@ test.describe("forced re-authentication (max_age=0)", () => {
 
     // Second login with max_age=0 — must re-authenticate (password + TOTP)
     await startOIDCFlowWithParams(page, { max_age: "0" });
-    await expect(page.getByText("Sign in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await loginWithPassword(page, email, PASSWORD);
     await submitTotpCode(page, secret);
     await expectOIDCFlowComplete(page);
@@ -174,7 +174,7 @@ test.describe("MFA enforcement", () => {
 
     // Second login with max_age=0 — full re-auth including MFA
     await startOIDCFlowWithParams(page, { max_age: "0" });
-    await expect(page.getByText("Sign in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await loginWithPassword(page, email, PASSWORD);
     await submitTotpCode(page, secret);
     await expectOIDCFlowComplete(page);

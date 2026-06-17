@@ -60,18 +60,18 @@ func (s *Service) recordError(span trace.Span, msg string, err error, keysAndVal
 	s.logger.Errorw(msg, append(keysAndValues, "error", err)...)
 }
 
-func (s *Service) ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, string, error) {
+func (s *Service) ListTenantsByUserID(ctx context.Context, userID string, opts ...types.ListOption) ([]*types.Tenant, error) {
 	ctx, span := s.tracer.Start(ctx, "tenant.Service.ListTenantsByUserID")
 	defer span.End()
 
 	s.logger.Debugw("listing tenants for user", "user_id", userID)
 
-	tenants, nextPageToken, err := s.storage.ListTenantsByUserID(ctx, userID, opts...)
+	tenants, err := s.storage.ListTenantsByUserID(ctx, userID, opts...)
 	if err != nil {
 		s.recordError(span, "failed to list tenants for user", err, "user_id", userID)
-		return nil, "", err
+		return nil, err
 	}
-	return tenants, nextPageToken, nil
+	return tenants, nil
 }
 
 func (s *Service) ListTenants(ctx context.Context, opts ...types.ListOption) ([]*types.Tenant, string, error) {
@@ -547,7 +547,7 @@ func (s *Service) LookupTenantsByEmail(ctx context.Context, email string) ([]*ty
 		return []*types.Tenant{}, nil
 	}
 
-	tenants, _, err := s.storage.ListTenantsByUserID(ctx, identityID, types.WithEnabled(true))
+	tenants, err := s.storage.ListTenantsByUserID(ctx, identityID, types.WithEnabled(true))
 	if err != nil {
 		s.recordError(span, "failed to list active tenants for identity", err, "email", email, "identity_id", identityID)
 		return nil, fmt.Errorf("failed to list tenants: %w", err)
@@ -566,7 +566,7 @@ func (s *Service) LookupTenantsByIdentityID(ctx context.Context, identityID stri
 
 	s.logger.Debugw("looking up tenants by identity ID")
 
-	tenants, _, err := s.storage.ListTenantsByUserID(ctx, identityID, types.WithEnabled(true))
+	tenants, err := s.storage.ListTenantsByUserID(ctx, identityID, types.WithEnabled(true))
 	if err != nil {
 		s.recordError(span, "failed to list active tenants for identity", err, "identity_id", identityID)
 		return nil, fmt.Errorf("failed to list tenants: %w", err)

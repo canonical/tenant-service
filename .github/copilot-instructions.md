@@ -3,7 +3,7 @@
 ## Project Overview
 
 This is the Tenant Service for the Identity Platform, providing authorization-aware tenant management.
-- **API**: gRPC with HTTP/JSON gateway (defined in `api/proto/v0/tenant.proto`).
+- **API**: gRPC with HTTP/JSON gateway. Contract and generated artifacts are owned by https://github.com/canonical/identity-platform-api.
 - **Authorization**: Fine-grained authorization via OpenFGA (see `internal/authorization`).
 - **Database**: PostgreSQL with `pressly/goose` for migrations.
 - **Observability**: OpenTelemetry tracing and Prometheus metrics.
@@ -11,7 +11,7 @@ This is the Tenant Service for the Identity Platform, providing authorization-aw
 ## Architecture
 
 ### Core Components
-- **API Layer**: `api/proto/v0/` defines the contract. `pkg/web/router.go` wires handlers.
+- **API Layer**: Proto contracts, gRPC stubs, and OpenAPI-generated clients are sourced from https://github.com/canonical/identity-platform-api. `pkg/web/router.go` wires handlers.
 - **Handler Layer**: `pkg/<domain>/handlers.go` implements the gRPC server interface.
   - Validates request parameters.
   - Calls the Service layer.
@@ -40,6 +40,10 @@ This is the Tenant Service for the Identity Platform, providing authorization-aw
 ## Development Workflows
 
 ### Build & Test
+- **API Contracts/Clients Ownership**:
+  - Do not add or modify proto contracts in this repository.
+  - Do not hand-edit generated gRPC/OpenAPI code in this repository.
+  - Make contract/generated-client changes in https://github.com/canonical/identity-platform-api, then update this service to consume the new version.
 - **Mock Generation**: `make mocks` (using `go.uber.org/mock/mockgen`).
   - Run this after changing any `interfaces.go`.
 - **Testing**: `make test`.

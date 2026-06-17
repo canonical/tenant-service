@@ -7,20 +7,21 @@ import (
 	"context"
 	"errors"
 	"net/mail"
+	"slices"
+	"strings"
 	"time"
 
 	"buf.build/go/protovalidate"
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
-	v0 "github.com/canonical/tenant-service/v0"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func tenantToProto(t *types.Tenant) *v0.Tenant {
@@ -74,6 +75,15 @@ func (h *Handler) InviteMember(ctx context.Context, req *v0.InviteMemberRequest)
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
+	}
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid email: %v", err)
+	}
+	if strings.TrimSpace(req.Role) == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "role is required")
+	}
 
 	link, code, err := h.service.InviteMember(ctx, req.TenantId, req.Email, req.Role)
 	if err != nil {
@@ -108,22 +118,18 @@ func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsReques
 		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 	}
 
-	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
+	opts := []types.ListOption{}
 	if req.Enabled != nil {
 		opts = append(opts, types.WithEnabled(*req.Enabled))
 	}
-	tenants, nextPageToken, err := h.service.ListTenantsByUserID(ctx, userID, opts...)
+	tenants, err := h.service.ListTenantsByUserID(ctx, userID, opts...)
 	if err != nil {
-		if errors.Is(err, storage.ErrInvalidPageToken) {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
-		}
 		h.logger.Errorw("failed to list tenants", "user_id", userID, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list tenants: %v", err)
 	}
 
 	return &v0.ListMyTenantsResponse{
-		Tenants:       tenantsToProto(tenants),
-		NextPageToken: nextPageToken,
+		Tenants: tenantsToProto(tenants),
 	}, nil
 }
 
@@ -161,6 +167,9 @@ func (h *Handler) CreateTenant(ctx context.Context, req *v0.CreateTenantRequest)
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
+	if strings.TrimSpace(req.Name) == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "name is required")
+	}
 
 	tenant, err := h.service.CreateTenant(ctx, req.Name)
 	if err != nil {
@@ -180,22 +189,33 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
+	}
 
-	// If update_mask is provided, use it. Otherwise, assume full update (or at least name and enabled).
-	var paths []string
-	if req.UpdateMask != nil {
-		paths = req.UpdateMask.Paths
+	for _, p := range req.UpdateMask.Paths {
+		if p != "name" && p != "enabled" {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid update_mask path: %s", p)
+		}
+	}
+	if slices.Contains(req.UpdateMask.Paths, "name") && strings.TrimSpace(req.Tenant.Name) == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "name is required when included in update_mask")
+	}
+	if slices.Contains(req.UpdateMask.Paths, "enabled") && req.Tenant.Enabled == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "enabled is required when included in update_mask")
 	}
 
 	updateData := &types.Tenant{
-		ID:      req.Tenant.Id, // From URL usually
-		Name:    req.Tenant.Name,
-		Enabled: req.Tenant.Enabled,
+		ID:   req.TenantId,
+		Name: req.Tenant.Name,
+	}
+	if req.Tenant.Enabled != nil {
+		updateData.Enabled = *req.Tenant.Enabled
 	}
 
-	tenant, err := h.service.UpdateTenant(ctx, updateData, paths)
+	tenant, err := h.service.UpdateTenant(ctx, updateData, req.UpdateMask.Paths)
 	if err != nil {
-		h.logger.Errorw("failed to update tenant", "tenant_id", req.Tenant.Id, "error", err)
+		h.logger.Errorw("failed to update tenant", "tenant_id", req.TenantId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to update tenant: %v", err)
 	}
 
@@ -204,12 +224,15 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 	}, nil
 }
 
-func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest) (*emptypb.Empty, error) {
+func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest) (*v0.DeleteTenantResponse, error) {
 	ctx, span := h.tracer.Start(ctx, "tenant.Handler.DeleteTenant")
 	defer span.End()
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	if err := h.service.DeleteTenant(ctx, req.TenantId); err != nil {
@@ -217,7 +240,7 @@ func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest)
 		return nil, status.Errorf(codes.Internal, "failed to delete tenant: %v", err)
 	}
 
-	return &emptypb.Empty{}, nil
+	return &v0.DeleteTenantResponse{Status: 0}, nil
 }
 
 func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserRequest) (*v0.ProvisionUserResponse, error) {
@@ -226,6 +249,9 @@ func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserReques
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	if err := h.service.ProvisionUser(ctx, req.TenantId, req.Email, req.Role); err != nil {
@@ -249,6 +275,12 @@ func (h *Handler) UpdateTenantUser(ctx context.Context, req *v0.UpdateTenantUser
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
+	}
+	if _, err := uuid.Parse(req.UserId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: must be a valid UUID")
 	}
 
 	user, err := h.service.UpdateTenantUser(ctx, req.TenantId, req.UserId, req.Role)
@@ -278,23 +310,22 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
+	if _, err := uuid.Parse(req.UserId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: must be a valid UUID")
+	}
 
-	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
+	opts := []types.ListOption{}
 	if req.Enabled != nil {
 		opts = append(opts, types.WithEnabled(*req.Enabled))
 	}
-	tenants, nextPageToken, err := h.service.ListTenantsByUserID(ctx, req.UserId, opts...)
+	tenants, err := h.service.ListTenantsByUserID(ctx, req.UserId, opts...)
 	if err != nil {
-		if errors.Is(err, storage.ErrInvalidPageToken) {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid page token")
-		}
 		h.logger.Errorw("failed to list user tenants", "user_id", req.UserId, "error", err)
 		return nil, status.Errorf(codes.Internal, "failed to list user tenants: %v", err)
 	}
 
 	return &v0.ListUserTenantsResponse{
-		Tenants:       tenantsToProto(tenants),
-		NextPageToken: nextPageToken,
+		Tenants: tenantsToProto(tenants),
 	}, nil
 }
 
@@ -304,6 +335,9 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}

@@ -300,7 +300,7 @@ test.describe("forced re-authentication (max_age=0)", () => {
 
     // Second login with max_age=0 — must re-authenticate (password + TOTP)
     await startOIDCFlowWithParams(page, { max_age: "0" });
-    await expect(page.getByText("Sign in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await loginWithPassword(page, email, PASSWORD);
     await submitTotpCode(page, secret);
     await expectOIDCFlowComplete(page);
@@ -317,7 +317,7 @@ test.describe("forced re-authentication (max_age=0)", () => {
     await expectOIDCFlowComplete(page);
 
     await startOIDCFlowWithParams(page, { max_age: "0" });
-    await expect(page.getByText("Sign in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await loginWithPassword(page, email, PASSWORD);
     await submitTotpCode(page, secret);
     // Single tenant → auto-selected after re-auth
@@ -344,7 +344,7 @@ test.describe("forced re-authentication (max_age=0)", () => {
 
     // Second login with max_age=0 — must re-authenticate AND re-select tenant
     await startOIDCFlowWithParams(page, { max_age: "0" });
-    await expect(page.getByText("Sign in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await enterEmail(page, email);
     await expect(page.getByText("Select a tenant")).toBeVisible();
     await page.getByRole("button", { name: "ReAuth Beta" }).click();
@@ -458,7 +458,7 @@ test.describe("MFA enforcement", () => {
 
     // Second login with max_age=0: email → tenant → password → TOTP
     await startOIDCFlowWithParams(page, { max_age: "0" });
-    await expect(page.getByText("Sign in")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await enterEmail(page, email);
     await expect(page.getByText("Select a tenant")).toBeVisible();
     await page.getByRole("button", { name: "MFA ReAuth Beta" }).click();

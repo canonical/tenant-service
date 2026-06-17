@@ -153,14 +153,14 @@ func (s *Storage) ListTenants(ctx context.Context, options ...types.ListOption) 
 	return tenants, nextPageToken, nil
 }
 
-func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, options ...types.ListOption) (tenants []*types.Tenant, token string, err error) {
+func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, options ...types.ListOption) (tenants []*types.Tenant, err error) {
 	defer func(start time.Time) { s.recordLatencyFor("ListTenantsByUserID", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.ListTenantsByUserID")
 	defer span.End()
 
-	pageSize, cursorID, opts, err := resolveListOptions(options)
+	_, _, opts, err := resolveListOptions(options)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	query := s.db.Statement(ctx).
@@ -168,19 +168,15 @@ func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, option
 		From("tenants t").
 		Join("memberships m ON t.id = m.tenant_id").
 		Where(sq.Eq{"m.kratos_identity_id": userID}).
-		OrderBy("t.id").
-		Limit(pageSize + 1)
+		OrderBy("t.id")
 
-	if cursorID != "" {
-		query = query.Where(sq.Gt{"t.id": cursorID})
-	}
 	if opts.Enabled != nil {
 		query = query.Where(sq.Eq{"t.enabled": *opts.Enabled})
 	}
 
 	rows, err := query.QueryContext(ctx)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to list tenants: %w", err)
+		return nil, fmt.Errorf("failed to list tenants: %w", err)
 	}
 	defer rows.Close()
 
@@ -188,22 +184,16 @@ func (s *Storage) ListTenantsByUserID(ctx context.Context, userID string, option
 	for rows.Next() {
 		var t types.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.Enabled); err != nil {
-			return nil, "", fmt.Errorf("failed to scan tenant: %w", err)
+			return nil, fmt.Errorf("failed to scan tenant: %w", err)
 		}
 		tenants = append(tenants, &t)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, "", fmt.Errorf("rows iteration error: %w", err)
+		return nil, fmt.Errorf("rows iteration error: %w", err)
 	}
 
-	var nextPageToken string
-	if uint64(len(tenants)) > pageSize {
-		nextPageToken = encodePageToken(tenants[pageSize-1].ID)
-		tenants = tenants[:pageSize]
-	}
-
-	return tenants, nextPageToken, nil
+	return tenants, nil
 }
 
 func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, options ...types.ListOption) (memberships []*types.Membership, token string, err error) {

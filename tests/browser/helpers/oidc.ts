@@ -34,7 +34,7 @@ export async function startOIDCFlow(page: Page): Promise<void> {
   const url = await buildAuthorizeUrl(page, {});
   await page.goto(url);
   // Wait until the login form is visible (identifier-first: email field)
-  await expect(page.getByText("Sign in")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 }
 
 /**

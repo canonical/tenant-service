@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"buf.build/go/protovalidate"
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
-	v0 "github.com/canonical/tenant-service/v0"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
@@ -168,29 +168,19 @@ func TestHandler_ListMyTenants(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		ctx               context.Context
-		setupMocks        func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr           bool
-		wantCode          codes.Code
-		wantNextPageToken string
+		name       string
+		ctx        context.Context
+		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
+		wantErr    bool
+		wantCode   codes.Code
 	}{
 		{
 			name: "success",
 			ctx:  authentication.WithUserID(context.Background(), "user-123"),
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123", gomock.Any()).Return(tenants, "", nil)
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123").Return(tenants, nil)
 			},
 			wantErr: false,
-		},
-		{
-			name: "success with next page token",
-			ctx:  authentication.WithUserID(context.Background(), "user-123"),
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123", gomock.Any()).Return(tenants, "next-token-abc", nil)
-			},
-			wantErr:           false,
-			wantNextPageToken: "next-token-abc",
 		},
 		{
 			name:       "unauthenticated",
@@ -203,7 +193,7 @@ func TestHandler_ListMyTenants(t *testing.T) {
 			name: "service error",
 			ctx:  authentication.WithUserID(context.Background(), "user-123"),
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123", gomock.Any()).Return(nil, "", errors.New("service error"))
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "user-123").Return(nil, errors.New("service error"))
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
@@ -243,9 +233,6 @@ func TestHandler_ListMyTenants(t *testing.T) {
 				}
 				if resp == nil || len(resp.Tenants) != len(tenants) {
 					t.Errorf("expected %d tenants, got %v", len(tenants), resp)
-				}
-				if resp != nil && resp.NextPageToken != tt.wantNextPageToken {
-					t.Errorf("expected NextPageToken %q, got %q", tt.wantNextPageToken, resp.NextPageToken)
 				}
 			}
 		})
@@ -416,13 +403,59 @@ func TestHandler_UpdateTenant(t *testing.T) {
 		{
 			name: "success",
 			request: &v0.UpdateTenantRequest{
-				Tenant:     &v0.Tenant{Id: "11111111-1111-1111-1111-111111111111", Name: "Updated", Enabled: true},
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Name: "Updated", Enabled: new(true)},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().UpdateTenant(gomock.Any(), gomock.Any(), []string{"name"}).Return(tenant, nil)
 			},
 			wantErr: false,
+		},
+		{
+			name: "success enabled-only patch",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Enabled: new(false)},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
+				mockSvc.EXPECT().UpdateTenant(gomock.Any(), gomock.Any(), []string{"enabled"}).Return(tenant, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid mask path",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Name: "Updated", Enabled: new(true)},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"foo"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
+		},
+		{
+			name: "enabled missing when enabled in mask",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Name: "Updated"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
+		},
+		{
+			name: "name missing when name in mask",
+			request: &v0.UpdateTenantRequest{
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Enabled: new(true)},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
+			wantErr:    true,
+			wantCode:   codes.InvalidArgument,
 		},
 		{
 			name:       "missing tenant",
@@ -434,7 +467,9 @@ func TestHandler_UpdateTenant(t *testing.T) {
 		{
 			name: "service error",
 			request: &v0.UpdateTenantRequest{
-				Tenant: &v0.Tenant{Id: "11111111-1111-1111-1111-111111111111", Name: "Updated"},
+				TenantId:   "11111111-1111-1111-1111-111111111111",
+				Tenant:     &v0.TenantInput{Name: "Updated", Enabled: new(true)},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().UpdateTenant(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("service error"))
@@ -730,35 +765,25 @@ func TestHandler_ListUserTenants(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		request           *v0.ListUserTenantsRequest
-		setupMocks        func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr           bool
-		wantCode          codes.Code
-		wantNextPageToken string
+		name       string
+		request    *v0.ListUserTenantsRequest
+		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
+		wantErr    bool
+		wantCode   codes.Code
 	}{
 		{
 			name:    "success",
 			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "", nil)
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, nil)
 			},
 			wantErr: false,
-		},
-		{
-			name:    "success with next page token",
-			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(tenants, "next-token-usr", nil)
-			},
-			wantErr:           false,
-			wantNextPageToken: "next-token-usr",
 		},
 		{
 			name:    "service error",
 			request: &v0.ListUserTenantsRequest{UserId: "22222222-2222-2222-2222-222222222222"},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(nil, "", errors.New("service error"))
+				mockSvc.EXPECT().ListTenantsByUserID(gomock.Any(), "22222222-2222-2222-2222-222222222222", gomock.Any()).Return(nil, errors.New("service error"))
 			},
 			wantErr: true,
 		},
@@ -804,9 +829,6 @@ func TestHandler_ListUserTenants(t *testing.T) {
 				}
 				if resp == nil {
 					t.Error("expected response but got nil")
-				}
-				if resp != nil && resp.NextPageToken != tt.wantNextPageToken {
-					t.Errorf("expected NextPageToken %q, got %q", tt.wantNextPageToken, resp.NextPageToken)
 				}
 			}
 		})

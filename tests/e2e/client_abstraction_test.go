@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	httpclient "github.com/canonical/tenant-service/client/http"
-	v0 "github.com/canonical/tenant-service/v0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -269,14 +269,9 @@ func (c *HTTPTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 		return err
 	}
 
-	// Create update request
 	updateMask := "name"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
-		Tenant: &struct {
-			CreatedAt *string `json:"created_at,omitempty"`
-			Enabled   *bool   `json:"enabled,omitempty"`
-			Name      *string `json:"name,omitempty"`
-		}{
+		Tenant: &httpclient.TenantTenantInput{
 			Name: &name,
 		},
 		UpdateMask: &updateMask,
@@ -331,11 +326,7 @@ func (c *HTTPTenantClient) DisableTenant(ctx context.Context, id string) error {
 	falseVal := false
 	updateMask := "enabled"
 	updateReq := httpclient.TenantServiceUpdateTenantJSONRequestBody{
-		Tenant: &struct {
-			CreatedAt *string `json:"created_at,omitempty"`
-			Enabled   *bool   `json:"enabled,omitempty"`
-			Name      *string `json:"name,omitempty"`
-		}{
+		Tenant: &httpclient.TenantTenantInput{
 			Enabled: &falseVal,
 		},
 		UpdateMask: &updateMask,
@@ -669,9 +660,9 @@ func (c *GRPCTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 	}
 
 	resp, err := c.client.ListTenantUsers(authCtx, &v0.ListTenantUsersRequest{
-		TenantId:     tenantID,
-		PageToken:    pageToken,
-		PageSize:     pageSize,
+		TenantId:      tenantID,
+		PageToken:     pageToken,
+		PageSize:      pageSize,
 		IncludeEmails: true,
 	})
 	if err != nil {
@@ -761,10 +752,8 @@ func (c *GRPCTenantClient) UpdateTenant(ctx context.Context, id, name string) er
 	}
 
 	_, err = c.client.UpdateTenant(authCtx, &v0.UpdateTenantRequest{
-		Tenant: &v0.Tenant{
-			Id:   id,
-			Name: name,
-		},
+		TenantId:   id,
+		Tenant:     &v0.TenantInput{Name: name},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 	})
 	return err
@@ -788,9 +777,9 @@ func (c *GRPCTenantClient) DisableTenant(ctx context.Context, id string) error {
 		return err
 	}
 
-	falseVal := false
 	_, err = c.client.UpdateTenant(authCtx, &v0.UpdateTenantRequest{
-		Tenant:     &v0.Tenant{Id: id, Enabled: falseVal},
+		TenantId:   id,
+		Tenant:     &v0.TenantInput{Enabled: new(false)},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"enabled"}},
 	})
 	return err

@@ -60,6 +60,7 @@ test_source.json
 
 ### Go Patch ###
 /vendor/
+/tests/e2e/vendor/
 /Godeps/
 
 # gomocks auto-generated
@@ -68,3 +69,13 @@ test_source.json
 # go binary name
 app
 log.txt
+
+/.github/agents/
+/.github/prompts/
+/.github/skills/
+
+# OpenSpec archives only
+openspec/changes/archive/
+
+# Local OpenAPI source used only for client generation (fetched in Makefile)
+openapi/openapi.yaml
