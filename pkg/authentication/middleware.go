@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	otelcodes "go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
@@ -66,12 +67,48 @@ func (m *Middleware) GRPCInterceptor(ctx context.Context, req interface{}, info 
 	ctx, span := m.tracer.Start(ctx, "authentication.Middleware.GRPCInterceptor")
 	defer span.End()
 
+	ctx, err := m.authenticateGRPC(ctx, span)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := handler(ctx, req)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
+	}
+	return resp, err
+}
+
+// GRPCStreamInterceptor is a streaming interceptor for gRPC authentication.
+// It authenticates the bearer token from the stream's incoming metadata and
+// propagates the verified user ID through the stream context before handing off.
+func (m *Middleware) GRPCStreamInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	ctx, span := m.tracer.Start(ss.Context(), "authentication.Middleware.GRPCStreamInterceptor")
+	defer span.End()
+
+	ctx, err := m.authenticateGRPC(ctx, span)
+	if err != nil {
+		return err
+	}
+
+	err = handler(srv, &authedServerStream{ServerStream: ss, ctx: ctx})
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
+	}
+	return err
+}
+
+// authenticateGRPC extracts and verifies the bearer token from gRPC metadata,
+// returning a context enriched with the verified user ID on success.
+func (m *Middleware) authenticateGRPC(ctx context.Context, span trace.Span) (context.Context, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		err := errors.New("metadata is not provided")
 		span.RecordError(err)
 		span.SetStatus(otelcodes.Error, err.Error())
-		return nil, status.Error(codes.Unauthenticated, "metadata is not provided")
+		return ctx, status.Error(codes.Unauthenticated, "metadata is not provided")
 	}
 
 	values := md.Get("authorization")
@@ -79,7 +116,7 @@ func (m *Middleware) GRPCInterceptor(ctx context.Context, req interface{}, info 
 		err := errors.New("authorization token is not provided")
 		span.RecordError(err)
 		span.SetStatus(otelcodes.Error, err.Error())
-		return nil, status.Error(codes.Unauthenticated, "authorization token is not provided")
+		return ctx, status.Error(codes.Unauthenticated, "authorization token is not provided")
 	}
 
 	authHeader := values[0]
@@ -87,7 +124,7 @@ func (m *Middleware) GRPCInterceptor(ctx context.Context, req interface{}, info 
 		err := errors.New("authorization token is not a bearer token")
 		span.RecordError(err)
 		span.SetStatus(otelcodes.Error, err.Error())
-		return nil, status.Error(codes.Unauthenticated, "authorization token is not a bearer token")
+		return ctx, status.Error(codes.Unauthenticated, "authorization token is not a bearer token")
 	}
 
 	token := strings.TrimPrefix(authHeader, "Bearer ")
@@ -96,16 +133,20 @@ func (m *Middleware) GRPCInterceptor(ctx context.Context, req interface{}, info 
 		m.logger.Debugf("gRPC JWT verification failed: %v", err)
 		span.RecordError(err)
 		span.SetStatus(otelcodes.Error, err.Error())
-		return nil, status.Error(codes.Unauthenticated, "invalid token")
+		return ctx, status.Error(codes.Unauthenticated, "invalid token")
 	}
 
-	ctx = WithUserID(ctx, userID)
-	resp, err := handler(ctx, req)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(otelcodes.Error, err.Error())
-	}
-	return resp, err
+	return WithUserID(ctx, userID), nil
+}
+
+// authedServerStream wraps grpc.ServerStream to propagate the authenticated context.
+type authedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s *authedServerStream) Context() context.Context {
+	return s.ctx
 }
 
 func (m *Middleware) getBearerToken(headers http.Header) (string, bool) {
