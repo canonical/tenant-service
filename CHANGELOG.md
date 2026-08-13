@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/canonical/tenant-service/compare/v0.3.0...v0.3.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* fix vulnerabilities ([22bd605](https://github.com/canonical/tenant-service/commit/22bd6059e7822154201e12c1e2901172aa407035))
+
 ## [0.3.0](https://github.com/canonical/tenant-service/compare/v0.2.0...v0.3.0) (2026-07-01)
 
 
