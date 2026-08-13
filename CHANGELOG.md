@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/canonical/tenant-service/compare/v0.2.0...v0.3.0) (2026-07-01)
+
+
+### Features
+
+* consume identity-platform-api and restore local openapi http client generation ([a0ea794](https://github.com/canonical/tenant-service/commit/a0ea7942755e44bd0042203736ea9bb02fcdb800))
+
+
+### Bug Fixes
+
+* add include_email param ([93d2828](https://github.com/canonical/tenant-service/commit/93d282819df602c653944e31908d571b0a3655e6))
+* add interceptors ([e2cb03b](https://github.com/canonical/tenant-service/commit/e2cb03b1eb5b8ac9d38e15ca01d3c386424a1b45))
+* consolidate tenant APIs ([a1f5f19](https://github.com/canonical/tenant-service/commit/a1f5f190590cc3ed66d42e70c50531947eb26441))
+* fix vulnerabilities ([bff85f5](https://github.com/canonical/tenant-service/commit/bff85f54cc766c28538476fd14bbceeb8ec6ac03))
+* use identity-platform-api ([2e30a58](https://github.com/canonical/tenant-service/commit/2e30a58a86784207185c4abc3f3c3ae046955a31)), closes [#13](https://github.com/canonical/tenant-service/issues/13)
+
 ## [0.2.0](https://github.com/canonical/tenant-service/compare/v0.1.0...v0.2.0) (2026-04-28)
 
 
