@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/mock/gomock"
 
+	"github.com/canonical/tenant-service/internal/events"
 	"github.com/canonical/tenant-service/internal/openfga"
 )
 
@@ -779,3 +780,55 @@ func TestAuthorizer_DeleteTenant(t *testing.T) {
 		})
 	}
 }
+
+type mockPublisher struct {
+	ops []*events.PermissionOperation
+}
+
+func (m *mockPublisher) PublishOperations(ctx context.Context, ops ...*events.PermissionOperation) error {
+	m.ops = append(m.ops, ops...)
+	return nil
+}
+
+func (m *mockPublisher) Close() error {
+	return nil
+}
+
+func TestAuthorizer_Publisher(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockAuthzClientInterface(ctrl)
+	mockTracer := NewMockTracingInterface(ctrl)
+	mockMonitor := NewMockMonitorInterface(ctrl)
+	mockLogger := NewMockLoggerInterface(ctrl)
+
+	mockTracer.EXPECT().Start(gomock.Any(), gomock.Any()).
+		Return(context.Background(), trace.SpanFromContext(context.Background())).AnyTimes()
+
+	pub := &mockPublisher{}
+	a := NewAuthorizer(mockClient, mockTracer, mockMonitor, mockLogger).WithPublisher(pub)
+
+	mockClient.EXPECT().WriteTuple(gomock.Any(), "user:u1", OWNER_RELATION, "tenant:t1").Return(nil)
+	err := a.AssignTenantOwner(context.Background(), "t1", "u1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	mockClient.EXPECT().DeleteTuple(gomock.Any(), "user:u1", MEMBER_RELATION, "tenant:t1").Return(nil)
+	err = a.RemoveTenantMember(context.Background(), "t1", "u1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(pub.ops) != 2 {
+		t.Fatalf("expected 2 published operations, got %d", len(pub.ops))
+	}
+	if pub.ops[0].Op != events.PermissionOp_PERMISSION_OP_WRITE || pub.ops[0].Relation != OWNER_RELATION {
+		t.Errorf("unexpected operation 0: %+v", pub.ops[0])
+	}
+	if pub.ops[1].Op != events.PermissionOp_PERMISSION_OP_DELETE || pub.ops[1].Relation != MEMBER_RELATION {
+		t.Errorf("unexpected operation 1: %+v", pub.ops[1])
+	}
+}
+

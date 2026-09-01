@@ -39,6 +39,10 @@ type EnvSpec struct {
 	OpenfgaStoreId       string `envconfig:"openfga_store_id"`
 	OpenfgaModelId       string `envconfig:"openfga_authorization_model_id" default:""`
 
+	KafkaBrokers          string `envconfig:"kafka_brokers" default:""`
+	KafkaPermissionsTopic string `envconfig:"kafka_permissions_topic" default:"tenant-service.permissions"`
+	KafkaEnabled          bool   `envconfig:"kafka_enabled" default:"false"`
+
 	AuthenticationEnabled         bool   `envconfig:"authentication_enabled" default:"true"`
 	AuthenticationIssuer          string `envconfig:"authentication_issuer"`
 	AuthenticationJwksURL         string `envconfig:"authentication_jwks_url"`
