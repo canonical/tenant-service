@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
+	"github.com/canonical/tenant-service/internal/events"
 	"github.com/canonical/tenant-service/internal/grpcutil"
 	"github.com/canonical/tenant-service/internal/kratos"
 	"github.com/canonical/tenant-service/internal/logging"
@@ -112,6 +113,18 @@ func serve() error {
 			logger,
 		)
 		logger.Info("Using noop authorizer")
+	}
+
+	if specs.KafkaEnabled && specs.KafkaBrokers != "" {
+		brokers := events.ParseBrokers(specs.KafkaBrokers)
+		publisher := events.NewKafkaPublisher(brokers, specs.KafkaPermissionsTopic, "tenant-service")
+		if publisher != nil {
+			authorizer.WithPublisher(publisher)
+			defer publisher.Close()
+			logger.Infof("Kafka permission events publisher initialized for brokers %v on topic %s", brokers, specs.KafkaPermissionsTopic)
+		}
+	} else {
+		authorizer.WithPublisher(&events.NoopPublisher{})
 	}
 
 	var jwtVerifier authentication.TokenVerifierInterface

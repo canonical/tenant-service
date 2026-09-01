@@ -1,0 +1,320 @@
+// Copyright 2026 Canonical Ltd.
+// SPDX-License-Identifier: AGPL-3.0-only
+
+package events
+
+import (
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	_ = protoimpl.EnforceVersion(20 - protoimpl.MinVersion)
+	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
+)
+
+type PermissionOp int32
+
+const (
+	PermissionOp_PERMISSION_OP_UNSPECIFIED PermissionOp = 0
+	PermissionOp_PERMISSION_OP_WRITE       PermissionOp = 1
+	PermissionOp_PERMISSION_OP_DELETE      PermissionOp = 2
+)
+
+var (
+	PermissionOp_name = map[int32]string{
+		0: "PERMISSION_OP_UNSPECIFIED",
+		1: "PERMISSION_OP_WRITE",
+		2: "PERMISSION_OP_DELETE",
+	}
+	PermissionOp_value = map[string]int32{
+		"PERMISSION_OP_UNSPECIFIED": 0,
+		"PERMISSION_OP_WRITE":       1,
+		"PERMISSION_OP_DELETE":      2,
+	}
+)
+
+func (x PermissionOp) Enum() *PermissionOp {
+	p := new(PermissionOp)
+	*p = x
+	return p
+}
+
+func (x PermissionOp) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PermissionOp) Descriptor() protoreflect.EnumDescriptor {
+	return file_v1_messages_proto_enumTypes[0].Descriptor()
+}
+
+func (PermissionOp) Type() protoreflect.EnumType {
+	return &file_v1_messages_proto_enumTypes[0]
+}
+
+func (x PermissionOp) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+func (PermissionOp) EnumDescriptor() ([]byte, []int) {
+	return file_v1_messages_proto_rawDescGZIP(), []int{0}
+}
+
+type PermissionUpdateEnvelope struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Version        string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	Service        string                 `protobuf:"bytes,2,opt,name=service,proto3" json:"service,omitempty"`
+	MessageId      string                 `protobuf:"bytes,3,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	EventTime      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=event_time,json=eventTime,proto3" json:"event_time,omitempty"`
+	IngestionTime  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=ingestion_time,json=ingestionTime,proto3" json:"ingestion_time,omitempty"`
+	CorrelationId  *string                `protobuf:"bytes,7,opt,name=correlation_id,json=correlationId,proto3,oneof" json:"correlation_id,omitempty"`
+	Operations     []*PermissionOperation `protobuf:"bytes,8,rep,name=operations,proto3" json:"operations,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PermissionUpdateEnvelope) Reset() {
+	*x = PermissionUpdateEnvelope{}
+	mi := &file_v1_messages_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PermissionUpdateEnvelope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PermissionUpdateEnvelope) ProtoMessage() {}
+
+func (x *PermissionUpdateEnvelope) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_messages_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (*PermissionUpdateEnvelope) Descriptor() ([]byte, []int) {
+	return file_v1_messages_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *PermissionUpdateEnvelope) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *PermissionUpdateEnvelope) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+func (x *PermissionUpdateEnvelope) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *PermissionUpdateEnvelope) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *PermissionUpdateEnvelope) GetEventTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EventTime
+	}
+	return nil
+}
+
+func (x *PermissionUpdateEnvelope) GetIngestionTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.IngestionTime
+	}
+	return nil
+}
+
+func (x *PermissionUpdateEnvelope) GetCorrelationId() string {
+	if x != nil && x.CorrelationId != nil {
+		return *x.CorrelationId
+	}
+	return ""
+}
+
+func (x *PermissionUpdateEnvelope) GetOperations() []*PermissionOperation {
+	if x != nil {
+		return x.Operations
+	}
+	return nil
+}
+
+type PermissionOperation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Op            PermissionOp           `protobuf:"varint,1,opt,name=op,proto3,enum=authorization.service.api.v1.PermissionOp" json:"op,omitempty"`
+	Subject       string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	Relation      string                 `protobuf:"bytes,3,opt,name=relation,proto3" json:"relation,omitempty"`
+	Object        string                 `protobuf:"bytes,4,opt,name=object,proto3" json:"object,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PermissionOperation) Reset() {
+	*x = PermissionOperation{}
+	mi := &file_v1_messages_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PermissionOperation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PermissionOperation) ProtoMessage() {}
+
+func (x *PermissionOperation) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_messages_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (*PermissionOperation) Descriptor() ([]byte, []int) {
+	return file_v1_messages_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *PermissionOperation) GetOp() PermissionOp {
+	if x != nil {
+		return x.Op
+	}
+	return PermissionOp_PERMISSION_OP_UNSPECIFIED
+}
+
+func (x *PermissionOperation) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *PermissionOperation) GetRelation() string {
+	if x != nil {
+		return x.Relation
+	}
+	return ""
+}
+
+func (x *PermissionOperation) GetObject() string {
+	if x != nil {
+		return x.Object
+	}
+	return ""
+}
+
+var File_v1_messages_proto protoreflect.FileDescriptor
+
+const file_v1_messages_proto_rawDesc = "" +
+	"\n" +
+	"\x11v1/messages.proto\x12\x1cauthorization.service.api.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa6\x03\n" +
+	"\x18PermissionUpdateEnvelope\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
+	"\aservice\x18\x02 \x01(\tR\aservice\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x03 \x01(\tR\tmessageId\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x129\n" +
+	"\n" +
+	"event_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\teventTime\x12A\n" +
+	"\x0eingestion_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\ringestionTime\x12*\n" +
+	"\x0ecorrelation_id\x18\a \x01(\tH\x00R\rcorrelationId\x88\x01\x01\x12Q\n" +
+	"\n" +
+	"operations\x18\b \x03(\v21.authorization.service.api.v1.PermissionOperationR\n" +
+	"operationsB\x11\n" +
+	"\x0f_correlation_id\"\x9f\x01\n" +
+	"\x13PermissionOperation\x12:\n" +
+	"\x02op\x18\x01 \x01(\x0e2*.authorization.service.api.v1.PermissionOpR\x02op\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject\x12\x1a\n" +
+	"\brelation\x18\x03 \x01(\tR\brelation\x12\x16\n" +
+	"\x06object\x18\x04 \x01(\tR\x06object*`\n" +
+	"\fPermissionOp\x12\x1d\n" +
+	"\x19PERMISSION_OP_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13PERMISSION_OP_WRITE\x10\x01\x12\x18\n" +
+	"\x14PERMISSION_OP_DELETE\x10\x02B\xfd\x01\n" +
+	" com.authorization.service.api.v1B\rMessagesProtoP\x01Z7github.com/canonical/authorization-service/api/proto/v1\xa2\x02\x03ASA\xaa\x02\x1cAuthorization.Service.Api.V1\xca\x02\x1cAuthorization\\Service\\Api\\V1\xe2\x02(Authorization\\Service\\Api\\V1\\GPBMetadata\xea\x02\x1fAuthorization::Service::Api::V1b\x06proto3"
+
+var (
+	file_v1_messages_proto_rawDescOnce sync.Once
+	file_v1_messages_proto_rawDescData []byte
+)
+
+func file_v1_messages_proto_rawDescGZIP() []byte {
+	file_v1_messages_proto_rawDescOnce.Do(func() {
+		file_v1_messages_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_v1_messages_proto_rawDesc), len(file_v1_messages_proto_rawDesc)))
+	})
+	return file_v1_messages_proto_rawDescData
+}
+
+var file_v1_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_v1_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_v1_messages_proto_goTypes = []any{
+	(PermissionOp)(0),
+	(*PermissionUpdateEnvelope)(nil),
+	(*PermissionOperation)(nil),
+	(*timestamppb.Timestamp)(nil),
+}
+var file_v1_messages_proto_depIdxs = []int32{
+	3,
+	3,
+	2,
+	0,
+	4,
+	4,
+	4,
+	4,
+	0,
+}
+
+func init() { file_v1_messages_proto_init() }
+func file_v1_messages_proto_init() {
+	if File_v1_messages_proto != nil {
+		return
+	}
+	file_v1_messages_proto_msgTypes[0].OneofWrappers = []any{}
+	type x struct{}
+	out := protoimpl.TypeBuilder{
+		File: protoimpl.DescBuilder{
+			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_messages_proto_rawDesc), len(file_v1_messages_proto_rawDesc)),
+			NumEnums:      1,
+			NumMessages:   2,
+			NumExtensions: 0,
+			NumServices:   0,
+		},
+		GoTypes:           file_v1_messages_proto_goTypes,
+		DependencyIndexes: file_v1_messages_proto_depIdxs,
+		EnumInfos:         file_v1_messages_proto_enumTypes,
+		MessageInfos:      file_v1_messages_proto_msgTypes,
+	}.Build()
+	File_v1_messages_proto = out.File
+	file_v1_messages_proto_goTypes = nil
+	file_v1_messages_proto_depIdxs = nil
+}

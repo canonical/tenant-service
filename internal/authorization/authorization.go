@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/canonical/tenant-service/internal/events"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/openfga"
@@ -17,7 +18,8 @@ import (
 var ErrInvalidAuthModel = fmt.Errorf("invalid authorization model schema")
 
 type Authorizer struct {
-	client AuthzClientInterface
+	client    AuthzClientInterface
+	publisher events.PermissionPublisherInterface
 
 	tracer  tracing.TracingInterface
 	monitor monitoring.MonitorInterface
@@ -77,42 +79,120 @@ func (a *Authorizer) AssignTenantOwner(ctx context.Context, tenantId, userId str
 	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.AssignTenantOwner")
 	defer span.End()
 
-	return a.client.WriteTuple(ctx, UserTuple(userId), OWNER_RELATION, TenantTuple(tenantId))
+	if err := a.client.WriteTuple(ctx, UserTuple(userId), OWNER_RELATION, TenantTuple(tenantId)); err != nil {
+		return err
+	}
+	if a.publisher != nil {
+		if err := a.publisher.PublishOperations(ctx, &events.PermissionOperation{
+			Op:       events.PermissionOp_PERMISSION_OP_WRITE,
+			Subject:  UserTuple(userId),
+			Relation: OWNER_RELATION,
+			Object:   TenantTuple(tenantId),
+		}); err != nil {
+			a.logger.Errorf("failed to publish AssignTenantOwner event: %s", err)
+		}
+	}
+	return nil
 }
 
 func (a *Authorizer) AssignPrivilegedAdmin(ctx context.Context, privilegedId, userId string) error {
 	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.AssignPrivilegedAdmin")
 	defer span.End()
 
-	return a.client.WriteTuple(ctx, UserTuple(userId), ADMIN_RELATION, PrivilegedTuple(privilegedId))
+	if err := a.client.WriteTuple(ctx, UserTuple(userId), ADMIN_RELATION, PrivilegedTuple(privilegedId)); err != nil {
+		return err
+	}
+	if a.publisher != nil {
+		if err := a.publisher.PublishOperations(ctx, &events.PermissionOperation{
+			Op:       events.PermissionOp_PERMISSION_OP_WRITE,
+			Subject:  UserTuple(userId),
+			Relation: ADMIN_RELATION,
+			Object:   PrivilegedTuple(privilegedId),
+		}); err != nil {
+			a.logger.Errorf("failed to publish AssignPrivilegedAdmin event: %s", err)
+		}
+	}
+	return nil
 }
 
 func (a *Authorizer) LinkTenantToPrivileged(ctx context.Context, tenantId, privilegedId string) error {
 	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.LinkTenantToPrivileged")
 	defer span.End()
 
-	return a.client.WriteTuple(ctx, PrivilegedTuple(privilegedId), PRIVILEGED_RELATION, TenantTuple(tenantId))
+	if err := a.client.WriteTuple(ctx, PrivilegedTuple(privilegedId), PRIVILEGED_RELATION, TenantTuple(tenantId)); err != nil {
+		return err
+	}
+	if a.publisher != nil {
+		if err := a.publisher.PublishOperations(ctx, &events.PermissionOperation{
+			Op:       events.PermissionOp_PERMISSION_OP_WRITE,
+			Subject:  PrivilegedTuple(privilegedId),
+			Relation: PRIVILEGED_RELATION,
+			Object:   TenantTuple(tenantId),
+		}); err != nil {
+			a.logger.Errorf("failed to publish LinkTenantToPrivileged event: %s", err)
+		}
+	}
+	return nil
 }
 
 func (a *Authorizer) AssignTenantMember(ctx context.Context, tenantId, userId string) error {
 	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.AssignTenantMember")
 	defer span.End()
 
-	return a.client.WriteTuple(ctx, UserTuple(userId), MEMBER_RELATION, TenantTuple(tenantId))
+	if err := a.client.WriteTuple(ctx, UserTuple(userId), MEMBER_RELATION, TenantTuple(tenantId)); err != nil {
+		return err
+	}
+	if a.publisher != nil {
+		if err := a.publisher.PublishOperations(ctx, &events.PermissionOperation{
+			Op:       events.PermissionOp_PERMISSION_OP_WRITE,
+			Subject:  UserTuple(userId),
+			Relation: MEMBER_RELATION,
+			Object:   TenantTuple(tenantId),
+		}); err != nil {
+			a.logger.Errorf("failed to publish AssignTenantMember event: %s", err)
+		}
+	}
+	return nil
 }
 
 func (a *Authorizer) RemoveTenantOwner(ctx context.Context, tenantId, userId string) error {
 	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.RemoveTenantOwner")
 	defer span.End()
 
-	return a.client.DeleteTuple(ctx, UserTuple(userId), OWNER_RELATION, TenantTuple(tenantId))
+	if err := a.client.DeleteTuple(ctx, UserTuple(userId), OWNER_RELATION, TenantTuple(tenantId)); err != nil {
+		return err
+	}
+	if a.publisher != nil {
+		if err := a.publisher.PublishOperations(ctx, &events.PermissionOperation{
+			Op:       events.PermissionOp_PERMISSION_OP_DELETE,
+			Subject:  UserTuple(userId),
+			Relation: OWNER_RELATION,
+			Object:   TenantTuple(tenantId),
+		}); err != nil {
+			a.logger.Errorf("failed to publish RemoveTenantOwner event: %s", err)
+		}
+	}
+	return nil
 }
 
 func (a *Authorizer) RemoveTenantMember(ctx context.Context, tenantId, userId string) error {
 	ctx, span := a.tracer.Start(ctx, "authorization.Authorizer.RemoveTenantMember")
 	defer span.End()
 
-	return a.client.DeleteTuple(ctx, UserTuple(userId), MEMBER_RELATION, TenantTuple(tenantId))
+	if err := a.client.DeleteTuple(ctx, UserTuple(userId), MEMBER_RELATION, TenantTuple(tenantId)); err != nil {
+		return err
+	}
+	if a.publisher != nil {
+		if err := a.publisher.PublishOperations(ctx, &events.PermissionOperation{
+			Op:       events.PermissionOp_PERMISSION_OP_DELETE,
+			Subject:  UserTuple(userId),
+			Relation: MEMBER_RELATION,
+			Object:   TenantTuple(tenantId),
+		}); err != nil {
+			a.logger.Errorf("failed to publish RemoveTenantMember event: %s", err)
+		}
+	}
+	return nil
 }
 
 func (a *Authorizer) CheckTenantAccess(ctx context.Context, tenantId, userId, relation string) (bool, error) {
@@ -137,12 +217,24 @@ func (a *Authorizer) DeleteTenant(ctx context.Context, tenantId string) error {
 			break
 		}
 		ts := make([]openfga.Tuple, len(r.Tuples))
+		ops := make([]*events.PermissionOperation, len(r.Tuples))
 		for i, t := range r.Tuples {
 			ts[i] = *openfga.NewTuple(t.Key.User, t.Key.Relation, t.Key.Object)
+			ops[i] = &events.PermissionOperation{
+				Op:       events.PermissionOp_PERMISSION_OP_DELETE,
+				Subject:  t.Key.User,
+				Relation: t.Key.Relation,
+				Object:   t.Key.Object,
+			}
 		}
 		if err := a.client.DeleteTuples(ctx, ts...); err != nil {
 			a.logger.Errorf("error when deleting tuples %v: %s", ts, err)
 			return err
+		}
+		if a.publisher != nil && len(ops) > 0 {
+			if err := a.publisher.PublishOperations(ctx, ops...); err != nil {
+				a.logger.Errorf("failed to publish DeleteTenant events: %s", err)
+			}
 		}
 		if r.ContinuationToken == "" {
 			break
@@ -150,6 +242,11 @@ func (a *Authorizer) DeleteTenant(ctx context.Context, tenantId string) error {
 		cToken = r.ContinuationToken
 	}
 	return nil
+}
+
+func (a *Authorizer) WithPublisher(publisher events.PermissionPublisherInterface) *Authorizer {
+	a.publisher = publisher
+	return a
 }
 
 func NewAuthorizer(client AuthzClientInterface, tracer tracing.TracingInterface, monitor monitoring.MonitorInterface, logger logging.LoggerInterface) *Authorizer {
