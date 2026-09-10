@@ -3,10 +3,11 @@
 
 package tenant
 
+//go:generate mockgen -build_flags=--mod=mod -package tenant -destination ./mock_tenant.go -source=./interfaces.go
+
 import (
 	"context"
 
-	"github.com/canonical/tenant-service/internal/openfga"
 	"github.com/canonical/tenant-service/internal/types"
 	ory "github.com/ory/client-go"
 )
@@ -38,14 +39,6 @@ type StorageInterface interface {
 	UpdateMember(ctx context.Context, tenantID, userID, role string) error
 }
 
-type AuthzInterface interface {
-	Check(ctx context.Context, user, relation, object string, tuples ...openfga.Tuple) (bool, error)
-	AssignTenantOwner(ctx context.Context, tenantID, userID string) error
-	AssignTenantMember(ctx context.Context, tenantID, userID string) error
-	RemoveTenantOwner(ctx context.Context, tenantID, userID string) error
-	RemoveTenantMember(ctx context.Context, tenantID, userID string) error
-	DeleteTenant(ctx context.Context, tenantID string) error
-}
 
 type KratosClientInterface interface {
 	GetIdentityIDByEmail(ctx context.Context, email string) (string, error)

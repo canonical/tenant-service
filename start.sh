@@ -4,8 +4,8 @@
 set -e
 
 cleanup () {
-  docker compose -f ./docker-compose.dev.yml down > /dev/null
-  docker stop oidc_client > /dev/null
+  docker compose -f ./docker-compose.dev.yml down > /dev/null 2>&1 || true
+  docker stop oidc_client > /dev/null 2>&1 || true
   exit
 }
 
@@ -45,6 +45,7 @@ AUTH_CLIENT_RESULT=$(docker exec "$HYDRA_CONTAINER_ID" \
   --endpoint http://127.0.0.1:4445 \
   --name "Tenant Service Auth Client" \
   --grant-type client_credentials \
+  --scope tenant-service \
   --format json)
 
 AUTH_CLIENT_ID=$(echo "$AUTH_CLIENT_RESULT" | yq -p json '.client_id // .[0].client_id')
@@ -74,12 +75,10 @@ export AUTHENTICATION_JWKS_URL="http://localhost:4444/.well-known/jwks.json"
 export AUTHENTICATION_ENABLED="true"
 export AUTHENTICATION_ALLOWED_SUBJECTS="$AUTH_CLIENT_ID"
 export AUTHENTICATION_REQUIRED_SCOPE="tenant-service"
-export OPENFGA_API_SCHEME="http"
-export OPENFGA_API_HOST="127.0.0.1:8080"
-export OPENFGA_API_TOKEN="42"
-export OPENFGA_STORE_ID=$(fga store create --name tenant-service --api-token $OPENFGA_API_TOKEN | yq .store.id)
-export OPENFGA_AUTHORIZATION_MODEL_ID=$(./app create-fga-model --fga-api-url http://127.0.0.1:8080 --fga-api-token $OPENFGA_API_TOKEN --fga-store-id $OPENFGA_STORE_ID --format json | yq .model_id)
-export AUTHORIZATION_ENABLED="true"
+export KAFKA_ENABLED="true"
+export KAFKA_BROKERS="localhost:9092"
+export KAFKA_PERMISSIONS_TOPIC="tenant-service.permissions"
+export KAFKA_CLIENT_ID="tenant-service"
 export WEBHOOKS_API_TOKEN="secret_api_key"
 export DSN="postgres://tenants:tenants@127.0.0.1:5432/tenants"
 

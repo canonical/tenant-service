@@ -11,8 +11,10 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	v1 "github.com/canonical/authorization-service/api/v1"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
+	"github.com/canonical/tenant-service/internal/permissions"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
@@ -23,7 +25,7 @@ import (
 // Service provides tenant business logic.
 type Service struct {
 	storage            StorageInterface
-	authz              AuthzInterface
+	publisher          permissions.Publisher
 	kratos             KratosClientInterface
 	invitationLifetime string
 	tracer             tracing.TracingInterface
@@ -34,7 +36,7 @@ type Service struct {
 // NewService creates a new tenant service.
 func NewService(
 	storage StorageInterface,
-	authz AuthzInterface,
+	publisher permissions.Publisher,
 	kratos KratosClientInterface,
 	invitationLifetime string,
 	tracer tracing.TracingInterface,
@@ -43,7 +45,7 @@ func NewService(
 ) *Service {
 	return &Service{
 		storage:            storage,
-		authz:              authz,
+		publisher:          publisher,
 		kratos:             kratos,
 		invitationLifetime: invitationLifetime,
 		tracer:             tracer,
@@ -139,24 +141,17 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 		// If duplicate (already a member), we proceed to send recovery link as a re-invite.
 	}
 
-	// 3. Assign Role in OpenFGA (Authorization)
-	// Map 'role' string to specific authz method
+	// 3. Publish permission event asynchronously to Kafka
 	switch role {
-	case "owner":
-		err = s.authz.AssignTenantOwner(ctx, tenantID, identityID)
-	case "member", "admin":
-		err = s.authz.AssignTenantMember(ctx, tenantID, identityID)
+	case "owner", "member", "admin":
+		s.publisher.Publish(ctx, tenantID, &v1.PermissionOperation{
+			Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
+			Subject:  "user:" + identityID,
+			Relation: role,
+			Object:   "tenant:" + tenantID,
+		})
 	default:
 		return "", "", fmt.Errorf("invalid role: %s", role)
-	}
-
-	if err != nil {
-		s.recordError(span, "failed to assign role in authz", err,
-			"tenant_id", tenantID,
-			"user_id", identityID,
-			"role", role,
-		)
-		return "", "", fmt.Errorf("failed to assign permissions")
 	}
 
 	// 4. Generate Kratos Recovery Link
@@ -234,14 +229,28 @@ func (s *Service) DeleteTenant(ctx context.Context, id string) error {
 	actor, _ := authentication.GetUserID(ctx)
 	s.logger.Debugw("deleting tenant", "tenant_id", id, "actor", actor)
 
+	// Retrieve active memberships prior to deletion to revoke permissions in authorization-service
+	members, _, err := s.storage.ListMembersByTenantID(ctx, id)
+	if err != nil {
+		s.logger.Warnw("failed to list tenant members prior to deletion", "tenant_id", id, "error", err)
+	}
+
 	if err := s.storage.DeleteTenant(ctx, id); err != nil {
 		s.recordError(span, "failed to delete tenant from storage", err, "tenant_id", id)
 		return fmt.Errorf("failed to delete tenant from storage: %w", err)
 	}
 
-	if err := s.authz.DeleteTenant(ctx, id); err != nil {
-		// Log error but don't fail, storage is already deleted
-		s.logger.Errorw("failed to delete tenant from authz", "tenant_id", id, "error", err)
+	if len(members) > 0 {
+		ops := make([]*v1.PermissionOperation, 0, len(members))
+		for _, m := range members {
+			ops = append(ops, &v1.PermissionOperation{
+				Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
+				Subject:  "user:" + m.KratosIdentityID,
+				Relation: m.Role,
+				Object:   "tenant:" + id,
+			})
+		}
+		s.publisher.Publish(ctx, id, ops...)
 	}
 
 	s.logger.Infow("tenant deleted", "tenant_id", id)
@@ -295,28 +304,20 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 		return fmt.Errorf("failed to add member to storage: %w", err)
 	}
 
-	// 3. Add to AuthZ
-	var authzErr error
+	// 3. Publish permission event asynchronously to Kafka
 	switch role {
-	case "owner":
-		authzErr = s.authz.AssignTenantOwner(ctx, tenantID, identityID)
-	case "member", "admin":
-		// Proto has owner, admin, member.
-		authzErr = s.authz.AssignTenantMember(ctx, tenantID, identityID)
+	case "owner", "member", "admin":
+		s.publisher.Publish(ctx, tenantID, &v1.PermissionOperation{
+			Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
+			Subject:  "user:" + identityID,
+			Relation: role,
+			Object:   "tenant:" + tenantID,
+		})
 	default:
 		err := fmt.Errorf("unknown role: %s", role)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return err
-	}
-
-	if authzErr != nil {
-		s.recordError(span, "failed to assign role in authz", authzErr,
-			"tenant_id", tenantID,
-			"user_id", identityID,
-			"role", role,
-		)
-		return fmt.Errorf("failed to assign role in authz: %w", authzErr)
 	}
 
 	s.logger.Infow("user provisioned",
@@ -427,59 +428,14 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 		}, nil
 	}
 
-	// 2. AuthZ Update
-	// Remove old role relation first to avoid transient permission issues?
-	// Or add new first?
-	// If demoting owner -> member: Add member, remove owner.
-	// If promoting member -> owner: Add owner, remove member (optional but clean).
-
-	// Add new role
+	// 2. Validate role
 	switch role {
-	case "owner":
-		if err := s.authz.AssignTenantOwner(ctx, tenantID, userID); err != nil {
-			s.recordError(span, "failed to assign owner role in authz", err,
-				"tenant_id", tenantID,
-				"user_id", userID,
-			)
-			return nil, fmt.Errorf("failed to assign owner role: %w", err)
-		}
-	case "member", "admin":
-		if err := s.authz.AssignTenantMember(ctx, tenantID, userID); err != nil {
-			s.recordError(span, "failed to assign member role in authz", err,
-				"tenant_id", tenantID,
-				"user_id", userID,
-			)
-			return nil, fmt.Errorf("failed to assign member role: %w", err)
-		}
+	case "owner", "member", "admin":
 	default:
 		err := fmt.Errorf("invalid role: %s", role)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
-	}
-
-	// Remove old role
-	switch currentMember.Role {
-	case "owner":
-		if err := s.authz.RemoveTenantOwner(ctx, tenantID, userID); err != nil {
-			s.logger.Errorw("failed to remove old owner relation from authz",
-				"tenant_id", tenantID,
-				"user_id", userID,
-				"error", err,
-			)
-			// Continue, as new role is assigned.
-		}
-	case "member", "admin":
-		if role == "owner" {
-			// If promoting to owner, we can remove the member relation to be clean
-			if err := s.authz.RemoveTenantMember(ctx, tenantID, userID); err != nil {
-				s.logger.Errorw("failed to remove old member relation from authz",
-					"tenant_id", tenantID,
-					"user_id", userID,
-					"error", err,
-				)
-			}
-		}
 	}
 
 	// 3. Storage Update
@@ -491,6 +447,22 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 		)
 		return nil, err
 	}
+
+	// 4. Publish permission update to Kafka
+	s.publisher.Publish(ctx, tenantID,
+		&v1.PermissionOperation{
+			Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
+			Subject:  "user:" + userID,
+			Relation: currentMember.Role,
+			Object:   "tenant:" + tenantID,
+		},
+		&v1.PermissionOperation{
+			Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
+			Subject:  "user:" + userID,
+			Relation: role,
+			Object:   "tenant:" + tenantID,
+		},
+	)
 
 	// 4. Return updated user
 	identity, err := s.kratos.GetIdentity(ctx, userID)
