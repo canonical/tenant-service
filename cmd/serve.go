@@ -17,14 +17,13 @@ import (
 
 	"buf.build/go/protovalidate"
 	v0 "github.com/canonical/identity-platform-api/v0/tenant"
-	"github.com/canonical/tenant-service/internal/authorization"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
 	"github.com/canonical/tenant-service/internal/grpcutil"
 	"github.com/canonical/tenant-service/internal/kratos"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring/prometheus"
-	"github.com/canonical/tenant-service/internal/openfga"
+	"github.com/canonical/tenant-service/internal/permissions"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/pkg/authentication"
@@ -57,8 +56,8 @@ func serve() error {
 	}
 
 	logger := logging.NewLogger(specs.LogLevel)
-	logger.Debugf("env vars: port=%d, grpc_port=%d, log_level=%s, debug=%v, tracing_enabled=%v, authorization_enabled=%v, authentication_enabled=%v",
-		specs.Port, specs.GRPCPort, specs.LogLevel, specs.Debug, specs.TracingEnabled, specs.AuthorizationEnabled, specs.AuthenticationEnabled)
+	logger.Debugf("env vars: port=%d, grpc_port=%d, log_level=%s, debug=%v, tracing_enabled=%v, kafka_enabled=%v, authentication_enabled=%v",
+		specs.Port, specs.GRPCPort, specs.LogLevel, specs.Debug, specs.TracingEnabled, specs.KafkaEnabled, specs.AuthenticationEnabled)
 	defer logger.Sync()
 
 	monitor := prometheus.NewMonitor("tenant-service", logger)
@@ -79,40 +78,24 @@ func serve() error {
 	defer dbClient.Close()
 	s := storage.NewStorage(dbClient, tracer, monitor, logger)
 
-	var authorizer *authorization.Authorizer
-	if specs.AuthorizationEnabled {
-		ofga := openfga.NewClient(
-			openfga.NewConfig(
-				specs.OpenfgaApiScheme,
-				specs.OpenfgaApiHost,
-				specs.OpenfgaStoreId,
-				specs.OpenfgaApiToken,
-				specs.OpenfgaModelId,
-				specs.Debug,
-				tracer,
-				monitor,
-				logger,
-			),
-		)
-		authorizer = authorization.NewAuthorizer(
-			ofga,
-			tracer,
-			monitor,
+	var publisher permissions.Publisher
+	if specs.KafkaEnabled {
+		publisher = permissions.NewKafkaPublisher(
+			specs.KafkaBrokers,
+			specs.KafkaPermissionsTopic,
+			specs.KafkaClientID,
 			logger,
 		)
-		logger.Info("Authorization is enabled")
-		if authorizer.ValidateModel(context.Background()) != nil {
-			panic("Invalid authorization model provided")
-		}
+		logger.Info("Kafka permissions publisher is enabled")
 	} else {
-		authorizer = authorization.NewAuthorizer(
-			openfga.NewNoopClient(tracer, monitor, logger),
-			tracer,
-			monitor,
-			logger,
-		)
-		logger.Info("Using noop authorizer")
+		publisher = permissions.NewNoopPublisher()
+		logger.Info("Using noop permissions publisher")
 	}
+	defer func() {
+		if err := publisher.Close(); err != nil {
+			logger.Warnw("failed to close permissions publisher", "error", err)
+		}
+	}()
 
 	var jwtVerifier authentication.TokenVerifierInterface
 	if specs.AuthenticationEnabled {
@@ -156,7 +139,7 @@ func serve() error {
 
 	tenantService := tenant.NewService(
 		s,
-		authorizer,
+		publisher,
 		kratosClient,
 		specs.InvitationLifetime,
 		tracer,
@@ -218,7 +201,7 @@ func serve() error {
 		authMiddleware,
 		s,
 		dbClient,
-		authorizer,
+		publisher,
 		tracer,
 		monitor,
 		logger,

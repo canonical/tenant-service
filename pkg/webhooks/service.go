@@ -11,8 +11,10 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	v1 "github.com/canonical/authorization-service/api/v1"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
+	"github.com/canonical/tenant-service/internal/permissions"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
@@ -21,27 +23,27 @@ import (
 
 // Service provides webhook business logic.
 type Service struct {
-	storage StorageInterface
-	authz   AuthorizerInterface
-	tracer  tracing.TracingInterface
-	monitor monitoring.MonitorInterface
-	logger  logging.LoggerInterface
+	storage   StorageInterface
+	publisher permissions.Publisher
+	tracer    tracing.TracingInterface
+	monitor   monitoring.MonitorInterface
+	logger    logging.LoggerInterface
 }
 
 // NewService creates a new webhook service.
 func NewService(
 	storage StorageInterface,
-	authz AuthorizerInterface,
+	publisher permissions.Publisher,
 	tracer tracing.TracingInterface,
 	monitor monitoring.MonitorInterface,
 	logger logging.LoggerInterface,
 ) *Service {
 	return &Service{
-		storage: storage,
-		authz:   authz,
-		tracer:  tracer,
-		monitor: monitor,
-		logger:  logger,
+		storage:   storage,
+		publisher: publisher,
+		tracer:    tracer,
+		monitor:   monitor,
+		logger:    logger,
 	}
 }
 
@@ -111,16 +113,13 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		return fmt.Errorf("failed to add member: %w", err)
 	}
 
-	// 3. Call OpenFGA to write the tuple
-	err = s.authz.AssignTenantOwner(ctx, newTenant.ID, identityID)
-	if err != nil {
-		s.recordError(span, "failed to assign tenant owner in authz on registration", err,
-			"tenant_id", newTenant.ID,
-			"identity_id", identityID,
-		)
-		s.recordRegistrationMetric("webhook_registration_failure")
-		return fmt.Errorf("failed to assign tenant owner in authz: %w", err)
-	}
+	// 3. Publish owner permission event asynchronously to Kafka
+	s.publisher.Publish(ctx, newTenant.ID, &v1.PermissionOperation{
+		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
+		Subject:  "user:" + identityID,
+		Relation: "owner",
+		Object:   "tenant:" + newTenant.ID,
+	})
 
 	s.logger.Infow("tenant provisioned on registration",
 		"tenant_id", newTenant.ID,

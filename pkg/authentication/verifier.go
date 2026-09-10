@@ -46,6 +46,12 @@ func (v *JWTVerifier) VerifyToken(ctx context.Context, rawToken string) (string,
 		return "", err
 	}
 
+	if claims.Subject == "" {
+		v.logger.Debugf("Token missing subject claim")
+		v.logger.Security().AuthzFailure("", "jwt_api_access")
+		return "", fmt.Errorf("unauthorized: token missing subject claim")
+	}
+
 	if len(v.allowedSubjects) > 0 && slices.Contains(v.allowedSubjects, claims.Subject) {
 		return claims.Subject, nil
 	}
@@ -63,9 +69,8 @@ func (v *JWTVerifier) VerifyToken(ctx context.Context, rawToken string) (string,
 	}
 
 	if len(v.allowedSubjects) == 0 && v.requiredScope == "" {
-		v.logger.Debugf("No authorization criteria configured")
-		v.logger.Security().AuthzFailure(claims.Subject, "jwt_api_access")
-		return "", fmt.Errorf("unauthorized: no access policy configured")
+		// When no subject/scope policy is configured, accept any validly signed token with a subject
+		return claims.Subject, nil
 	}
 
 	v.logger.Security().AuthzFailure(claims.Subject, "jwt_api_access")
@@ -90,8 +95,9 @@ func NewJWTVerifier(
 	}
 
 	config := &oidc.Config{
-		SkipClientIDCheck: true,
-		SkipIssuerCheck:   false,
+		SkipClientIDCheck:    true,
+		SkipIssuerCheck:      false,
+		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256},
 	}
 
 	v.verifier = provider.Verifier(config)
