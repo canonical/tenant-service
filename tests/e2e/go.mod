@@ -3,7 +3,7 @@ module github.com/canonical/tenant-service/tests/e2e
 go 1.26.1
 
 require (
-	github.com/canonical/identity-platform-api v0.0.0-20260609125125-fe6c4040a954
+	github.com/canonical/identity-platform-api v0.0.0-20260924175044-8c1a27b95cef
 	github.com/canonical/tenant-service v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
@@ -113,7 +113,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.19.1 // indirect
+	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect

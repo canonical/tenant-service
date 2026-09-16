@@ -38,9 +38,9 @@ var listUsersCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "USER_ID\tEMAIL\tROLE")
+		fmt.Fprintln(w, "USER_ID\tEMAIL")
 		for _, u := range resp.Users {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", u.UserId, u.Email, u.Role)
+			fmt.Fprintf(w, "%s\t%s\n", u.UserId, u.Email)
 		}
 		w.Flush()
 		return nil
@@ -48,9 +48,9 @@ var listUsersCmd = &cobra.Command{
 }
 
 var inviteUserCmd = &cobra.Command{
-	Use:   "invite [tenant-id] [email] [role]",
+	Use:   "invite [tenant-id] [email]",
 	Short: "Invite a user to a tenant",
-	Args:  cobra.ExactArgs(3),
+	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conn, client, err := getClient()
 		if err != nil {
@@ -62,7 +62,6 @@ var inviteUserCmd = &cobra.Command{
 		resp, err := client.InviteMember(ctx, &v0.InviteMemberRequest{
 			TenantId: args[0],
 			Email:    args[1],
-			Role:     args[2],
 		})
 		if err != nil {
 			return fmt.Errorf("failed to invite user: %w", err)
@@ -81,9 +80,9 @@ var inviteUserCmd = &cobra.Command{
 }
 
 var provisionUserCmd = &cobra.Command{
-	Use:   "provision [tenant-id] [email] [role]",
+	Use:   "provision [tenant-id] [email]",
 	Short: "Provision a user to a tenant directly",
-	Args:  cobra.ExactArgs(3),
+	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conn, client, err := getClient()
 		if err != nil {
@@ -95,40 +94,12 @@ var provisionUserCmd = &cobra.Command{
 		_, err = client.ProvisionUser(ctx, &v0.ProvisionUserRequest{
 			TenantId: args[0],
 			Email:    args[1],
-			Role:     args[2],
 		})
 		if err != nil {
 			return fmt.Errorf("failed to provision user: %w", err)
 		}
 
-		fmt.Printf("User provisioned: %s (Role: %s)\n", args[1], args[2])
-		return nil
-	},
-}
-
-var updateUserCmd = &cobra.Command{
-	Use:   "update [tenant-id] [user-id] [role]",
-	Short: "Update user role",
-	Args:  cobra.ExactArgs(3),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		conn, client, err := getClient()
-		if err != nil {
-			return err
-		}
-		defer conn()
-
-		ctx := getAuthenticatedContext(context.Background())
-		resp, err := client.UpdateTenantUser(ctx, &v0.UpdateTenantUserRequest{
-			TenantId: args[0],
-			UserId:   args[1],
-			Role:     args[2],
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update user: %w", err)
-		}
-
-		fmt.Printf("User updated: %s\n", resp.User.Email)
-		fmt.Printf("New Role: %s\n", resp.User.Role)
+		fmt.Printf("User provisioned: %s\n", args[1])
 		return nil
 	},
 }
@@ -138,5 +109,4 @@ func init() {
 	usersCmd.AddCommand(listUsersCmd)
 	usersCmd.AddCommand(inviteUserCmd)
 	usersCmd.AddCommand(provisionUserCmd)
-	usersCmd.AddCommand(updateUserCmd)
 }

@@ -1,0 +1,55 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: tenant-service-route
+  namespace: default
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: authorization-service-gateway
+      namespace: default
+  hostnames:
+    - "localhost"
+    - "iam.internal.io"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v0/tenants
+        - path:
+            type: PathPrefix
+            value: /api/v0/me/tenants
+        - path:
+            type: PathPrefix
+            value: /api/v0/users
+      backendRefs:
+        - name: tenant-service
+          port: 8080
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: tenant-service-ext-authz
+  namespace: default
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: authorization-service-gateway
+  # Delegate authorization checks to the external authorization service
+  action: CUSTOM
+  provider:
+    name: "authorization-service"
+  rules:
+    - to:
+        - operation:
+            # Protect tenant-service routes specifically (avoid collisions on shared gateway)
+            paths:
+              - "/api/v0/tenants"
+              - "/api/v0/tenants/*"
+              - "/api/v0/users"
+              - "/api/v0/users/*"
+            notPaths:
+              # Unauthenticated tenant lookup used by login UI
+              - "/api/v0/tenants/lookup"

@@ -207,7 +207,7 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 	}
 
 	query := s.db.Statement(ctx).
-		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
+		Select("id", "tenant_id", "kratos_identity_id", "created_at").
 		From("memberships").
 		Where(sq.Eq{"tenant_id": tenantID}).
 		OrderBy("id").
@@ -215,9 +215,6 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 
 	if cursorID != "" {
 		query = query.Where(sq.Gt{"id": cursorID})
-	}
-	if opts.Role != "" {
-		query = query.Where(sq.Eq{"role": opts.Role})
 	}
 	if opts.IdentityID != "" {
 		query = query.Where(sq.Eq{"kratos_identity_id": opts.IdentityID})
@@ -232,7 +229,7 @@ func (s *Storage) ListMembersByTenantID(ctx context.Context, tenantID string, op
 	members := make([]*types.Membership, 0)
 	for rows.Next() {
 		var m types.Membership
-		if err := rows.Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.CreatedAt); err != nil {
 			return nil, "", fmt.Errorf("failed to scan member: %w", err)
 		}
 		members = append(members, &m)
@@ -258,14 +255,14 @@ func (s *Storage) GetMemberByTenantAndUserID(ctx context.Context, tenantID, user
 
 	var m types.Membership
 	err = s.db.Statement(ctx).
-		Select("id", "tenant_id", "kratos_identity_id", "role", "created_at").
+		Select("id", "tenant_id", "kratos_identity_id", "created_at").
 		From("memberships").
 		Where(sq.Eq{
 			"tenant_id":          tenantID,
 			"kratos_identity_id": userID,
 		}).
 		QueryRowContext(ctx).
-		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt)
+		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.CreatedAt)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -284,7 +281,7 @@ func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID
 
 	var m types.Membership
 	err = s.db.Statement(ctx).
-		Select("m.id", "m.tenant_id", "m.kratos_identity_id", "m.role", "m.created_at").
+		Select("m.id", "m.tenant_id", "m.kratos_identity_id", "m.created_at").
 		From("memberships m").
 		Join("tenants t ON t.id = m.tenant_id").
 		Where(sq.Eq{
@@ -293,7 +290,7 @@ func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID
 			"t.enabled":            true,
 		}).
 		QueryRowContext(ctx).
-		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.Role, &m.CreatedAt)
+		Scan(&m.ID, &m.TenantID, &m.KratosIdentityID, &m.CreatedAt)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -305,7 +302,7 @@ func (s *Storage) GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID
 	return &m, nil
 }
 
-func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) (membershipID string, err error) {
+func (s *Storage) AddMember(ctx context.Context, tenantID, userID string) (membershipID string, err error) {
 	defer func(start time.Time) { s.recordLatencyFor("AddMember", start, err) }(time.Now())
 	ctx, span := s.tracer.Start(ctx, "storage.AddMember")
 	defer span.End()
@@ -317,8 +314,8 @@ func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) 
 
 	_, err = s.db.Statement(ctx).
 		Insert("memberships").
-		Columns("id", "tenant_id", "kratos_identity_id", "role").
-		Values(id.String(), tenantID, userID, role).
+		Columns("id", "tenant_id", "kratos_identity_id").
+		Values(id.String(), tenantID, userID).
 		ExecContext(ctx)
 
 	if err != nil {
@@ -332,35 +329,6 @@ func (s *Storage) AddMember(ctx context.Context, tenantID, userID, role string) 
 	}
 
 	return id.String(), nil
-}
-
-func (s *Storage) UpdateMember(ctx context.Context, tenantID, userID, role string) (err error) {
-	defer func(start time.Time) { s.recordLatencyFor("UpdateMember", start, err) }(time.Now())
-	ctx, span := s.tracer.Start(ctx, "storage.UpdateMember")
-	defer span.End()
-
-	res, err := s.db.Statement(ctx).
-		Update("memberships").
-		Set("role", role).
-		Where(sq.Eq{
-			"tenant_id":          tenantID,
-			"kratos_identity_id": userID,
-		}).
-		ExecContext(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to update member: %w", err)
-	}
-
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to check rows affected: %w", err)
-	}
-	if rows == 0 {
-		return fmt.Errorf("member not found")
-	}
-
-	return nil
 }
 
 // UpdateTenant updates fields specified in paths.

@@ -23,14 +23,12 @@ type Membership struct {
 	ID               string    `db:"id"`
 	TenantID         string    `db:"tenant_id"`
 	KratosIdentityID string    `db:"kratos_identity_id"`
-	Role             string    `db:"role"`
 	CreatedAt        time.Time `db:"created_at"`
 }
 
 type TenantUser struct {
 	UserID string
 	Email  string
-	Role   string
 }
 
 // ListOptions holds pagination and filter parameters for List* operations.
@@ -42,7 +40,6 @@ type ListOptions struct {
 	Enabled *bool // nil = no filter
 
 	// Membership filters
-	Role       string // "" = no filter; exact match
 	IdentityID string // "" = no filter; resolved from email in service layer
 	Email      string // "" = no filter; resolved to IdentityID in service layer before storage call
 }
@@ -68,13 +65,6 @@ func WithPageSize(size int32) ListOption {
 func WithEnabled(v bool) ListOption {
 	return func(o *ListOptions) {
 		o.Enabled = &v
-	}
-}
-
-// WithRole filters memberships by exact role match.
-func WithRole(role string) ListOption {
-	return func(o *ListOptions) {
-		o.Role = role
 	}
 }
 

@@ -64,10 +64,9 @@ func TestHandler_InviteMember(t *testing.T) {
 			request: &v0.InviteMemberRequest{
 				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
-				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").
+				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com").
 					Return("https://link", "code123", nil)
 			},
 			wantErr: false,
@@ -77,10 +76,9 @@ func TestHandler_InviteMember(t *testing.T) {
 			request: &v0.InviteMemberRequest{
 				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
-				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").
+				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com").
 					Return("", "", errors.New("service error"))
 			},
 			wantErr:  true,
@@ -91,7 +89,6 @@ func TestHandler_InviteMember(t *testing.T) {
 			request: &v0.InviteMemberRequest{
 				TenantId: "not-a-uuid",
 				Email:    "user@example.com",
-				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {},
 			wantErr:    true,
@@ -102,18 +99,6 @@ func TestHandler_InviteMember(t *testing.T) {
 			request: &v0.InviteMemberRequest{
 				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "not-an-email",
-				Role:     "member",
-			},
-			setupMocks: func(mockSvc *MockServiceInterface) {},
-			wantErr:    true,
-			wantCode:   codes.InvalidArgument,
-		},
-		{
-			name: "empty role",
-			request: &v0.InviteMemberRequest{
-				TenantId: "11111111-1111-1111-1111-111111111111",
-				Email:    "user@example.com",
-				Role:     "",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {},
 			wantErr:    true,
@@ -598,10 +583,9 @@ func TestHandler_ProvisionUser(t *testing.T) {
 			request: &v0.ProvisionUserRequest{
 				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
-				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").Return(nil)
+				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com").Return(nil)
 			},
 			wantErr: false,
 		},
@@ -610,10 +594,9 @@ func TestHandler_ProvisionUser(t *testing.T) {
 			request: &v0.ProvisionUserRequest{
 				TenantId: "11111111-1111-1111-1111-111111111111",
 				Email:    "user@example.com",
-				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com", "member").
+				mockSvc.EXPECT().ProvisionUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com").
 					Return(errors.New("service error"))
 			},
 			wantErr: true,
@@ -623,7 +606,6 @@ func TestHandler_ProvisionUser(t *testing.T) {
 			request: &v0.ProvisionUserRequest{
 				TenantId: "not-a-uuid",
 				Email:    "user@example.com",
-				Role:     "member",
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
 			wantErr:    true,
@@ -664,94 +646,6 @@ func TestHandler_ProvisionUser(t *testing.T) {
 				}
 				if resp == nil || resp.Status != "provisioned" {
 					t.Error("expected provisioned status")
-				}
-			}
-		})
-	}
-}
-
-func TestHandler_UpdateTenantUser(t *testing.T) {
-	user := &types.TenantUser{UserID: "22222222-2222-2222-2222-222222222222", Email: "user@example.com", Role: "owner"}
-
-	tests := []struct {
-		name       string
-		request    *v0.UpdateTenantUserRequest
-		setupMocks func(*MockServiceInterface, *MockLoggerInterface)
-		wantErr    bool
-		wantCode   codes.Code
-	}{
-		{
-			name: "success",
-			request: &v0.UpdateTenantUserRequest{
-				TenantId: "11111111-1111-1111-1111-111111111111",
-				UserId:   "22222222-2222-2222-2222-222222222222",
-				Role:     "owner",
-			},
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().UpdateTenantUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "owner").Return(user, nil)
-			},
-			wantErr: false,
-		},
-		{
-			name: "service error",
-			request: &v0.UpdateTenantUserRequest{
-				TenantId: "11111111-1111-1111-1111-111111111111",
-				UserId:   "22222222-2222-2222-2222-222222222222",
-				Role:     "owner",
-			},
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
-				mockSvc.EXPECT().UpdateTenantUser(gomock.Any(), "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "owner").
-					Return(nil, errors.New("service error"))
-			},
-			wantErr:  true,
-			wantCode: codes.Internal,
-		},
-		{
-			name: "invalid tenant_id",
-			request: &v0.UpdateTenantUserRequest{
-				TenantId: "not-a-uuid",
-				UserId:   "22222222-2222-2222-2222-222222222222",
-				Role:     "owner",
-			},
-			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {},
-			wantErr:    true,
-			wantCode:   codes.InvalidArgument,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			mockSvc := NewMockServiceInterface(ctrl)
-			mockTracer := NewMockTracingInterface(ctrl)
-			mockLogger := NewMockLoggerInterface(ctrl)
-			setupLoggerMock(ctrl, mockLogger)
-			mockMonitor := NewMockMonitorInterface(ctrl)
-
-			h := NewHandler(mockSvc, testValidator, mockTracer, mockMonitor, mockLogger)
-
-			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.UpdateTenantUser").
-				Return(context.Background(), trace.SpanFromContext(context.Background()))
-			tt.setupMocks(mockSvc, mockLogger)
-
-			resp, err := h.UpdateTenantUser(context.Background(), tt.request)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Error("expected error but got none")
-				}
-				st, ok := status.FromError(err)
-				if ok && st.Code() != tt.wantCode {
-					t.Errorf("expected code %v, got %v", tt.wantCode, st.Code())
-				}
-			} else {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-				if resp == nil {
-					t.Error("expected response but got nil")
 				}
 			}
 		})
@@ -837,7 +731,7 @@ func TestHandler_ListUserTenants(t *testing.T) {
 
 func TestHandler_ListTenantUsers(t *testing.T) {
 	users := []*types.TenantUser{
-		{UserID: "user-1", Email: "user1@example.com", Role: "owner"},
+		{UserID: "user-1", Email: "user1@example.com"},
 	}
 
 	tests := []struct {
@@ -1128,10 +1022,9 @@ func TestHandler_ListTenants_WithFilter(t *testing.T) {
 
 func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
 	users := []*types.TenantUser{
-		{UserID: "user-1", Email: "owner@example.com", Role: "owner"},
+		{UserID: "user-1", Email: "owner@example.com"},
 	}
 
-	role := "owner"
 	email := "owner@example.com"
 
 	tests := []struct {
@@ -1141,16 +1034,6 @@ func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
 		wantErr    bool
 		wantLen    int
 	}{
-		{
-			name:    "filter by role",
-			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111", Role: &role},
-			setupMocks: func(mockSvc *MockServiceInterface) {
-				mockSvc.EXPECT().ListTenantUsers(gomock.Any(), "11111111-1111-1111-1111-111111111111", false, optionsMatcher{check: func(o types.ListOptions) bool {
-					return o.Role == "owner"
-				}}).Return(users, "", nil)
-			},
-			wantLen: 1,
-		},
 		{
 			name:    "filter by email",
 			request: &v0.ListTenantUsersRequest{TenantId: "11111111-1111-1111-1111-111111111111", Email: &email},

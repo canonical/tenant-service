@@ -97,7 +97,6 @@ type Tenant struct {
 type TenantUser struct {
 	UserID string
 	Email  string
-	Role   string
 }
 
 // TenantFilterOptions holds optional query filters for tenant listing.
@@ -108,8 +107,6 @@ type TenantFilterOptions struct {
 
 // TenantUserFilterOptions holds optional query filters for tenant-user listing.
 type TenantUserFilterOptions struct {
-	// Role, when non-empty, restricts results to members with the exact role.
-	Role string
 	// Email, when non-empty, restricts results to the member with that email.
 	// The service layer resolves it to an identity_id via Kratos.
 	Email string
@@ -142,8 +139,9 @@ type TenantClient interface {
 	// ListTenantUsersFiltered retrieves all users in a tenant matching the given filter.
 	ListTenantUsersFiltered(ctx context.Context, tenantID string, f TenantUserFilterOptions) ([]TenantUser, error)
 
-	// ProvisionTenantUser adds a user (by email) to a tenant with the given role.
-	ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error
+	// ProvisionTenantUser adds a user (by email) to a tenant. The service
+	// grants the user can_view on the tenant.
+	ProvisionTenantUser(ctx context.Context, tenantID, email string) error
 
 	// UpdateTenant modifies the tenant with the given ID.
 	UpdateTenant(ctx context.Context, id, name string) error
@@ -425,7 +423,6 @@ func (c *HTTPTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 		Users []struct {
 			UserID string `json:"user_id"`
 			Email  string `json:"email"`
-			Role   string `json:"role"`
 		} `json:"users"`
 		NextPageToken string `json:"next_page_token"`
 	}
@@ -435,7 +432,7 @@ func (c *HTTPTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 
 	users := make([]TenantUser, len(result.Users))
 	for i, u := range result.Users {
-		users[i] = TenantUser{UserID: u.UserID, Email: u.Email, Role: u.Role}
+		users[i] = TenantUser{UserID: u.UserID, Email: u.Email}
 	}
 	return users, result.NextPageToken, nil
 }
@@ -486,9 +483,6 @@ func (c *HTTPTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID
 
 	includeEmails := true
 	params := &httpclient.TenantServiceListTenantUsersParams{IncludeEmails: &includeEmails}
-	if f.Role != "" {
-		params.Role = &f.Role
-	}
 	if f.IdentityID != "" {
 		params.IdentityId = &f.IdentityID
 	} else if f.Email != "" {
@@ -512,7 +506,6 @@ func (c *HTTPTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID
 		Users []struct {
 			UserID string `json:"user_id"`
 			Email  string `json:"email"`
-			Role   string `json:"role"`
 		} `json:"users"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -521,12 +514,12 @@ func (c *HTTPTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID
 
 	users := make([]TenantUser, len(result.Users))
 	for i, u := range result.Users {
-		users[i] = TenantUser{UserID: u.UserID, Email: u.Email, Role: u.Role}
+		users[i] = TenantUser{UserID: u.UserID, Email: u.Email}
 	}
 	return users, nil
 }
 
-func (c *HTTPTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error {
+func (c *HTTPTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email string) error {
 	authEditor, err := c.authEditor(ctx)
 	if err != nil {
 		return err
@@ -534,7 +527,6 @@ func (c *HTTPTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, em
 
 	resp, err := c.client.TenantServiceProvisionUser(ctx, tenantID, httpclient.TenantServiceProvisionUserJSONRequestBody{
 		Email: &email,
-		Role:  &role,
 	}, authEditor)
 	if err != nil {
 		return err
@@ -671,7 +663,7 @@ func (c *GRPCTenantClient) ListTenantUsersPaged(ctx context.Context, tenantID, p
 
 	users := make([]TenantUser, len(resp.Users))
 	for i, u := range resp.Users {
-		users[i] = TenantUser{UserID: u.UserId, Email: u.Email, Role: u.Role}
+		users[i] = TenantUser{UserID: u.UserId, Email: u.Email}
 	}
 	return users, resp.NextPageToken, nil
 }
@@ -707,10 +699,6 @@ func (c *GRPCTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID
 	}
 
 	req := &v0.ListTenantUsersRequest{TenantId: tenantID, IncludeEmails: true}
-	if f.Role != "" {
-		v := f.Role
-		req.Role = &v
-	}
 	if f.IdentityID != "" {
 		v := f.IdentityID
 		req.IdentityId = &v
@@ -726,12 +714,12 @@ func (c *GRPCTenantClient) ListTenantUsersFiltered(ctx context.Context, tenantID
 
 	users := make([]TenantUser, len(resp.Users))
 	for i, u := range resp.Users {
-		users[i] = TenantUser{UserID: u.UserId, Email: u.Email, Role: u.Role}
+		users[i] = TenantUser{UserID: u.UserId, Email: u.Email}
 	}
 	return users, nil
 }
 
-func (c *GRPCTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email, role string) error {
+func (c *GRPCTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, email string) error {
 	authCtx, err := c.authContext(ctx)
 	if err != nil {
 		return err
@@ -740,7 +728,6 @@ func (c *GRPCTenantClient) ProvisionTenantUser(ctx context.Context, tenantID, em
 	_, err = c.client.ProvisionUser(authCtx, &v0.ProvisionUserRequest{
 		TenantId: tenantID,
 		Email:    email,
-		Role:     role,
 	})
 	return err
 }
