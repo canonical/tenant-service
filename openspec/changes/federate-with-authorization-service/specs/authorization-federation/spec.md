@@ -54,3 +54,10 @@ The system SHALL verify incoming bearer JWT tokens issued by STS using keys from
 #### Scenario: Token verification without static allowed subjects or scopes
 - **WHEN** an authenticated request arrives with a validly signed token but no `AUTHENTICATION_ALLOWED_SUBJECTS` or `AUTHENTICATION_REQUIRED_SCOPE` is configured
 - **THEN** the system accepts the token and extracts the `sub` identity without rejecting the request
+
+### Requirement: Static Account Permission Event Publishing on Service Startup
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event containing a `WRITE` operation for `user:*` with relation `can_view` on object `account:me` when the service starts up with permissions publishing enabled.
+
+#### Scenario: Service startup publishes static account viewing permission
+- **WHEN** `tenant-service` starts up with Kafka permissions publishing enabled
+- **THEN** the system asynchronously publishes an envelope with op `WRITE`, subject `user:*`, relation `can_view`, and object `account:me` to Kafka

@@ -44,6 +44,12 @@ See `proposal.md` for background and motivation. Currently, `tenant-service` dir
   3. Permit validly signed tokens when no explicit `allowedSubjects` or `requiredScope` are specified, so any authenticated user identity (`sub`) is accepted and injected into the request context.
 - **Alternative Considered**: Requiring hardcoded subject lists or scopes—rejected because STS user tokens represent arbitrary identities and route authorization is enforced upstream.
 
+### Decision 7: Publish static `account:me` viewing tuple at service startup
+- **Rationale**: The endpoint `GET /api/v0/me/tenants` returns the calling user's tenant memberships and evaluates against `account:me` in the authorization service. Rather than publishing redundant per-user tuples upon registration or requiring infrastructure-level OpenFGA bootstrapping, `tenant-service` publishes an idempotent permission write (`user:*` -> `can_view` -> `account:me`) at service startup when permissions publishing is initialized.
+- **Alternatives Considered**:
+  - Per-user tuple publishing on registration/provisioning—rejected due to high write volume, redundancy, and chicken-and-egg denial for identities with no existing tenant associations.
+  - Bypassing external authorization via Istio/Gateway `AuthorizationPolicy` (authenticated-only rule)—rejected to avoid relying on external infrastructure configuration, keeping route protection self-contained within the federated authorization service model.
+
 ## Risks / Trade-offs
 
 - **[Risk] Kafka publish failure in fire-and-forget mode** → **Mitigation**: Publisher performs background retries with exponential backoff using a detached context (`context.WithoutCancel`). If publishing ultimately fails, structured error logs and telemetry metrics are emitted for operational alerting and auditing.
