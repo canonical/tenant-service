@@ -271,3 +271,29 @@ func (p *KafkaPublisher) Close() error {
 	}
 	return nil
 }
+
+// PermissionOpForRole constructs a *v1.PermissionOperation mapped for the given role.
+// In the authz model, roles are entirely replaced with fine-grained cascading permissions
+// on the tenant resource directly:
+// - "owner" maps to "can_delete" (cascades to can_edit and can_view)
+// - "admin" maps to "can_edit" (cascades to can_view)
+// - "member" maps to "can_view"
+func PermissionOpForRole(op v1.PermissionOp, identityID, role, tenantID string) *v1.PermissionOperation {
+	var relation string
+	switch role {
+	case "owner":
+		relation = "can_delete"
+	case "admin":
+		relation = "can_edit"
+	case "member":
+		relation = "can_view"
+	default:
+		relation = role
+	}
+	return &v1.PermissionOperation{
+		Op:       op,
+		Subject:  "user:" + identityID,
+		Relation: relation,
+		Object:   "tenant:" + tenantID,
+	}
+}

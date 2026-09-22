@@ -326,3 +326,26 @@ func TestKafkaPublisher_Close_WaitsForInFlight(t *testing.T) {
 	assert.True(t, mockWriter.closed)
 	assert.Len(t, mockWriter.getMessages(), 1)
 }
+
+func TestPermissionOpForRole(t *testing.T) {
+	// Owner maps to tenant:tenant-abc with relation can_delete
+	ownerOp := PermissionOpForRole(v1.PermissionOp_PERMISSION_OP_WRITE, "user-123", "owner", "tenant-abc")
+	assert.Equal(t, v1.PermissionOp_PERMISSION_OP_WRITE, ownerOp.Op)
+	assert.Equal(t, "user:user-123", ownerOp.Subject)
+	assert.Equal(t, "can_delete", ownerOp.Relation)
+	assert.Equal(t, "tenant:tenant-abc", ownerOp.Object)
+
+	// Admin maps to tenant:tenant-abc with relation can_edit
+	adminOp := PermissionOpForRole(v1.PermissionOp_PERMISSION_OP_WRITE, "user-789", "admin", "tenant-abc")
+	assert.Equal(t, v1.PermissionOp_PERMISSION_OP_WRITE, adminOp.Op)
+	assert.Equal(t, "user:user-789", adminOp.Subject)
+	assert.Equal(t, "can_edit", adminOp.Relation)
+	assert.Equal(t, "tenant:tenant-abc", adminOp.Object)
+
+	// Member maps to tenant:tenant-abc with relation can_view
+	memberOp := PermissionOpForRole(v1.PermissionOp_PERMISSION_OP_DELETE, "user-456", "member", "tenant-abc")
+	assert.Equal(t, v1.PermissionOp_PERMISSION_OP_DELETE, memberOp.Op)
+	assert.Equal(t, "user:user-456", memberOp.Subject)
+	assert.Equal(t, "can_view", memberOp.Relation)
+	assert.Equal(t, "tenant:tenant-abc", memberOp.Object)
+}

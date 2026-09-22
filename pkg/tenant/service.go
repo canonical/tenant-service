@@ -144,12 +144,12 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 	// 3. Publish permission event asynchronously to Kafka
 	switch role {
 	case "owner", "member", "admin":
-		s.publisher.Publish(ctx, tenantID, &v1.PermissionOperation{
-			Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
-			Subject:  "user:" + identityID,
-			Relation: role,
-			Object:   "tenant:" + tenantID,
-		})
+		s.publisher.Publish(ctx, tenantID, permissions.PermissionOpForRole(
+			v1.PermissionOp_PERMISSION_OP_WRITE,
+			identityID,
+			role,
+			tenantID,
+		))
 	default:
 		return "", "", fmt.Errorf("invalid role: %s", role)
 	}
@@ -244,12 +244,12 @@ func (s *Service) DeleteTenant(ctx context.Context, id string) error {
 	if len(members) > 0 {
 		ops := make([]*v1.PermissionOperation, 0, len(members))
 		for _, m := range members {
-			ops = append(ops, &v1.PermissionOperation{
-				Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
-				Subject:  "user:" + m.KratosIdentityID,
-				Relation: m.Role,
-				Object:   "tenant:" + id,
-			})
+			ops = append(ops, permissions.PermissionOpForRole(
+				v1.PermissionOp_PERMISSION_OP_DELETE,
+				m.KratosIdentityID,
+				m.Role,
+				id,
+			))
 		}
 		s.publisher.Publish(ctx, id, ops...)
 	}
@@ -308,12 +308,12 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	// 3. Publish permission event asynchronously to Kafka
 	switch role {
 	case "owner", "member", "admin":
-		s.publisher.Publish(ctx, tenantID, &v1.PermissionOperation{
-			Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
-			Subject:  "user:" + identityID,
-			Relation: role,
-			Object:   "tenant:" + tenantID,
-		})
+		s.publisher.Publish(ctx, tenantID, permissions.PermissionOpForRole(
+			v1.PermissionOp_PERMISSION_OP_WRITE,
+			identityID,
+			role,
+			tenantID,
+		))
 	default:
 		err := fmt.Errorf("unknown role: %s", role)
 		span.RecordError(err)
@@ -451,18 +451,18 @@ func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role s
 
 	// 4. Publish permission update to Kafka
 	s.publisher.Publish(ctx, tenantID,
-		&v1.PermissionOperation{
-			Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
-			Subject:  "user:" + userID,
-			Relation: currentMember.Role,
-			Object:   "tenant:" + tenantID,
-		},
-		&v1.PermissionOperation{
-			Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
-			Subject:  "user:" + userID,
-			Relation: role,
-			Object:   "tenant:" + tenantID,
-		},
+		permissions.PermissionOpForRole(
+			v1.PermissionOp_PERMISSION_OP_DELETE,
+			userID,
+			currentMember.Role,
+			tenantID,
+		),
+		permissions.PermissionOpForRole(
+			v1.PermissionOp_PERMISSION_OP_WRITE,
+			userID,
+			role,
+			tenantID,
+		),
 	)
 
 	// 4. Return updated user

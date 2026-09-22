@@ -114,12 +114,12 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 	}
 
 	// 3. Publish owner permission event asynchronously to Kafka
-	s.publisher.Publish(ctx, newTenant.ID, &v1.PermissionOperation{
-		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
-		Subject:  "user:" + identityID,
-		Relation: "owner",
-		Object:   "tenant:" + newTenant.ID,
-	})
+	s.publisher.Publish(ctx, newTenant.ID, permissions.PermissionOpForRole(
+		v1.PermissionOp_PERMISSION_OP_WRITE,
+		identityID,
+		"owner",
+		newTenant.ID,
+	))
 
 	s.logger.Infow("tenant provisioned on registration",
 		"tenant_id", newTenant.ID,

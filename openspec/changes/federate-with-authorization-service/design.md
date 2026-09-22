@@ -48,7 +48,15 @@ See `proposal.md` for background and motivation. Currently, `tenant-service` dir
 - **Rationale**: The endpoint `GET /api/v0/me/tenants` returns the calling user's tenant memberships and evaluates against `account:me` in the authorization service. Rather than publishing redundant per-user tuples upon registration or requiring infrastructure-level OpenFGA bootstrapping, `tenant-service` publishes an idempotent permission write (`user:*` -> `can_view` -> `account:me`) at service startup when permissions publishing is initialized.
 - **Alternatives Considered**:
   - Per-user tuple publishing on registration/provisioning—rejected due to high write volume, redundancy, and chicken-and-egg denial for identities with no existing tenant associations.
-  - Bypassing external authorization via Istio/Gateway `AuthorizationPolicy` (authenticated-only rule)—rejected to avoid relying on external infrastructure configuration, keeping route protection self-contained within the federated authorization service model.
+### Decision 8: Replace Roles in Tenant Authorization with Direct Fine-Grained Permissions and Cascading Privileges
+- **Rationale**: Rather than using role relations (`owner`, `member`) on `type tenant` or attempting to bind tenant ownership to a global `role:tenant-owner` (which introduces multi-tenancy context collision issues and requires bridging tuples), roles are completely eliminated from tenant service authorization in favor of direct fine-grained permissions on `tenant:<tenant_id>`:
+  - `owner` maps to `can_delete`
+  - `admin` maps to `can_edit`
+  - `member` maps to `can_view`
+  The authorization service model defines cascading privileges where `can_delete` automatically confers `can_edit`, and `can_edit` automatically confers `can_view` (`can_delete -> can_edit -> can_view`).
+- **Alternatives Considered**:
+  - Global `role:tenant-owner#assignee` with `tenant_match` condition—rejected because OpenFGA tuple keys `(user, relation, object)` collide when a user owns multiple tenants, `PermissionOperation` in `messages.proto` lacks condition context parameters, and extra bridging tuples would be required.
+  - Retaining role relations (`owner`, `member`) on `type tenant`—rejected to eliminate role abstractions from authorization and align directly with fine-grained endpoint rules (`can_view`, `can_edit`, `can_delete`).
 
 ## Risks / Trade-offs
 

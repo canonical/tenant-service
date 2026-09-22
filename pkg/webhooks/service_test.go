@@ -67,7 +67,7 @@ func TestService_HandleRegistration(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenant.ID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "owner",
+					Relation: "can_delete",
 					Object:   "tenant:" + tenant.ID,
 				}).Times(1)
 			},

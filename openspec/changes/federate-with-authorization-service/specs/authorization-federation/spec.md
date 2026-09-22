@@ -12,29 +12,29 @@ The system SHALL execute incoming tenant and member operations without executing
 - **THEN** the system executes the requested operation directly against storage without performing in-process authorization queries
 
 ### Requirement: Permission Event Publishing on Tenant Creation
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation for `owner` relation on `tenant-service.permissions` topic when a new tenant is created.
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation for the tenant resource with relation `can_delete` on `tenant-service.permissions` topic when a new tenant is created.
 
 #### Scenario: Self-registration creates tenant and publishes owner permission
 - **WHEN** a user completes self-registration triggering tenant creation
-- **THEN** the system saves the tenant and membership to storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<identity_id>`, relation `owner`, and object `tenant:<tenant_id>` keyed by `tenant_id` to Kafka
+- **THEN** the system saves the tenant and membership to storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<identity_id>`, relation `can_delete`, and object `tenant:<tenant_id>` keyed by `tenant_id` to Kafka
 
 ### Requirement: Permission Event Publishing on Member Provisioning and Invites
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation for the assigned role (`owner` or `member`) when a member is added or invited to a tenant.
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation for the assigned role when a member is added or invited to a tenant, mapping roles to fine-grained permissions on the tenant resource (`owner` to `can_delete`, `admin` to `can_edit`, and `member` to `can_view`).
 
 #### Scenario: Provisioning user into tenant publishes permission event
 - **WHEN** an admin or owner provisions a user into a tenant with a given role
-- **THEN** the system creates the membership record in storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<user_id>`, relation `<role>`, and object `tenant:<tenant_id>` keyed by `tenant_id` to Kafka
+- **THEN** the system creates the membership record in storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<user_id>`, mapped relation (`can_delete`, `can_edit`, or `can_view`), and mapped object keyed by `tenant_id` to Kafka
 
 ### Requirement: Permission Event Publishing on Role Update
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing atomic `WRITE` for the new role and `DELETE` for the prior role when a member's role is updated.
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing atomic `WRITE` for the new role's permission and `DELETE` for the prior role's permission when a member's role is updated, mapping roles to fine-grained permissions on the tenant resource (`owner` -> `can_delete`, `admin` -> `can_edit`, `member` -> `can_view`).
 
-#### Scenario: Demoting owner to member emits write member and delete owner ops
+#### Scenario: Demoting owner to member emits write can_view and delete can_delete ops
 - **WHEN** a tenant owner is demoted to member role
-- **THEN** the system updates storage and asynchronously publishes an envelope containing op `WRITE` for `member` and op `DELETE` for `owner` for that user and tenant keyed by `tenant_id`
+- **THEN** the system updates storage and asynchronously publishes an envelope containing op `WRITE` for `can_view` on `tenant:<tenant_id>` and op `DELETE` for `can_delete` on `tenant:<tenant_id>` for that user keyed by `tenant_id`
 
-#### Scenario: Promoting member to owner emits write owner and delete member ops
+#### Scenario: Promoting member to owner emits write can_delete and delete can_view ops
 - **WHEN** a tenant member is promoted to owner role
-- **THEN** the system updates storage and asynchronously publishes an envelope containing op `WRITE` for `owner` and op `DELETE` for `member` for that user and tenant keyed by `tenant_id`
+- **THEN** the system updates storage and asynchronously publishes an envelope containing op `WRITE` for `can_delete` on `tenant:<tenant_id>` and op `DELETE` for `can_view` on `tenant:<tenant_id>` for that user keyed by `tenant_id`
 
 
 ### Requirement: Permission Event Publishing on Tenant Deletion

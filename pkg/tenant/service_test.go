@@ -201,7 +201,7 @@ func TestService_InviteMember(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "member",
+					Relation: "can_view",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return(recoveryLink, recoveryCode, nil)
@@ -220,7 +220,7 @@ func TestService_InviteMember(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "owner",
+					Relation: "can_delete",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return(recoveryLink, recoveryCode, nil)
@@ -239,7 +239,7 @@ func TestService_InviteMember(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "member",
+					Relation: "can_view",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return(recoveryLink, recoveryCode, nil)
@@ -293,7 +293,7 @@ func TestService_InviteMember(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "member",
+					Relation: "can_view",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 				mockKratos.EXPECT().CreateRecoveryLink(gomock.Any(), identityID, "1h").Return("", "", errors.New("kratos error"))
@@ -500,7 +500,7 @@ func TestService_DeleteTenant(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
 					Subject:  "user:identity-1",
-					Relation: "owner",
+					Relation: "can_delete",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 			},
@@ -575,7 +575,7 @@ func TestService_ProvisionUser(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "member",
+					Relation: "can_view",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "user_provisioned", "role": "member"}).Return(nil)
@@ -591,7 +591,7 @@ func TestService_ProvisionUser(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "owner",
+					Relation: "can_delete",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "user_provisioned", "role": "owner"}).Return(nil)
@@ -607,7 +607,7 @@ func TestService_ProvisionUser(t *testing.T) {
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenantID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "admin",
+					Relation: "can_edit",
 					Object:   "tenant:" + tenantID,
 				}).Times(1)
 				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "user_provisioned", "role": "admin"}).Return(nil)
@@ -799,13 +799,13 @@ func TestService_UpdateTenantUser(t *testing.T) {
 					&v1.PermissionOperation{
 						Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
 						Subject:  "user:" + userID,
-						Relation: "member",
+						Relation: "can_view",
 						Object:   "tenant:" + tenantID,
 					},
 					&v1.PermissionOperation{
 						Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 						Subject:  "user:" + userID,
-						Relation: "owner",
+						Relation: "can_delete",
 						Object:   "tenant:" + tenantID,
 					},
 				).Times(1)
@@ -847,13 +847,13 @@ func TestService_UpdateTenantUser(t *testing.T) {
 					&v1.PermissionOperation{
 						Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
 						Subject:  "user:" + userID,
-						Relation: "member",
+						Relation: "can_view",
 						Object:   "tenant:" + tenantID,
 					},
 					&v1.PermissionOperation{
 						Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 						Subject:  "user:" + userID,
-						Relation: "owner",
+						Relation: "can_delete",
 						Object:   "tenant:" + tenantID,
 					},
 				).Times(1)
