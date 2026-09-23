@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"buf.build/go/protovalidate"
-	v1 "github.com/canonical/authorization-service/api/v1"
 	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/canonical/tenant-service/internal/config"
 	"github.com/canonical/tenant-service/internal/db"
@@ -102,8 +101,6 @@ func serve() error {
 		}
 	}()
 
-	// Publish static system permission tuples on startup
-	publishStaticPermissions(context.Background(), publisher)
 
 	var jwtVerifier authentication.TokenVerifierInterface
 	if specs.AuthenticationEnabled {
@@ -257,13 +254,3 @@ func main() {
 	}
 }
 
-// publishStaticPermissions publishes baseline static permission tuples (e.g. wildcard account access)
-// to ensure endpoints like GET /api/v0/me/tenants are accessible by any authenticated user.
-func publishStaticPermissions(ctx context.Context, publisher permissions.Publisher) {
-	publisher.Publish(ctx, "", &v1.PermissionOperation{
-		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
-		Subject:  "user:*",
-		Relation: "can_view",
-		Object:   "account:me",
-	})
-}

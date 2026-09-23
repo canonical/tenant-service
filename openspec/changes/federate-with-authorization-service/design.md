@@ -44,10 +44,11 @@ See `proposal.md` for background and motivation. Currently, `tenant-service` dir
   3. Permit validly signed tokens when no explicit `allowedSubjects` or `requiredScope` are specified, so any authenticated user identity (`sub`) is accepted and injected into the request context.
 - **Alternative Considered**: Requiring hardcoded subject lists or scopes—rejected because STS user tokens represent arbitrary identities and route authorization is enforced upstream.
 
-### Decision 7: Publish static `account:me` viewing tuple at service startup
-- **Rationale**: The endpoint `GET /api/v0/me/tenants` returns the calling user's tenant memberships and evaluates against `account:me` in the authorization service. Rather than publishing redundant per-user tuples upon registration or requiring infrastructure-level OpenFGA bootstrapping, `tenant-service` publishes an idempotent permission write (`user:*` -> `can_view` -> `account:me`) at service startup when permissions publishing is initialized.
+### Decision 7: Bypass `authorization-service` for `GET /api/v0/me/tenants` via Istio Gateway Rules
+- **Rationale**: The endpoint `GET /api/v0/me/tenants` returns the calling user's tenant memberships and only inspects the caller's own memberships (`authentication.GetUserID(ctx)`). Rather than maintaining an artificial `account:me` OpenFGA resource and publishing static wildcard tuples (`user:* -> can_view -> account:me`) on startup, Istio Gateway rules bypass external authorization (`notPaths: ["/api/v0/me/tenants"]`) and route requests directly to `tenant-service`, where the built-in JWT authentication middleware validates the token and extracts the user identity.
 - **Alternatives Considered**:
-  - Per-user tuple publishing on registration/provisioning—rejected due to high write volume, redundancy, and chicken-and-egg denial for identities with no existing tenant associations.
+  - OpenFGA `type account` with static `user:* -> can_view -> account:me` tuple—rejected due to unnecessary schema complexity, startup synchronization requirements, and ext_authz latency on self-inspection queries.
+  - Per-user tuple publishing on registration/provisioning—rejected due to write amplification, redundancy, and chicken-and-egg issues for new identities.
 ### Decision 8: Replace Roles in Tenant Authorization with Direct Fine-Grained Permissions and Cascading Privileges
 - **Rationale**: Rather than using role relations (`owner`, `member`) on `type tenant` or attempting to bind tenant ownership to a global `role:tenant-owner` (which introduces multi-tenancy context collision issues and requires bridging tuples), roles are completely eliminated from tenant service authorization in favor of direct fine-grained permissions on `tenant:<tenant_id>`:
   - `owner` maps to `can_delete`

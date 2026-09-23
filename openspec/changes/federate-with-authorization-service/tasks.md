@@ -19,8 +19,8 @@
 - [x] 4.1 Refactor `pkg/tenant/service.go` to replace OpenFGA calls with asynchronous `permissions.Publisher` event publishing and remove internal authorization check queries.
 - [x] 4.2 Refactor `pkg/webhooks/service.go` to publish owner permission events asynchronously via `permissions.Publisher` on self-registration.
 - [x] 4.3 Update unit tests in `pkg/tenant/service_test.go`, `pkg/tenant/handlers_test.go`, and `pkg/webhooks/service_test.go` with mock publisher expectations.
-- [x] 4.4 Emit static wildcard permission tuple (`user:*` -> `can_view` -> `account:me`) on service startup in `cmd/serve.go`.
-- [x] 4.5 Update unit/integration tests to verify static account permission publishing on service startup.
+- [x] 4.4 Configure Istio Gateway rules (`k8s/istio.yaml`) to bypass `authorization-service` for `GET /api/v0/me/tenants` and rely on built-in JWT verification, removing static `account:me` emission from `cmd/serve.go`.
+- [x] 4.5 Clean up static permission publishing tests in `cmd/serve_test.go`.
 
 ## 5. Legacy OpenFGA Cleanup
 
