@@ -40,7 +40,7 @@ See `proposal.md` for background and motivation. Currently, `tenant-service` dir
 ### Decision 6: Support STS JWT Verification in `pkg/authentication`
 - **Rationale**: Upstream Envoy Gateway and Authorization Service forward the caller's STS access token via `Authorization: Bearer <token>`. In `pkg/authentication/provider.go` and `verifier.go`:
   1. Add `SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256}` to support STS signing keys.
-  2. Set `SkipIssuerCheck: true` when manual JWKS (`AUTHENTICATION_JWKS_URL`) is configured.
+  2. Enforce issuer validation (`SkipIssuerCheck: false`) when manual JWKS (`AUTHENTICATION_JWKS_URL`) is configured, ensuring tokens originate from the expected issuer.
   3. Permit validly signed tokens when no explicit `allowedSubjects` or `requiredScope` are specified, so any authenticated user identity (`sub`) is accepted and injected into the request context.
 - **Alternative Considered**: Requiring hardcoded subject lists or scopes—rejected because STS user tokens represent arbitrary identities and route authorization is enforced upstream.
 

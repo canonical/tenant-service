@@ -132,7 +132,7 @@ func TestJWTVerifier_STS_TokenVerification(t *testing.T) {
 		verifier := NewJWTVerifierDirect(idTokenVerifier, nil, "", mockTracer, mockMonitor, mockLogger)
 
 		token, err := signTestJWT(privKey, "sts-key-1", map[string]interface{}{
-			"iss": "https://different-issuer.example.com", // SkipIssuerCheck should allow different issuer
+			"iss": "https://sts.example.com",
 			"sub": "user-sts-456",
 			"exp": time.Now().Add(1 * time.Hour).Unix(),
 			"aud": "tenant-service",
@@ -142,6 +142,29 @@ func TestJWTVerifier_STS_TokenVerification(t *testing.T) {
 		sub, err := verifier.VerifyToken(ctx, token)
 		require.NoError(t, err)
 		assert.Equal(t, "user-sts-456", sub)
+	})
+
+	t.Run("STS token rejected when issuer does not match", func(t *testing.T) {
+		ctrl, mockTracer, mockMonitor, mockLogger := setupMocks(t)
+		defer ctrl.Finish()
+
+		mockSecurity := NewMockSecurityLoggerInterface(ctrl)
+		mockLogger.EXPECT().Security().Return(mockSecurity).AnyTimes()
+		mockSecurity.EXPECT().AuthzFailure(gomock.Any(), "jwt_api_access").AnyTimes()
+
+		verifier := NewJWTVerifierDirect(idTokenVerifier, nil, "", mockTracer, mockMonitor, mockLogger)
+
+		token, err := signTestJWT(privKey, "sts-key-1", map[string]interface{}{
+			"iss": "https://different-issuer.example.com",
+			"sub": "user-sts-456",
+			"exp": time.Now().Add(1 * time.Hour).Unix(),
+			"aud": "tenant-service",
+		})
+		require.NoError(t, err)
+
+		_, err = verifier.VerifyToken(ctx, token)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "oidc: id token issued by a different provider")
 	})
 
 	t.Run("STS token rejected when empty subject", func(t *testing.T) {

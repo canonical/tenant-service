@@ -39,7 +39,7 @@ func NewProviderWithJWKS(ctx context.Context, issuer, jwksURL string) (*oidc.IDT
 
 	verifier := oidc.NewVerifier(issuer, keySet, &oidc.Config{
 		SkipClientIDCheck:    true,
-		SkipIssuerCheck:      true,
+		SkipIssuerCheck:      false,
 		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256},
 	})
 

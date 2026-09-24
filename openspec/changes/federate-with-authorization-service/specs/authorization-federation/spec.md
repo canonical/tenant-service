@@ -55,6 +55,10 @@ The system SHALL verify incoming bearer JWT tokens issued by STS using keys from
 - **WHEN** an authenticated request arrives with a validly signed token but no `AUTHENTICATION_ALLOWED_SUBJECTS` or `AUTHENTICATION_REQUIRED_SCOPE` is configured
 - **THEN** the system accepts the token and extracts the `sub` identity without rejecting the request
 
+#### Scenario: Token with mismatched issuer is rejected
+- **WHEN** an authenticated request arrives with a token whose `iss` claim does not match the configured issuer
+- **THEN** the system rejects the token verification with an error
+
 ### Requirement: Gateway Bypass and Direct JWT Authentication for Self-Inspection
 The system SHALL configure Istio Gateway rules to bypass external authorization checks for `GET /api/v0/me/tenants` and SHALL validate caller identity directly via JWT authentication middleware.
 

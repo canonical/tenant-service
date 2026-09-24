@@ -5,7 +5,7 @@
 
 ## 2. Authentication and STS Token Verification
 
-- [x] 2.1 Update `pkg/authentication/provider.go` to support `RS256` and `ES256` signing algorithms and set `SkipIssuerCheck: true` when a manual JWKS URL is provided.
+- [x] 2.1 Update `pkg/authentication/provider.go` to support `RS256` and `ES256` signing algorithms and enforce issuer validation (`SkipIssuerCheck: false`).
 - [x] 2.2 Update `pkg/authentication/verifier.go` to permit validly signed tokens when neither allowed subjects nor required scopes are configured.
 - [x] 2.3 Update unit tests in `pkg/authentication/verifier_test.go` and `pkg/authentication/middleware_test.go` to cover STS token verification and algorithm support.
 
