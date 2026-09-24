@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "github.com/canonical/authorization-service/api/v1"
@@ -32,10 +31,6 @@ type KafkaPublisher struct {
 	service        string
 	logger         logging.LoggerInterface
 	publishTimeout time.Duration
-	maxRetries     int
-	retryBackoff   time.Duration
-	closeTimeout   time.Duration
-	wg             sync.WaitGroup
 }
 
 // NewKafkaPublisher initializes a new KafkaPublisher with the specified brokers and topic.
@@ -70,10 +65,19 @@ func NewKafkaPublisher(
 	writer := &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,
-		Balancer:               &kafka.LeastBytes{},
+		Balancer:               &kafka.Hash{},
 		RequiredAcks:           kafka.RequireAll,
-		MaxAttempts:            3,
+		MaxAttempts:            10,
+		Async:                  true,
 		AllowAutoTopicCreation: false,
+		Completion: func(messages []kafka.Message, err error) {
+			if err != nil {
+				logger.Errorw("failed to publish permission update to kafka",
+					"error", err,
+					"messages_count", len(messages),
+				)
+			}
+		},
 	}
 
 	return &KafkaPublisher{
@@ -81,9 +85,6 @@ func NewKafkaPublisher(
 		service:        service,
 		logger:         logger,
 		publishTimeout: 5 * time.Second,
-		maxRetries:     3,
-		retryBackoff:   100 * time.Millisecond,
-		closeTimeout:   5 * time.Second,
 	}, nil
 }
 
@@ -106,14 +107,11 @@ func NewKafkaPublisherWithWriter(
 		service:        service,
 		logger:         logger,
 		publishTimeout: 5 * time.Second,
-		maxRetries:     3,
-		retryBackoff:   50 * time.Millisecond,
-		closeTimeout:   5 * time.Second,
 	}
 }
 
 // Publish builds a PermissionUpdateEnvelope, keys the message by tenantID for FIFO ordering,
-// and publishes asynchronously using a detached context so callers never wait on Kafka I/O.
+// and publishes asynchronously via the underlying Kafka writer.
 func (p *KafkaPublisher) Publish(ctx context.Context, tenantID string, ops ...*v1.PermissionOperation) {
 	if p == nil || p.writer == nil || len(ops) == 0 {
 		return
@@ -128,14 +126,16 @@ func (p *KafkaPublisher) Publish(ctx context.Context, tenantID string, ops ...*v
 		return
 	}
 
-	// Detach context so request cancellation or database commit completion does not abort publishing
-	detachedCtx := context.WithoutCancel(ctx)
+	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), p.publishTimeout)
+	defer cancel()
 
-	p.wg.Add(1)
-	go func(targetCtx context.Context, message kafka.Message, msgID string, tID string, opCount int) {
-		defer p.wg.Done()
-		p.writeWithRetry(targetCtx, message, msgID, tID, opCount)
-	}(detachedCtx, msg, envelope.MessageId, tenantID, len(ops))
+	if err := p.writer.WriteMessages(writeCtx, msg); err != nil {
+		p.logger.Errorw("failed to write kafka message",
+			"tenant_id", tenantID,
+			"message_id", envelope.MessageId,
+			"error", err,
+		)
+	}
 }
 
 // PublishSync publishes the permission operations synchronously (primarily for testing and migration scripts).
@@ -195,81 +195,12 @@ func (p *KafkaPublisher) buildMessage(
 	return envelope, msg, nil
 }
 
-func (p *KafkaPublisher) writeWithRetry(
-	ctx context.Context,
-	msg kafka.Message,
-	msgID string,
-	tenantID string,
-	opCount int,
-) {
-	var err error
-	backoff := p.retryBackoff
-
-	for attempt := 1; attempt <= p.maxRetries; attempt++ {
-		writeCtx, cancel := context.WithTimeout(ctx, p.publishTimeout)
-		err = p.writer.WriteMessages(writeCtx, msg)
-		cancel()
-
-		if err == nil {
-			return
-		}
-
-		if attempt < p.maxRetries {
-			select {
-			case <-ctx.Done():
-				p.logger.Errorw("context canceled during kafka write retries",
-					"message_id", msgID,
-					"tenant_id", tenantID,
-					"attempt", attempt,
-					"error", ctx.Err(),
-				)
-				return
-			case <-time.After(backoff):
-				backoff *= 2
-			}
-		}
-	}
-
-	p.logger.Errorw("failed to publish permission update to kafka after retries",
-		"message_id", msgID,
-		"tenant_id", tenantID,
-		"operation_count", opCount,
-		"attempts", p.maxRetries,
-		"error", err,
-	)
-}
-
-// Close waits for any in-flight background publish operations with a bounded timeout,
-// then closes the underlying Kafka writer.
+// Close closes the underlying Kafka writer, which flushes any pending messages.
 func (p *KafkaPublisher) Close() error {
-	if p == nil {
+	if p == nil || p.writer == nil {
 		return nil
 	}
-
-	// Wait for in-flight goroutines to complete within timeout
-	done := make(chan struct{})
-	go func() {
-		p.wg.Wait()
-		close(done)
-	}()
-
-	timeout := p.closeTimeout
-	if timeout == 0 {
-		timeout = 5 * time.Second
-	}
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		p.logger.Warnw("timed out waiting for in-flight kafka publish operations to complete",
-			"timeout", timeout,
-		)
-	}
-
-	if p.writer != nil {
-		return p.writer.Close()
-	}
-	return nil
+	return p.writer.Close()
 }
 
 // PermissionOpForRole constructs a *v1.PermissionOperation mapped for the given role.

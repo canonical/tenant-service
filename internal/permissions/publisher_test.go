@@ -10,7 +10,6 @@ import (
 	"errors"
 	"sync"
 	"testing"
-	"time"
 
 	v1 "github.com/canonical/authorization-service/api/v1"
 	"github.com/segmentio/kafka-go"
@@ -134,12 +133,8 @@ func TestKafkaPublisher_Publish_Async(t *testing.T) {
 	ctx := context.Background()
 	publisher.Publish(ctx, "tenant-456", op)
 
-	// Wait briefly for asynchronous goroutine
-	require.Eventually(t, func() bool {
-		return len(mockWriter.getMessages()) == 1
-	}, 1*time.Second, 10*time.Millisecond)
-
 	msgs := mockWriter.getMessages()
+	require.Len(t, msgs, 1)
 	assert.Equal(t, []byte("tenant-456"), msgs[0].Key)
 
 	var env v1.PermissionUpdateEnvelope
@@ -179,31 +174,23 @@ func TestKafkaPublisher_WithCorrelationID(t *testing.T) {
 	assert.Equal(t, expectedTraceID, *env.CorrelationId)
 }
 
-func TestKafkaPublisher_Retry(t *testing.T) {
+func TestKafkaPublisher_Publish_WriteError(t *testing.T) {
 	mockWriter := &mockKafkaWriter{
-		writeErrFunc: func(attempt int) error {
-			if attempt < 3 {
-				return errors.New("temporary kafka error")
-			}
-			return nil
-		},
+		writeErr: errors.New("write failure"),
 	}
 
 	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
 
 	ctx := context.Background()
-	publisher.Publish(ctx, "tenant-retry", &v1.PermissionOperation{
+	// Should not panic on write error
+	publisher.Publish(ctx, "tenant-err", &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 		Subject:  "user:u1",
 		Relation: "owner",
-		Object:   "tenant:tenant-retry",
+		Object:   "tenant:tenant-err",
 	})
 
-	require.Eventually(t, func() bool {
-		return len(mockWriter.getMessages()) == 1
-	}, 2*time.Second, 20*time.Millisecond)
-
-	assert.Equal(t, 3, mockWriter.getAttempts())
+	assert.Equal(t, 1, mockWriter.getAttempts())
 }
 
 func TestKafkaPublisher_Close(t *testing.T) {
@@ -274,57 +261,23 @@ func TestNewKafkaPublisher(t *testing.T) {
 	}
 }
 
-func TestKafkaPublisher_Close_WaitsForInFlight(t *testing.T) {
-	writeStarted := make(chan struct{})
-	allowWrite := make(chan struct{})
+func TestNewKafkaPublisher_WriterConfig(t *testing.T) {
+	pub, err := NewKafkaPublisher([]string{"localhost:9092"}, "test-topic", "test-service", nil)
+	require.NoError(t, err)
+	require.NotNil(t, pub)
 
-	mockWriter := &mockKafkaWriter{
-		writeErrFunc: func(attempt int) error {
-			close(writeStarted)
-			<-allowWrite
-			return nil
-		},
-	}
+	kw, ok := pub.writer.(*kafka.Writer)
+	require.True(t, ok)
+	assert.True(t, kw.Async)
+	assert.Equal(t, 10, kw.MaxAttempts)
+	assert.IsType(t, &kafka.Hash{}, kw.Balancer)
+	assert.NotNil(t, kw.Completion)
 
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
-	publisher.closeTimeout = 1 * time.Second
-
-	ctx := context.Background()
-	publisher.Publish(ctx, "tenant-inflight", &v1.PermissionOperation{
-		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
-		Subject:  "user:u1",
-		Relation: "owner",
-		Object:   "tenant:tenant-inflight",
+	// Verify completion hook runs without panicking
+	assert.NotPanics(t, func() {
+		kw.Completion([]kafka.Message{{Key: []byte("test")}}, errors.New("test error"))
+		kw.Completion([]kafka.Message{{Key: []byte("test")}}, nil)
 	})
-
-	// Wait until goroutine enters WriteMessages
-	<-writeStarted
-
-	closedCh := make(chan struct{})
-	go func() {
-		_ = publisher.Close()
-		close(closedCh)
-	}()
-
-	// Ensure writer is not yet closed while goroutine is in-flight
-	select {
-	case <-closedCh:
-		t.Fatal("Close returned before in-flight operation finished")
-	case <-time.After(50 * time.Millisecond):
-	}
-
-	// Unblock write
-	close(allowWrite)
-
-	// Close should now finish
-	select {
-	case <-closedCh:
-	case <-time.After(1 * time.Second):
-		t.Fatal("Close timed out waiting for in-flight operation")
-	}
-
-	assert.True(t, mockWriter.closed)
-	assert.Len(t, mockWriter.getMessages(), 1)
 }
 
 func TestPermissionOpForRole(t *testing.T) {
