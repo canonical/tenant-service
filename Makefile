@@ -37,6 +37,11 @@ vendor:
 	$(GO) mod vendor
 .PHONY: vendor
 
+govulncheck: vendor
+	$(GO) install golang.org/x/vuln/cmd/govulncheck@latest
+	PATH="$$($(GO) env GOPATH)/bin:$$PATH" govulncheck ./...
+.PHONY: govulncheck
+
 generate-http-client:
 	@mkdir -p openapi
 	curl -fsSL "$(OPENAPI_SPEC_URL)" -o openapi/openapi.yaml

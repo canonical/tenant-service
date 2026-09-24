@@ -16,7 +16,6 @@ import (
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
-	"github.com/ory/hydra/v2/oauth2"
 )
 
 // Service provides webhook business logic.
@@ -133,7 +132,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 	return nil
 }
 
-func (s *Service) HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequest) (*TokenHookResponse, error) {
+func (s *Service) HandleTokenHook(ctx context.Context, req *TokenHookRequest) (*TokenHookResponse, error) {
 	ctx, span := s.tracer.Start(ctx, "webhooks.Service.HandleTokenHook")
 	defer span.End()
 
@@ -257,7 +256,7 @@ func isNotFound(err error) bool {
 // is never forwarded to the consent session. If it were to arrive here, the
 // membership check would fail (no tenant with id "_none" exists), resulting
 // in a 403 — correct fail-closed behavior.
-func (s *Service) extractTenantIDFromSession(req *oauth2.TokenHookRequest) string {
+func (s *Service) extractTenantIDFromSession(req *TokenHookRequest) string {
 	if req.Session != nil && req.Session.Extra != nil {
 		if v, ok := req.Session.Extra["_tenant_id"].(string); ok {
 			return v

@@ -5,8 +5,6 @@ package webhooks
 
 import (
 	"encoding/json"
-
-	"github.com/ory/hydra/v2/oauth2"
 )
 
 // KratosIdentity represents a user identity from Kratos.
@@ -29,7 +27,25 @@ func (k *KratosIdentity) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type TokenHookRequest = oauth2.TokenHookRequest
+// Session represents the session data sent in the token hook request.
+type Session struct {
+	Subject  string                 `json:"subject,omitempty"`
+	Extra    map[string]interface{} `json:"extra,omitempty"`
+	ClientID string                 `json:"client_id,omitempty"`
+}
+
+// NewSession creates a Session with the given subject and an initialized Extra map.
+func NewSession(subject string) *Session {
+	return &Session{
+		Subject: subject,
+		Extra:   make(map[string]interface{}),
+	}
+}
+
+// TokenHookRequest is the request body sent to the Ory Hydra token hook.
+type TokenHookRequest struct {
+	Session *Session `json:"session"`
+}
 
 // TokenHookResponse represents the response containing the tokens session.
 type TokenHookResponse struct {
