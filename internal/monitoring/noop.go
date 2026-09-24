@@ -35,3 +35,6 @@ func (m *NoopMonitor) SetDependencyAvailability(map[string]string, float64) erro
 func (m *NoopMonitor) IncrementCounter(map[string]string) error {
 	return nil
 }
+func (m *NoopMonitor) AddPermissionEvents(map[string]string, float64) error {
+	return nil
+}

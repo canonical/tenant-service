@@ -24,7 +24,6 @@ import (
 
 const (
 	defaultBaseURL = "http://localhost:8000"
-	fgaAPIToken    = "42" // Matches docker-compose
 )
 
 var (
@@ -123,25 +122,11 @@ func setupTestEnvironment() (*TestEnvironment, error) {
 		return nil, fmt.Errorf("failed to start docker compose: %w", err)
 	}
 
-	// Wait for OpenFGA
-	openfgaURL := "http://localhost:8080"
-	if err := waitForHTTP(ctx, openfgaURL+"/healthz"); err != nil {
-		cleanup()
-		return nil, fmt.Errorf("openfga not ready: %w", err)
-	}
-
 	// Run Migrations
 	dsn := "postgres://tenants:tenants@localhost:5432/tenants?sslmode=disable"
 	if err := runMigrations(ctx, binPath, dsn); err != nil {
 		cleanup()
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
-	}
-
-	// Setup OpenFGA Model
-	storeID, modelID, err := setupOpenFGA(ctx, binPath, openfgaURL)
-	if err != nil {
-		cleanup()
-		return nil, fmt.Errorf("failed to setup openfga: %w", err)
 	}
 
 	// Setup Hydra OAuth2 client for authentication
@@ -156,11 +141,7 @@ func setupTestEnvironment() (*TestEnvironment, error) {
 		"WEBHOOKS_API_TOKEN":              "secret_api_key",
 		"DSN":                             dsn,
 		"KRATOS_ADMIN_URL":                "http://localhost:4434",
-		"OPENFGA_API_SCHEME":              "http",
-		"OPENFGA_API_HOST":                "localhost:8080",
-		"OPENFGA_STORE_ID":                storeID,
-		"OPENFGA_AUTHORIZATION_MODEL_ID":  modelID,
-		"OPENFGA_API_TOKEN":               fgaAPIToken,
+		"KAFKA_ENABLED":                   "false",
 		"PORT":                            "8000",
 		"LOG_LEVEL":                       "debug",
 		"TRACING_ENABLED":                 "false",
@@ -328,29 +309,6 @@ func runMigrations(ctx context.Context, binPath, dsn string) error {
 			}
 		}
 	}
-}
-
-func setupOpenFGA(ctx context.Context, binPath, apiURL string) (string, string, error) {
-	cmd := exec.CommandContext(ctx, binPath, "create-fga-model",
-		"--fga-api-url", apiURL,
-		"--fga-api-token", fgaAPIToken,
-		"--format", "json",
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create fga model: %v, output: %s", err, string(output))
-	}
-
-	var result struct {
-		StoreID string `json:"store_id"`
-		ModelID string `json:"model_id"`
-	}
-
-	if err := json.Unmarshal(output, &result); err != nil {
-		return "", "", fmt.Errorf("failed to parse fga model output: %v, output: %s", err, string(output))
-	}
-
-	return result.StoreID, result.ModelID, nil
 }
 
 func setupHydraClient(ctx context.Context, clientName string) (string, string, error) {

@@ -132,12 +132,8 @@ func testListTenantUsersPagination(t *testing.T, client TenantClient) {
 	ts := time.Now().UnixNano()
 	for i := 0; i < paginationNumUsers; i++ {
 		email := fmt.Sprintf("user%03d-%d@e2e.example.com", i+1, ts)
-		role := "member"
-		if i == 0 {
-			role = "owner"
-		}
-		if err := client.ProvisionTenantUser(ctx, tenantID, email, role); err != nil {
-			t.Fatalf("setup: ProvisionTenantUser(%q, %q): %v", email, role, err)
+		if err := client.ProvisionTenantUser(ctx, tenantID, email); err != nil {
+			t.Fatalf("setup: ProvisionTenantUser(%q): %v", email, err)
 		}
 		createdEmails[email] = struct{}{}
 	}

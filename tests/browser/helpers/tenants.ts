@@ -83,7 +83,6 @@ export async function provisionUser(
   token: string,
   tenantId: string,
   email: string,
-  role: string = "member",
 ): Promise<void> {
   const res = await fetch(
     `${TENANT_SERVICE}/api/v0/tenants/${tenantId}/users`,
@@ -93,7 +92,7 @@ export async function provisionUser(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({ email }),
     },
   );
 
