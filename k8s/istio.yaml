@@ -23,9 +23,6 @@ spec:
         - path:
             type: PathPrefix
             value: /api/v0/users
-        - path:
-            type: PathPrefix
-            value: /api/v0/status
       backendRefs:
         - name: tenant-service
           port: 8080
@@ -47,14 +44,12 @@ spec:
   rules:
     - to:
         - operation:
-            # Protect all /api/v0/ routes by default (fail-secure)
+            # Protect tenant-service routes specifically (avoid collisions on shared gateway)
             paths:
-              - "/api/v0/*"
+              - "/api/v0/tenants"
+              - "/api/v0/tenants/*"
+              - "/api/v0/users"
+              - "/api/v0/users/*"
             notPaths:
-              # Bypass authorization-service for me/tenants:
-              # tenant-service directly validates caller JWT and extracts user ID
-              - "/api/v0/me/tenants"
               # Unauthenticated tenant lookup used by login UI
               - "/api/v0/tenants/lookup"
-              # Unauthenticated service status
-              - "/api/v0/status"
