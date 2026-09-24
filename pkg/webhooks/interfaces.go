@@ -3,8 +3,6 @@
 
 package webhooks
 
-//go:generate mockgen -build_flags=--mod=mod -package webhooks -destination ./mock_webhooks.go -source=./interfaces.go
-
 import (
 	"context"
 
