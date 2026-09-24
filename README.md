@@ -15,6 +15,15 @@ This command will:
 2. Build and run the service locally.
 3. Start an OIDC client on `http://localhost:4446` to facilitate login flows.
 
+Permission events are disabled by default (`KAFKA_ENABLED=false`), since they are only consumed by the
+authorization service. To publish them locally, start the authorization service's dependencies
+(`make start-deps` in `authorization-service`, which provides Kafka on `localhost:9092` and creates the
+`tenant-service.permissions` topic) and run:
+
+```bash
+KAFKA_ENABLED=true ./start.sh
+```
+
 ## Kubernetes Development
 
 To run the full stack in a MicroK8s cluster using Skaffold:
@@ -57,12 +66,10 @@ The service is configured using environment variables.
 | `DB_MIN_CONNS` | Minimum open DB connections | `2` | No |
 | `DB_MAX_CONN_LIFETIME` | Maximum amount of time a connection may be reused | `1h` | No |
 | `DB_MAX_CONN_IDLE_TIME` | Maximum amount of time a connection may be idle | `30m` | No |
-| `AUTHORIZATION_ENABLED` | Enable OpenFGA authorization checks | `false` | No |
-| `OPENFGA_API_SCHEME` | OpenFGA API Scheme (http/https) | | No |
-| `OPENFGA_API_HOST` | OpenFGA API Host | | No |
-| `OPENFGA_API_TOKEN` | OpenFGA API Token | | No |
-| `OPENFGA_STORE_ID` | OpenFGA Store ID | | No |
-| `OPENFGA_AUTHORIZATION_MODEL_ID` | OpenFGA Model ID | | No |
+| `KAFKA_ENABLED` | Publish permission events to Kafka (a no-op publisher is used when disabled) | `false` | No |
+| `KAFKA_BROKERS` | Comma-separated Kafka broker addresses | | If Kafka enabled |
+| `KAFKA_PERMISSIONS_TOPIC` | Topic for permission events | `tenant-service.permissions` | No |
+| `KAFKA_CLIENT_ID` | Service name set on published envelopes | `tenant-service` | No |
 | `AUTHENTICATION_ENABLED` | Enable JWT Authentication | `true` | No |
 | `AUTHENTICATION_ISSUER` | OIDC Issuer URL | | No |
 | `AUTHENTICATION_JWKS_URL` | Manual JWKS URL (optional) | | No |
