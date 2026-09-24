@@ -9,4 +9,7 @@ type MonitorInterface interface {
 	SetStorageResponseTimeMetric(map[string]string, float64) error
 	SetDependencyAvailability(map[string]string, float64) error
 	IncrementCounter(map[string]string) error
+	// AddPermissionEvents adds count to the permission events counter.
+	// Expected tags: "result" and "stage".
+	AddPermissionEvents(map[string]string, float64) error
 }

@@ -47,3 +47,4 @@
 - [x] 7.9 Drop the `role` label from `business_operations_total`.
 - [x] 7.10 Update CLI (`cmd/tenant_users.go`, `cmd/client_http.go`) and regenerate `client/http/client.gen.go`.
 - [x] 7.11 Update unit, e2e, and browser tests.
+- [x] 7.12 Add the `permission_events_total{result, stage}` counter to the publisher, recording marshal, write, and delivery outcomes per envelope, and remove the unused `PublishSync`.

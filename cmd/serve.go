@@ -86,6 +86,7 @@ func serve() error {
 			specs.KafkaPermissionsTopic,
 			specs.KafkaClientID,
 			logger,
+			monitor,
 		)
 		if err != nil {
 			return fmt.Errorf("invalid kafka configuration: %w", err)

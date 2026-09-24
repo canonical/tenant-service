@@ -17,6 +17,7 @@ type Monitor struct {
 	storageResponseTime    *prometheus.HistogramVec
 	dependencyAvailability *prometheus.GaugeVec
 	operationsTotal        *prometheus.CounterVec
+	permissionEventsTotal  *prometheus.CounterVec
 
 	logger logging.LoggerInterface
 }
@@ -61,6 +62,16 @@ func (m *Monitor) IncrementCounter(tags map[string]string) error {
 	}
 
 	m.operationsTotal.With(tags).Inc()
+
+	return nil
+}
+
+func (m *Monitor) AddPermissionEvents(tags map[string]string, count float64) error {
+	if m.permissionEventsTotal == nil {
+		return fmt.Errorf("metric not instantiated")
+	}
+
+	m.permissionEventsTotal.With(tags).Add(count)
 
 	return nil
 }
@@ -154,7 +165,16 @@ func (m *Monitor) registerCounters() {
 		[]string{"operation"},
 	)
 
-	counters = append(counters, m.operationsTotal)
+	m.permissionEventsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:        "permission_events_total",
+			Help:        "Total number of permission event envelopes published to Kafka, partitioned by result and the stage at which the result was determined.",
+			ConstLabels: labels,
+		},
+		[]string{"result", "stage"},
+	)
+
+	counters = append(counters, m.operationsTotal, m.permissionEventsTotal)
 
 	for _, counter := range counters {
 		err := prometheus.Register(counter)

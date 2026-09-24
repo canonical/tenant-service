@@ -69,7 +69,7 @@ See `proposal.md` for background and motivation. Currently, `tenant-service` dir
 
 ## Risks / Trade-offs
 
-- **[Risk] Kafka publish failure in fire-and-forget mode** → **Mitigation**: Publisher performs background retries with exponential backoff using a detached context (`context.WithoutCancel`). If publishing ultimately fails, structured error logs and telemetry metrics are emitted for operational alerting and auditing.
+- **[Risk] Kafka publish failure in fire-and-forget mode** → **Mitigation**: Publisher performs background retries with exponential backoff using a detached context (`context.WithoutCancel`). If publishing ultimately fails, a structured error log is written and the `permission_events_total{result="failure"}` counter is incremented (`stage` is `marshal`, `write`, or `delivery`) for operational alerting and auditing. Successful deliveries are counted with `result="success"`.
 - **[Risk] Local test environment overhead** → **Mitigation**: `NoopPublisher` and mock publisher interfaces allow all existing test suites to run without requiring a running Kafka broker.
 - **[Risk] Breaking API change for other `identity-platform-api` consumers (e.g. Admin UI)** → **Mitigation**: Coordinate the upstream change; removed proto fields are `reserved` so field numbers are never reused.
 - **[Risk] Admin-created tenants have no owner until one is granted through the authorization service API** → **Mitigation**: Document the platform-admin flow; self-registered tenants are unaffected.

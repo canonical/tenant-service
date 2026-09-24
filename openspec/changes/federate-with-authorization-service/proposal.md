@@ -32,4 +32,4 @@ Currently, `tenant-service` directly queries and mutates OpenFGA tuple stores in
 - **Infrastructure**: Requires Kafka broker connection (`KAFKA_BROKERS`, `KAFKA_PERMISSIONS_TOPIC`). Removes OpenFGA store connection requirements.
 - **Database**: Migration `003_drop_memberships_role.sql` drops `memberships.role`.
 - **API / Clients**: Breaking for clients sending `role` or calling `PATCH /api/v0/tenants/{tenant_id}/users/{user_id}`. The `tenant users update` CLI command is removed and `invite`/`provision` no longer take a role argument.
-- **Observability**: The `business_operations_total` metric drops its `role` label.
+- **Observability**: The `business_operations_total` metric drops its `role` label. A new `permission_events_total{result, stage}` counter tracks permission event publishing, one count per envelope, so delivery failures can be alerted on.

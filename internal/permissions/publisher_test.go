@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	v1 "github.com/canonical/authorization-service/api/v1"
+	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,9 +82,9 @@ func TestNoopPublisher(t *testing.T) {
 	assert.NoError(t, noop.Close())
 }
 
-func TestKafkaPublisher_PublishSync(t *testing.T) {
+func TestKafkaPublisher_Publish_Envelope(t *testing.T) {
 	mockWriter := &mockKafkaWriter{}
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 	require.NotNil(t, publisher)
 
 	op := &v1.PermissionOperation{
@@ -94,8 +95,7 @@ func TestKafkaPublisher_PublishSync(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := publisher.PublishSync(ctx, "tenant-123", op)
-	require.NoError(t, err)
+	publisher.Publish(ctx, "tenant-123", op)
 
 	msgs := mockWriter.getMessages()
 	require.Len(t, msgs, 1)
@@ -105,7 +105,7 @@ func TestKafkaPublisher_PublishSync(t *testing.T) {
 
 	// Verify protobuf deserialization
 	var env v1.PermissionUpdateEnvelope
-	err = proto.Unmarshal(msgs[0].Value, &env)
+	err := proto.Unmarshal(msgs[0].Value, &env)
 	require.NoError(t, err)
 
 	assert.Equal(t, "1.0", env.Version)
@@ -122,7 +122,7 @@ func TestKafkaPublisher_PublishSync(t *testing.T) {
 
 func TestKafkaPublisher_Publish_Async(t *testing.T) {
 	mockWriter := &mockKafkaWriter{}
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 
 	op := &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
@@ -146,7 +146,7 @@ func TestKafkaPublisher_Publish_Async(t *testing.T) {
 
 func TestKafkaPublisher_WithCorrelationID(t *testing.T) {
 	mockWriter := &mockKafkaWriter{}
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 
 	tp := sdktrace.NewTracerProvider()
 	otel.SetTracerProvider(tp)
@@ -157,19 +157,18 @@ func TestKafkaPublisher_WithCorrelationID(t *testing.T) {
 
 	expectedTraceID := span.SpanContext().TraceID().String()
 
-	err := publisher.PublishSync(ctx, "tenant-789", &v1.PermissionOperation{
+	publisher.Publish(ctx, "tenant-789", &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 		Subject:  "user:u1",
 		Relation: RelationCanEdit,
 		Object:   "tenant:tenant-789",
 	})
-	require.NoError(t, err)
 
 	msgs := mockWriter.getMessages()
 	require.Len(t, msgs, 1)
 
 	var env v1.PermissionUpdateEnvelope
-	err = proto.Unmarshal(msgs[0].Value, &env)
+	err := proto.Unmarshal(msgs[0].Value, &env)
 	require.NoError(t, err)
 	require.NotNil(t, env.CorrelationId)
 	assert.Equal(t, expectedTraceID, *env.CorrelationId)
@@ -180,7 +179,7 @@ func TestKafkaPublisher_Publish_WriteError(t *testing.T) {
 		writeErr: errors.New("write failure"),
 	}
 
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 
 	ctx := context.Background()
 	// Should not panic on write error
@@ -196,7 +195,7 @@ func TestKafkaPublisher_Publish_WriteError(t *testing.T) {
 
 func TestKafkaPublisher_Close(t *testing.T) {
 	mockWriter := &mockKafkaWriter{}
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 
 	assert.NoError(t, publisher.Close())
 	assert.True(t, mockWriter.closed)
@@ -246,7 +245,7 @@ func TestNewKafkaPublisher(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pub, err := NewKafkaPublisher(tt.brokers, tt.topic, tt.service, nil)
+			pub, err := NewKafkaPublisher(tt.brokers, tt.topic, tt.service, nil, nil)
 			if tt.expectErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -263,7 +262,7 @@ func TestNewKafkaPublisher(t *testing.T) {
 }
 
 func TestNewKafkaPublisher_WriterConfig(t *testing.T) {
-	pub, err := NewKafkaPublisher([]string{"localhost:9092"}, "test-topic", "test-service", nil)
+	pub, err := NewKafkaPublisher([]string{"localhost:9092"}, "test-topic", "test-service", nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, pub)
 
@@ -387,20 +386,9 @@ func TestKafkaPublisher_Chunking(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("PublishSync/"+tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			mockWriter := &mockKafkaWriter{}
-			publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
-
-			ops := buildOps(tt.numOps, "tenant-big")
-			require.NoError(t, publisher.PublishSync(context.Background(), "tenant-big", ops...))
-
-			assert.Equal(t, 1, mockWriter.getAttempts(), "all envelopes must be written in a single WriteMessages call")
-			assertChunkedMessages(t, mockWriter.getMessages(), "tenant-big", ops, tt.expectedSizes)
-		})
-
-		t.Run("Publish/"+tt.name, func(t *testing.T) {
-			mockWriter := &mockKafkaWriter{}
-			publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+			publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 
 			ops := buildOps(tt.numOps, "tenant-big")
 			publisher.Publish(context.Background(), "tenant-big", ops...)
@@ -413,21 +401,88 @@ func TestKafkaPublisher_Chunking(t *testing.T) {
 
 func TestKafkaPublisher_NoOps(t *testing.T) {
 	mockWriter := &mockKafkaWriter{}
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 
 	publisher.Publish(context.Background(), "tenant-empty")
-	require.NoError(t, publisher.PublishSync(context.Background(), "tenant-empty"))
 
 	assert.Equal(t, 0, mockWriter.getAttempts())
 	assert.Empty(t, mockWriter.getMessages())
 }
 
-func TestKafkaPublisher_PublishSync_WriteError(t *testing.T) {
-	mockWriter := &mockKafkaWriter{writeErr: errors.New("write failure")}
-	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+// recordingMonitor captures permission event metrics.
+type recordingMonitor struct {
+	*monitoring.NoopMonitor
+	mu     sync.Mutex
+	events map[string]float64
+}
 
-	err := publisher.PublishSync(context.Background(), "tenant-err", buildOps(250, "tenant-err")...)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "write failure")
+func newRecordingMonitor() *recordingMonitor {
+	return &recordingMonitor{
+		NoopMonitor: monitoring.NewNoopMonitor("tenant-service", nil),
+		events:      map[string]float64{},
+	}
+}
+
+func (m *recordingMonitor) AddPermissionEvents(tags map[string]string, count float64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.events[tags["result"]+"/"+tags["stage"]] += count
+	return nil
+}
+
+func (m *recordingMonitor) snapshot() map[string]float64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make(map[string]float64, len(m.events))
+	for k, v := range m.events {
+		out[k] = v
+	}
+	return out
+}
+
+func TestKafkaPublisher_Metrics_Completion(t *testing.T) {
+	monitor := newRecordingMonitor()
+	pub, err := NewKafkaPublisher([]string{"localhost:9092"}, "test-topic", "test-service", nil, monitor)
+	require.NoError(t, err)
+
+	kw, ok := pub.writer.(*kafka.Writer)
+	require.True(t, ok)
+
+	kw.Completion(make([]kafka.Message, 3), nil)
+	kw.Completion(make([]kafka.Message, 2), errors.New("delivery failed"))
+	kw.Completion(nil, nil)
+
+	assert.Equal(t, map[string]float64{
+		"success/delivery": 3,
+		"failure/delivery": 2,
+	}, monitor.snapshot())
+}
+
+func TestKafkaPublisher_Metrics_WriteError(t *testing.T) {
+	monitor := newRecordingMonitor()
+	mockWriter := &mockKafkaWriter{writeErr: errors.New("write failure")}
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, monitor)
+
+	publisher.Publish(context.Background(), "tenant-err", buildOps(150, "tenant-err")...)
+
+	// 150 ops are split into 2 envelopes.
 	assert.Equal(t, 1, mockWriter.getAttempts())
+	assert.Equal(t, map[string]float64{"failure/write": 2}, monitor.snapshot())
+}
+
+func TestKafkaPublisher_Metrics_WriteSuccessDefersToCompletion(t *testing.T) {
+	monitor := newRecordingMonitor()
+	mockWriter := &mockKafkaWriter{}
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, monitor)
+
+	publisher.Publish(context.Background(), "tenant-ok", buildOps(10, "tenant-ok")...)
+
+	// Successful hand-off to the writer is not delivery; the Completion callback records it.
+	assert.Empty(t, monitor.snapshot())
+}
+
+func TestEnvelopeCount(t *testing.T) {
+	for ops, want := range map[int]int{0: 0, 1: 1, 100: 1, 101: 2, 250: 3} {
+		assert.Equal(t, want, envelopeCount(ops), "ops=%d", ops)
+	}
 }

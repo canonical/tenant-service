@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/canonical/authorization-service/api/v1"
 	"github.com/canonical/tenant-service/internal/logging"
+	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel/trace"
@@ -26,11 +27,29 @@ type KafkaWriter interface {
 	Close() error
 }
 
+// Labels for the permission_events_total metric. Each envelope is counted once:
+// as a success when the broker acknowledges it, or as a failure at the stage
+// where it was lost.
+const (
+	resultSuccess = "success"
+	resultFailure = "failure"
+
+	// stageMarshal: the envelope could not be serialized.
+	stageMarshal = "marshal"
+	// stageWrite: the writer rejected the messages before sending (e.g. broker
+	// metadata unavailable, message too large, timeout).
+	stageWrite = "write"
+	// stageDelivery: the broker acknowledged the messages, or delivery failed
+	// after the writer exhausted its retries.
+	stageDelivery = "delivery"
+)
+
 // KafkaPublisher publishes permission mutation events to Kafka asynchronously.
 type KafkaPublisher struct {
 	writer         KafkaWriter
 	service        string
 	logger         logging.LoggerInterface
+	monitor        monitoring.MonitorInterface
 	publishTimeout time.Duration
 }
 
@@ -40,6 +59,7 @@ func NewKafkaPublisher(
 	topic string,
 	service string,
 	logger logging.LoggerInterface,
+	monitor monitoring.MonitorInterface,
 ) (*KafkaPublisher, error) {
 	if len(brokers) == 0 {
 		return nil, errors.New("kafka brokers list cannot be empty")
@@ -63,7 +83,18 @@ func NewKafkaPublisher(
 		logger = logging.NewNoopLogger()
 	}
 
-	writer := &kafka.Writer{
+	if monitor == nil {
+		monitor = monitoring.NewNoopMonitor(service, logger)
+	}
+
+	p := &KafkaPublisher{
+		service:        service,
+		logger:         logger,
+		monitor:        monitor,
+		publishTimeout: 5 * time.Second,
+	}
+
+	p.writer = &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,
 		Balancer:               &kafka.Hash{},
@@ -71,22 +102,34 @@ func NewKafkaPublisher(
 		MaxAttempts:            10,
 		Async:                  true,
 		AllowAutoTopicCreation: false,
-		Completion: func(messages []kafka.Message, err error) {
-			if err != nil {
-				logger.Errorw("failed to publish permission update to kafka",
-					"error", err,
-					"messages_count", len(messages),
-				)
-			}
-		},
+		Completion:             p.onCompletion,
 	}
 
-	return &KafkaPublisher{
-		writer:         writer,
-		service:        service,
-		logger:         logger,
-		publishTimeout: 5 * time.Second,
-	}, nil
+	return p, nil
+}
+
+// onCompletion is invoked by the async Kafka writer once a batch has been
+// acknowledged by the broker or has failed after all retries.
+func (p *KafkaPublisher) onCompletion(messages []kafka.Message, err error) {
+	if err != nil {
+		p.logger.Errorw("failed to publish permission update to kafka",
+			"error", err,
+			"messages_count", len(messages),
+		)
+		p.recordEvents(resultFailure, stageDelivery, len(messages))
+		return
+	}
+	p.recordEvents(resultSuccess, stageDelivery, len(messages))
+}
+
+// recordEvents adds count envelopes to the permission_events_total metric.
+func (p *KafkaPublisher) recordEvents(result, stage string, count int) {
+	if count == 0 {
+		return
+	}
+	if err := p.monitor.AddPermissionEvents(map[string]string{"result": result, "stage": stage}, float64(count)); err != nil {
+		p.logger.Warnw("failed to record permission events metric", "error", err)
+	}
 }
 
 // NewKafkaPublisherWithWriter initializes a KafkaPublisher with a custom KafkaWriter (useful for testing).
@@ -94,6 +137,7 @@ func NewKafkaPublisherWithWriter(
 	writer KafkaWriter,
 	service string,
 	logger logging.LoggerInterface,
+	monitor monitoring.MonitorInterface,
 ) *KafkaPublisher {
 	if service == "" {
 		service = "tenant-service"
@@ -103,10 +147,15 @@ func NewKafkaPublisherWithWriter(
 		logger = logging.NewNoopLogger()
 	}
 
+	if monitor == nil {
+		monitor = monitoring.NewNoopMonitor(service, logger)
+	}
+
 	return &KafkaPublisher{
 		writer:         writer,
 		service:        service,
 		logger:         logger,
+		monitor:        monitor,
 		publishTimeout: 5 * time.Second,
 	}
 }
@@ -125,40 +174,28 @@ func (p *KafkaPublisher) Publish(ctx context.Context, tenantID string, ops ...*v
 			"tenant_id", tenantID,
 			"error", err,
 		)
+		p.recordEvents(resultFailure, stageMarshal, envelopeCount(len(ops)))
 		return
 	}
 
 	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), p.publishTimeout)
 	defer cancel()
 
+	// Delivery results are recorded by the writer's Completion callback; only
+	// errors returned before messages are handed to the writer are recorded here.
 	if err := p.writer.WriteMessages(writeCtx, msgs...); err != nil {
 		p.logger.Errorw("failed to write kafka message",
 			"tenant_id", tenantID,
 			"messages_count", len(msgs),
 			"error", err,
 		)
+		p.recordEvents(resultFailure, stageWrite, len(msgs))
 	}
 }
 
-// PublishSync publishes the permission operations synchronously (primarily for testing and migration scripts).
-func (p *KafkaPublisher) PublishSync(ctx context.Context, tenantID string, ops ...*v1.PermissionOperation) error {
-	if p == nil || p.writer == nil || len(ops) == 0 {
-		return nil
-	}
-
-	msgs, err := p.buildMessages(ctx, tenantID, ops...)
-	if err != nil {
-		return fmt.Errorf("build permission message: %w", err)
-	}
-
-	writeCtx, cancel := context.WithTimeout(ctx, p.publishTimeout)
-	defer cancel()
-
-	if err := p.writer.WriteMessages(writeCtx, msgs...); err != nil {
-		return fmt.Errorf("write kafka message: %w", err)
-	}
-
-	return nil
+// envelopeCount returns the number of envelopes needed to carry ops operations.
+func envelopeCount(ops int) int {
+	return (ops + MaxOperationsPerEnvelope - 1) / MaxOperationsPerEnvelope
 }
 
 // buildMessages splits ops into chunks of at most MaxOperationsPerEnvelope and builds
@@ -169,7 +206,7 @@ func (p *KafkaPublisher) buildMessages(
 	tenantID string,
 	ops ...*v1.PermissionOperation,
 ) ([]kafka.Message, error) {
-	msgs := make([]kafka.Message, 0, (len(ops)+MaxOperationsPerEnvelope-1)/MaxOperationsPerEnvelope)
+	msgs := make([]kafka.Message, 0, envelopeCount(len(ops)))
 	for chunk := range slices.Chunk(ops, MaxOperationsPerEnvelope) {
 		msg, err := p.buildMessage(ctx, tenantID, chunk...)
 		if err != nil {
