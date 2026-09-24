@@ -117,8 +117,9 @@ Use the CLI to simulate an invite. You need the Tenant ID from the previous step
 ./app tenant list
 
 # Invite a user (email) to the tenant
-./app tenant users invite <tenant-id> <email> <role>
-# Example: ./app tenant users invite <uuid> bob@example.com member
+./app tenant users invite <tenant-id> <email>
+# Example: ./app tenant users invite <uuid> bob@example.com
+# Invited users are granted can_view; elevated permissions are managed via the authorization service.
 ```
 
 ### 3. Enterprise Onboarding
@@ -132,8 +133,9 @@ Manual provisioning flow for enterprise customers.
 ./app tenant create "Acme Corp"
 # Output: Tenant created: Acme Corp (ID: <uuid>)
 
-# 2. Provision an Owner for the Tenant
-./app tenant users provision <uuid> alice@acme.com owner
+# 2. Provision the first member of the Tenant (granted can_view)
+./app tenant users provision <uuid> alice@acme.com
+# 3. Grant the member can_delete on tenant:<uuid> through the authorization service API
 ```
 
 ### 4. Tenant-Aware Login

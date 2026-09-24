@@ -33,3 +33,17 @@
 
 - [x] 6.1 Run test suite `go test ./...` in `tenant-service` to verify all unit and handler tests pass.
 - [x] 6.2 Validate `openspec validate` to confirm all planning artifacts are consistent.
+
+## 7. Remove Membership Roles
+
+- [x] 7.1 In `identity-platform-api`, remove `role` from `InviteMemberRequest`, `ProvisionUserRequest`, `ListTenantUsersRequest` and `TenantUser` (reserving field numbers), remove the `UpdateTenantUser` RPC and messages, and regenerate Go and OpenAPI artifacts.
+- [x] 7.2 Replace the local `replace` directives in `go.mod` and `tests/e2e/go.mod` with the released `identity-platform-api` version once the upstream change is merged.
+- [x] 7.3 Add migration `migrations/003_drop_memberships_role.sql` dropping `memberships.role`.
+- [x] 7.4 Remove role from `internal/types` and `internal/storage` (`AddMember` signature, `UpdateMember`, role filter).
+- [x] 7.5 Update `pkg/tenant` service and handlers: invite/provision publish `can_view`, remove `UpdateTenantUser`, remove role from `ListTenantUsers`.
+- [x] 7.6 Update `DeleteTenant` to page through all members and revoke `can_view`, `can_edit`, and `can_delete` per member; split publisher envelopes to at most 100 operations.
+- [x] 7.7 Replace `PermissionOpForRole` with `TenantPermissionOp` / `RevokeTenantPermissionOps` and relation constants in `internal/permissions`.
+- [x] 7.8 Update `pkg/webhooks` self-registration to add the member without a role and publish `can_delete`.
+- [x] 7.9 Drop the `role` label from `business_operations_total`.
+- [x] 7.10 Update CLI (`cmd/tenant_users.go`, `cmd/client_http.go`) and regenerate `client/http/client.gen.go`.
+- [x] 7.11 Update unit, e2e, and browser tests.

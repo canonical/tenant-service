@@ -148,10 +148,10 @@ func (m *Monitor) registerCounters() {
 	m.operationsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name:        "business_operations_total",
-			Help:        "Total number of business operations, partitioned by operation type and role.",
+			Help:        "Total number of business operations, partitioned by operation type.",
 			ConstLabels: labels,
 		},
-		[]string{"operation", "role"},
+		[]string{"operation"},
 	)
 
 	counters = append(counters, m.operationsTotal)

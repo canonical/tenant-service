@@ -37,7 +37,6 @@ func TestReadOnlyMethods(t *testing.T) {
 		"/identity.platform.api.tenant.TenantService/UpdateTenant",
 		"/identity.platform.api.tenant.TenantService/DeleteTenant",
 		"/identity.platform.api.tenant.TenantService/ProvisionUser",
-		"/identity.platform.api.tenant.TenantService/UpdateTenantUser",
 		"/identity.platform.api.tenant.TenantService/InviteMember",
 	}
 

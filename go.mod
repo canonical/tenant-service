@@ -6,7 +6,7 @@ require (
 	buf.build/go/protovalidate v1.1.3
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/canonical/authorization-service v1.0.0
-	github.com/canonical/identity-platform-api v0.0.0-20260609125125-fe6c4040a954
+	github.com/canonical/identity-platform-api v0.0.0-20260924175044-8c1a27b95cef
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/exaring/otelpgx v0.10.0
 	github.com/go-chi/chi/v5 v5.2.5

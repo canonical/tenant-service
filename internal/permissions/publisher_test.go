@@ -8,6 +8,7 @@ package permissions
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -73,7 +74,7 @@ func TestNoopPublisher(t *testing.T) {
 	noop.Publish(context.Background(), "tenant-123", &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 		Subject:  "user:u1",
-		Relation: "owner",
+		Relation: RelationCanDelete,
 		Object:   "tenant:tenant-123",
 	})
 
@@ -88,7 +89,7 @@ func TestKafkaPublisher_PublishSync(t *testing.T) {
 	op := &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 		Subject:  "user:u1",
-		Relation: "owner",
+		Relation: RelationCanDelete,
 		Object:   "tenant:tenant-123",
 	}
 
@@ -115,7 +116,7 @@ func TestKafkaPublisher_PublishSync(t *testing.T) {
 	require.Len(t, env.Operations, 1)
 	assert.Equal(t, v1.PermissionOp_PERMISSION_OP_WRITE, env.Operations[0].Op)
 	assert.Equal(t, "user:u1", env.Operations[0].Subject)
-	assert.Equal(t, "owner", env.Operations[0].Relation)
+	assert.Equal(t, RelationCanDelete, env.Operations[0].Relation)
 	assert.Equal(t, "tenant:tenant-123", env.Operations[0].Object)
 }
 
@@ -126,7 +127,7 @@ func TestKafkaPublisher_Publish_Async(t *testing.T) {
 	op := &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_DELETE,
 		Subject:  "user:u2",
-		Relation: "member",
+		Relation: RelationCanView,
 		Object:   "tenant:tenant-456",
 	}
 
@@ -159,7 +160,7 @@ func TestKafkaPublisher_WithCorrelationID(t *testing.T) {
 	err := publisher.PublishSync(ctx, "tenant-789", &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 		Subject:  "user:u1",
-		Relation: "admin",
+		Relation: RelationCanEdit,
 		Object:   "tenant:tenant-789",
 	})
 	require.NoError(t, err)
@@ -186,7 +187,7 @@ func TestKafkaPublisher_Publish_WriteError(t *testing.T) {
 	publisher.Publish(ctx, "tenant-err", &v1.PermissionOperation{
 		Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 		Subject:  "user:u1",
-		Relation: "owner",
+		Relation: RelationCanDelete,
 		Object:   "tenant:tenant-err",
 	})
 
@@ -280,25 +281,153 @@ func TestNewKafkaPublisher_WriterConfig(t *testing.T) {
 	})
 }
 
-func TestPermissionOpForRole(t *testing.T) {
-	// Owner maps to tenant:tenant-abc with relation can_delete
-	ownerOp := PermissionOpForRole(v1.PermissionOp_PERMISSION_OP_WRITE, "user-123", "owner", "tenant-abc")
-	assert.Equal(t, v1.PermissionOp_PERMISSION_OP_WRITE, ownerOp.Op)
-	assert.Equal(t, "user:user-123", ownerOp.Subject)
-	assert.Equal(t, "can_delete", ownerOp.Relation)
-	assert.Equal(t, "tenant:tenant-abc", ownerOp.Object)
+func TestTenantPermissionOp(t *testing.T) {
+	tests := []struct {
+		name     string
+		op       v1.PermissionOp
+		relation string
+	}{
+		{name: "write can_view", op: v1.PermissionOp_PERMISSION_OP_WRITE, relation: RelationCanView},
+		{name: "write can_edit", op: v1.PermissionOp_PERMISSION_OP_WRITE, relation: RelationCanEdit},
+		{name: "write can_delete", op: v1.PermissionOp_PERMISSION_OP_WRITE, relation: RelationCanDelete},
+		{name: "delete can_view", op: v1.PermissionOp_PERMISSION_OP_DELETE, relation: RelationCanView},
+	}
 
-	// Admin maps to tenant:tenant-abc with relation can_edit
-	adminOp := PermissionOpForRole(v1.PermissionOp_PERMISSION_OP_WRITE, "user-789", "admin", "tenant-abc")
-	assert.Equal(t, v1.PermissionOp_PERMISSION_OP_WRITE, adminOp.Op)
-	assert.Equal(t, "user:user-789", adminOp.Subject)
-	assert.Equal(t, "can_edit", adminOp.Relation)
-	assert.Equal(t, "tenant:tenant-abc", adminOp.Object)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TenantPermissionOp(tt.op, "user-123", tt.relation, "tenant-abc")
+			require.NotNil(t, got)
+			assert.Equal(t, tt.op, got.Op)
+			assert.Equal(t, "user:user-123", got.Subject)
+			assert.Equal(t, tt.relation, got.Relation)
+			assert.Equal(t, "tenant:tenant-abc", got.Object)
+		})
+	}
+}
 
-	// Member maps to tenant:tenant-abc with relation can_view
-	memberOp := PermissionOpForRole(v1.PermissionOp_PERMISSION_OP_DELETE, "user-456", "member", "tenant-abc")
-	assert.Equal(t, v1.PermissionOp_PERMISSION_OP_DELETE, memberOp.Op)
-	assert.Equal(t, "user:user-456", memberOp.Subject)
-	assert.Equal(t, "can_view", memberOp.Relation)
-	assert.Equal(t, "tenant:tenant-abc", memberOp.Object)
+func TestTenantRelationConstants(t *testing.T) {
+	assert.Equal(t, "can_view", RelationCanView)
+	assert.Equal(t, "can_edit", RelationCanEdit)
+	assert.Equal(t, "can_delete", RelationCanDelete)
+	assert.Equal(t, 100, MaxOperationsPerEnvelope)
+}
+
+func TestRevokeTenantPermissionOps(t *testing.T) {
+	ops := RevokeTenantPermissionOps("user-456", "tenant-abc")
+	require.Len(t, ops, 3)
+
+	expectedRelations := []string{RelationCanView, RelationCanEdit, RelationCanDelete}
+	for i, op := range ops {
+		assert.Equal(t, v1.PermissionOp_PERMISSION_OP_DELETE, op.Op)
+		assert.Equal(t, "user:user-456", op.Subject)
+		assert.Equal(t, expectedRelations[i], op.Relation)
+		assert.Equal(t, "tenant:tenant-abc", op.Object)
+	}
+}
+
+func buildOps(n int, tenantID string) []*v1.PermissionOperation {
+	ops := make([]*v1.PermissionOperation, 0, n)
+	for i := range n {
+		ops = append(ops, TenantPermissionOp(
+			v1.PermissionOp_PERMISSION_OP_DELETE,
+			fmt.Sprintf("user-%d", i),
+			RelationCanView,
+			tenantID,
+		))
+	}
+	return ops
+}
+
+func assertChunkedMessages(t *testing.T, msgs []kafka.Message, tenantID string, ops []*v1.PermissionOperation, expectedSizes []int) {
+	t.Helper()
+
+	require.Len(t, msgs, len(expectedSizes))
+
+	messageIDs := make(map[string]struct{}, len(msgs))
+	idempotencyKeys := make(map[string]struct{}, len(msgs))
+	offset := 0
+	for i, msg := range msgs {
+		assert.Equal(t, []byte(tenantID), msg.Key)
+
+		var env v1.PermissionUpdateEnvelope
+		require.NoError(t, proto.Unmarshal(msg.Value, &env))
+
+		assert.Equal(t, "1.0", env.Version)
+		assert.Equal(t, "tenant-service", env.Service)
+		require.NotEmpty(t, env.MessageId)
+		require.NotEmpty(t, env.IdempotencyKey)
+		messageIDs[env.MessageId] = struct{}{}
+		idempotencyKeys[env.IdempotencyKey] = struct{}{}
+
+		require.Len(t, env.Operations, expectedSizes[i])
+		for j, op := range env.Operations {
+			expected := ops[offset+j]
+			assert.Equal(t, expected.Op, op.Op)
+			assert.Equal(t, expected.Subject, op.Subject)
+			assert.Equal(t, expected.Relation, op.Relation)
+			assert.Equal(t, expected.Object, op.Object)
+		}
+		offset += len(env.Operations)
+	}
+
+	assert.Equal(t, len(ops), offset)
+	assert.Len(t, messageIDs, len(msgs), "message IDs must be distinct")
+	assert.Len(t, idempotencyKeys, len(msgs), "idempotency keys must be distinct")
+}
+
+func TestKafkaPublisher_Chunking(t *testing.T) {
+	tests := []struct {
+		name          string
+		numOps        int
+		expectedSizes []int
+	}{
+		{name: "exactly max ops", numOps: 100, expectedSizes: []int{100}},
+		{name: "one over max ops", numOps: 101, expectedSizes: []int{100, 1}},
+		{name: "250 ops", numOps: 250, expectedSizes: []int{100, 100, 50}},
+	}
+
+	for _, tt := range tests {
+		t.Run("PublishSync/"+tt.name, func(t *testing.T) {
+			mockWriter := &mockKafkaWriter{}
+			publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+
+			ops := buildOps(tt.numOps, "tenant-big")
+			require.NoError(t, publisher.PublishSync(context.Background(), "tenant-big", ops...))
+
+			assert.Equal(t, 1, mockWriter.getAttempts(), "all envelopes must be written in a single WriteMessages call")
+			assertChunkedMessages(t, mockWriter.getMessages(), "tenant-big", ops, tt.expectedSizes)
+		})
+
+		t.Run("Publish/"+tt.name, func(t *testing.T) {
+			mockWriter := &mockKafkaWriter{}
+			publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+
+			ops := buildOps(tt.numOps, "tenant-big")
+			publisher.Publish(context.Background(), "tenant-big", ops...)
+
+			assert.Equal(t, 1, mockWriter.getAttempts(), "all envelopes must be written in a single WriteMessages call")
+			assertChunkedMessages(t, mockWriter.getMessages(), "tenant-big", ops, tt.expectedSizes)
+		})
+	}
+}
+
+func TestKafkaPublisher_NoOps(t *testing.T) {
+	mockWriter := &mockKafkaWriter{}
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+
+	publisher.Publish(context.Background(), "tenant-empty")
+	require.NoError(t, publisher.PublishSync(context.Background(), "tenant-empty"))
+
+	assert.Equal(t, 0, mockWriter.getAttempts())
+	assert.Empty(t, mockWriter.getMessages())
+}
+
+func TestKafkaPublisher_PublishSync_WriteError(t *testing.T) {
+	mockWriter := &mockKafkaWriter{writeErr: errors.New("write failure")}
+	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil)
+
+	err := publisher.PublishSync(context.Background(), "tenant-err", buildOps(250, "tenant-err")...)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "write failure")
+	assert.Equal(t, 1, mockWriter.getAttempts())
 }

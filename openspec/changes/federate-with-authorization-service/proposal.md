@@ -9,12 +9,13 @@ Currently, `tenant-service` directly queries and mutates OpenFGA tuple stores in
 - **Remove Direct OpenFGA Dependencies**: Drop `internal/openfga`, `internal/authorization`, `cmd/createFgaModel.go`, and OpenFGA SDK dependencies.
 - **Support STS Token Verification**: Update `pkg/authentication` to support STS-issued bearer tokens with RS256/ES256 algorithms and permissive subject/scope validation for federated ingress.
 - **Update Service Configuration**: Replace `OPENFGA_*` environment variables with `KAFKA_*` configuration in `internal/config/specs.go`.
+- **Remove Membership Roles**: Drop the `role` field from `InviteMember`, `ProvisionUser`, `ListTenantUsers` and `TenantUser`, and remove the `UpdateTenantUser` RPC (upstream change in `identity-platform-api`). Drop the `memberships.role` column. The tenant service grants only baseline permissions (`can_delete` to the self-registering user, `can_view` to invited/provisioned users); elevated permissions are managed through the Authorization Service API.
 
 ## Non-Goals
 
 - Modifying upstream `Authorization Service` route rules (maintained separately).
 - Implementing transactional outbox tables in PostgreSQL (fire-and-forget asynchronous publishing with retry and error logging is used).
-- Changing external gRPC/HTTP API contracts or client protobuf interfaces.
+- Changing external gRPC/HTTP API contracts or client protobuf interfaces beyond removing membership roles.
 
 ## Capabilities
 
@@ -26,6 +27,9 @@ Currently, `tenant-service` directly queries and mutates OpenFGA tuple stores in
 
 ## Impact
 
-- **Affected Packages**: `pkg/tenant`, `pkg/webhooks`, `pkg/authentication`, `internal/config`, `internal/authorization` (removed), `internal/openfga` (removed), `internal/permissions` (new).
-- **Dependencies**: Remove `github.com/openfga/go-sdk` and `github.com/openfga/language/pkg/go`. Add `github.com/segmentio/kafka-go` and `github.com/canonical/authorization-service/api/v1`.
+- **Affected Packages**: `pkg/tenant`, `pkg/webhooks`, `pkg/authentication`, `internal/config`, `internal/storage`, `internal/types`, `internal/monitoring`, `cmd`, `internal/authorization` (removed), `internal/openfga` (removed), `internal/permissions` (new).
+- **Dependencies**: Remove `github.com/openfga/go-sdk` and `github.com/openfga/language/pkg/go`. Add `github.com/segmentio/kafka-go` and `github.com/canonical/authorization-service/api/v1`. Bump `github.com/canonical/identity-platform-api` to the version without membership roles.
 - **Infrastructure**: Requires Kafka broker connection (`KAFKA_BROKERS`, `KAFKA_PERMISSIONS_TOPIC`). Removes OpenFGA store connection requirements.
+- **Database**: Migration `003_drop_memberships_role.sql` drops `memberships.role`.
+- **API / Clients**: Breaking for clients sending `role` or calling `PATCH /api/v0/tenants/{tenant_id}/users/{user_id}`. The `tenant users update` CLI command is removed and `invite`/`provision` no longer take a role argument.
+- **Observability**: The `business_operations_total` metric drops its `role` label.

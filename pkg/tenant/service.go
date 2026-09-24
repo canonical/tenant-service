@@ -91,7 +91,7 @@ func (s *Service) ListTenants(ctx context.Context, opts ...types.ListOption) ([]
 	return tenants, nextPageToken, nil
 }
 
-func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string) (string, string, error) {
+func (s *Service) InviteMember(ctx context.Context, tenantID, email string) (string, string, error) {
 	ctx, span := s.tracer.Start(ctx, "tenant.Service.InviteMember")
 	defer span.End()
 
@@ -99,7 +99,6 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 	s.logger.Debugw("inviting member to tenant",
 		"tenant_id", tenantID,
 		"email", email,
-		"role", role,
 		"actor", actor,
 	)
 
@@ -129,30 +128,26 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 	}
 
 	// 2. Add Member to Database (idempotent for duplicate key)
-	if _, err := s.storage.AddMember(ctx, tenantID, identityID, role); err != nil {
+	if _, err := s.storage.AddMember(ctx, tenantID, identityID); err != nil {
 		if !errors.Is(err, storage.ErrDuplicateKey) {
 			s.recordError(span, "failed to add member to storage", err,
 				"tenant_id", tenantID,
 				"user_id", identityID,
-				"role", role,
 			)
 			return "", "", fmt.Errorf("failed to add member")
 		}
 		// If duplicate (already a member), we proceed to send recovery link as a re-invite.
 	}
 
-	// 3. Publish permission event asynchronously to Kafka
-	switch role {
-	case "owner", "member", "admin":
-		s.publisher.Publish(ctx, tenantID, permissions.PermissionOpForRole(
-			v1.PermissionOp_PERMISSION_OP_WRITE,
-			identityID,
-			role,
-			tenantID,
-		))
-	default:
-		return "", "", fmt.Errorf("invalid role: %s", role)
-	}
+	// 3. Grant view access asynchronously via Kafka. Elevated permissions are
+	// managed through the authorization service API. Re-inviting an existing
+	// member is safe: duplicate writes are ignored by the authorization service.
+	s.publisher.Publish(ctx, tenantID, permissions.TenantPermissionOp(
+		v1.PermissionOp_PERMISSION_OP_WRITE,
+		identityID,
+		permissions.RelationCanView,
+		tenantID,
+	))
 
 	// 4. Generate Kratos Recovery Link
 	// We use the configured lifetime for the link
@@ -169,10 +164,9 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email, role string
 		"tenant_id", tenantID,
 		"user_id", identityID,
 		"email", email,
-		"role", role,
 	)
 	s.logger.Security().AdminAction(actor, "invite_member", "tenant.Service.InviteMember", tenantID+":"+email)
-	s.incrementCounter("invitation_sent", role)
+	s.incrementCounter("invitation_sent")
 	return link, code, nil
 }
 
@@ -229,11 +223,23 @@ func (s *Service) DeleteTenant(ctx context.Context, id string) error {
 	actor, _ := authentication.GetUserID(ctx)
 	s.logger.Debugw("deleting tenant", "tenant_id", id, "actor", actor)
 
-	// Retrieve active memberships prior to deletion to revoke permissions in authorization-service
-	members, _, err := s.storage.ListMembersByTenantID(ctx, id)
-	if err != nil {
-		s.recordError(span, "failed to list tenant members prior to deletion", err, "tenant_id", id)
-		return fmt.Errorf("failed to list tenant members prior to deletion: %w", err)
+	// Collect every membership prior to deletion to revoke permissions in authorization-service.
+	// Memberships cascade-delete with the tenant, so this must happen first.
+	var ops []*v1.PermissionOperation
+	pageToken := ""
+	for {
+		members, next, err := s.storage.ListMembersByTenantID(ctx, id, types.WithPageToken(pageToken))
+		if err != nil {
+			s.recordError(span, "failed to list tenant members prior to deletion", err, "tenant_id", id)
+			return fmt.Errorf("failed to list tenant members prior to deletion: %w", err)
+		}
+		for _, m := range members {
+			ops = append(ops, permissions.RevokeTenantPermissionOps(m.KratosIdentityID, id)...)
+		}
+		if next == "" {
+			break
+		}
+		pageToken = next
 	}
 
 	if err := s.storage.DeleteTenant(ctx, id); err != nil {
@@ -241,25 +247,14 @@ func (s *Service) DeleteTenant(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to delete tenant from storage: %w", err)
 	}
 
-	if len(members) > 0 {
-		ops := make([]*v1.PermissionOperation, 0, len(members))
-		for _, m := range members {
-			ops = append(ops, permissions.PermissionOpForRole(
-				v1.PermissionOp_PERMISSION_OP_DELETE,
-				m.KratosIdentityID,
-				m.Role,
-				id,
-			))
-		}
-		s.publisher.Publish(ctx, id, ops...)
-	}
+	s.publisher.Publish(ctx, id, ops...)
 
 	s.logger.Infow("tenant deleted", "tenant_id", id)
 	s.logger.Security().AdminAction(actor, "delete_tenant", "tenant.Service.DeleteTenant", id)
 	return nil
 }
 
-func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role string) error {
+func (s *Service) ProvisionUser(ctx context.Context, tenantID, email string) error {
 	ctx, span := s.tracer.Start(ctx, "admin.ProvisionUser")
 	defer span.End()
 
@@ -267,7 +262,6 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	s.logger.Debugw("provisioning user",
 		"tenant_id", tenantID,
 		"email", email,
-		"role", role,
 		"actor", actor,
 	)
 
@@ -296,39 +290,30 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email, role strin
 	}
 
 	// 2. Add to Storage
-	if _, err := s.storage.AddMember(ctx, tenantID, identityID, role); err != nil {
+	if _, err := s.storage.AddMember(ctx, tenantID, identityID); err != nil {
 		s.recordError(span, "failed to add provisioned member to storage", err,
 			"tenant_id", tenantID,
 			"user_id", identityID,
-			"role", role,
 		)
 		return fmt.Errorf("failed to add member to storage: %w", err)
 	}
 
-	// 3. Publish permission event asynchronously to Kafka
-	switch role {
-	case "owner", "member", "admin":
-		s.publisher.Publish(ctx, tenantID, permissions.PermissionOpForRole(
-			v1.PermissionOp_PERMISSION_OP_WRITE,
-			identityID,
-			role,
-			tenantID,
-		))
-	default:
-		err := fmt.Errorf("unknown role: %s", role)
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return err
-	}
+	// 3. Grant view access asynchronously via Kafka. Elevated permissions are
+	// managed through the authorization service API.
+	s.publisher.Publish(ctx, tenantID, permissions.TenantPermissionOp(
+		v1.PermissionOp_PERMISSION_OP_WRITE,
+		identityID,
+		permissions.RelationCanView,
+		tenantID,
+	))
 
 	s.logger.Infow("user provisioned",
 		"tenant_id", tenantID,
 		"user_id", identityID,
 		"email", email,
-		"role", role,
 	)
 	s.logger.Security().AdminAction(actor, "provision_user", "tenant.Service.ProvisionUser", tenantID+":"+email)
-	s.incrementCounter("user_provisioned", role)
+	s.incrementCounter("user_provisioned")
 	return nil
 }
 
@@ -387,114 +372,14 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, includeE
 		users = append(users, &types.TenantUser{
 			UserID: m.KratosIdentityID,
 			Email:  email,
-			Role:   m.Role,
 		})
 	}
 
 	return users, nextPageToken, nil
 }
 
-func (s *Service) UpdateTenantUser(ctx context.Context, tenantID, userID, role string) (*types.TenantUser, error) {
-	ctx, span := s.tracer.Start(ctx, "admin.UpdateTenantUser")
-	defer span.End()
-
-	actor, _ := authentication.GetUserID(ctx)
-	s.logger.Debugw("updating tenant user role",
-		"tenant_id", tenantID,
-		"user_id", userID,
-		"role", role,
-		"actor", actor,
-	)
-
-	// 1. Get current member to check if exists and current role
-	currentMember, err := s.storage.GetMemberByTenantAndUserID(ctx, tenantID, userID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			err := fmt.Errorf("user %s not found in tenant %s", userID, tenantID)
-			s.recordError(span, "user not found in tenant", err, "tenant_id", tenantID, "user_id", userID)
-			return nil, err
-		}
-		s.recordError(span, "failed to check current membership", err,
-			"tenant_id", tenantID,
-			"user_id", userID,
-		)
-		return nil, fmt.Errorf("failed to check current membership: %w", err)
-	}
-
-	if currentMember.Role == role {
-		return &types.TenantUser{
-			UserID: userID,
-			Role:   role,
-			// Email is fetched separately if needed or just return partial
-		}, nil
-	}
-
-	// 2. Validate role
-	switch role {
-	case "owner", "member", "admin":
-	default:
-		err := fmt.Errorf("invalid role: %s", role)
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return nil, err
-	}
-
-	// 3. Storage Update
-	if err := s.storage.UpdateMember(ctx, tenantID, userID, role); err != nil {
-		s.recordError(span, "failed to update member in storage", err,
-			"tenant_id", tenantID,
-			"user_id", userID,
-			"role", role,
-		)
-		return nil, err
-	}
-
-	// 4. Publish permission update to Kafka
-	s.publisher.Publish(ctx, tenantID,
-		permissions.PermissionOpForRole(
-			v1.PermissionOp_PERMISSION_OP_DELETE,
-			userID,
-			currentMember.Role,
-			tenantID,
-		),
-		permissions.PermissionOpForRole(
-			v1.PermissionOp_PERMISSION_OP_WRITE,
-			userID,
-			role,
-			tenantID,
-		),
-	)
-
-	// 4. Return updated user
-	identity, err := s.kratos.GetIdentity(ctx, userID)
-	if err != nil {
-		s.recordError(span, "failed to fetch identity after role update", err, "tenant_id", tenantID, "user_id", userID)
-		return nil, fmt.Errorf("failed to fetch identity: %w", err)
-	}
-	email := ""
-	if traits, ok := identity.Traits.(map[string]interface{}); ok {
-		if e, ok := traits["email"].(string); ok {
-			email = e
-		}
-	}
-
-	s.logger.Infow("tenant user role updated",
-		"tenant_id", tenantID,
-		"user_id", userID,
-		"role", role,
-		"previous_role", currentMember.Role,
-	)
-	s.logger.Security().AdminAction(actor, "update_tenant_user", "tenant.Service.UpdateTenantUser", tenantID+":"+userID)
-
-	return &types.TenantUser{
-		UserID: userID,
-		Email:  email,
-		Role:   role,
-	}, nil
-}
-
-func (s *Service) incrementCounter(operation, role string) {
-	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation, "role": role}); err != nil {
+func (s *Service) incrementCounter(operation string) {
+	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation}); err != nil {
 		s.logger.Warnf("failed to increment counter %s: %v", operation, err)
 	}
 }

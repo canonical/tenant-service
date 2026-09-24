@@ -57,7 +57,7 @@ func (s *Service) recordError(span trace.Span, msg string, err error, keysAndVal
 
 // recordRegistrationMetric safely increments the business operations counter.
 func (s *Service) recordRegistrationMetric(operation string) {
-	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation, "role": "system"}); err != nil {
+	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation}); err != nil {
 		s.logger.Errorw(fmt.Sprintf("failed to increment registration %s counter", operation), "error", err)
 	}
 }
@@ -102,8 +102,8 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		return fmt.Errorf("failed to create tenant: %w", err)
 	}
 
-	// 2. Add the user as 'owner'
-	_, err = s.storage.AddMember(ctx, newTenant.ID, identityID, "owner")
+	// 2. Add the user as a member
+	_, err = s.storage.AddMember(ctx, newTenant.ID, identityID)
 	if err != nil {
 		s.recordError(span, "failed to add owner member on registration", err,
 			"tenant_id", newTenant.ID,
@@ -113,11 +113,11 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		return fmt.Errorf("failed to add member: %w", err)
 	}
 
-	// 3. Publish owner permission event asynchronously to Kafka
-	s.publisher.Publish(ctx, newTenant.ID, permissions.PermissionOpForRole(
+	// 3. Grant the registering user full control of their tenant asynchronously via Kafka
+	s.publisher.Publish(ctx, newTenant.ID, permissions.TenantPermissionOp(
 		v1.PermissionOp_PERMISSION_OP_WRITE,
 		identityID,
-		"owner",
+		permissions.RelationCanDelete,
 		newTenant.ID,
 	))
 

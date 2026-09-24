@@ -52,7 +52,7 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
-				mockMonitor.EXPECT().IncrementCounter(gomock.Any()).Return(nil).AnyTimes()
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_success"}).Return(nil).Times(1)
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, t *types.Tenant) (*types.Tenant, error) {
 						if t.Name != "user@example.com's Org" {
@@ -63,11 +63,11 @@ func TestService_HandleRegistration(t *testing.T) {
 						}
 						return tenant, nil
 					})
-				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID, "owner").Return("member-id", nil)
+				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID).Return("member-id", nil)
 				mockPublisher.EXPECT().Publish(gomock.Any(), tenant.ID, &v1.PermissionOperation{
 					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
 					Subject:  "user:" + identityID,
-					Relation: "can_delete",
+					Relation: permissions.RelationCanDelete,
 					Object:   "tenant:" + tenant.ID,
 				}).Times(1)
 			},
@@ -78,7 +78,7 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      "",
 			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
-				mockMonitor.EXPECT().IncrementCounter(gomock.Any()).Return(nil).AnyTimes()
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
 			},
 			expectedErr: true,
 		},
@@ -87,7 +87,7 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: "",
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
-				mockMonitor.EXPECT().IncrementCounter(gomock.Any()).Return(nil).AnyTimes()
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
 			},
 			expectedErr: true,
 		},
@@ -96,7 +96,7 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
-				mockMonitor.EXPECT().IncrementCounter(gomock.Any()).Return(nil).AnyTimes()
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).Return(nil, errors.New("storage error"))
 			},
 			expectedErr: true,
@@ -106,9 +106,9 @@ func TestService_HandleRegistration(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
-				mockMonitor.EXPECT().IncrementCounter(gomock.Any()).Return(nil).AnyTimes()
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
 				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).Return(tenant, nil)
-				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID, "owner").Return("", errors.New("storage error"))
+				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID).Return("", errors.New("storage error"))
 			},
 			expectedErr: true,
 		},
@@ -152,7 +152,6 @@ func TestService_HandleTokenHook(t *testing.T) {
 		ID:               "mem-1",
 		TenantID:         tenantID,
 		KratosIdentityID: userID,
-		Role:             "owner",
 	}
 
 	makeSession := func(subject string, extra map[string]interface{}) *oauth2.TokenHookRequest {
@@ -302,7 +301,6 @@ func TestService_HandleLoginHook(t *testing.T) {
 		ID:               "mem-1",
 		TenantID:         tenantID,
 		KratosIdentityID: identityID,
-		Role:             "owner",
 	}
 
 	testCases := []struct {

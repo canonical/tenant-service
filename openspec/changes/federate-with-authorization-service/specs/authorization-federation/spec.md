@@ -11,38 +11,45 @@ The system SHALL execute incoming tenant and member operations without executing
 - **WHEN** a valid authenticated request reaches the service handler
 - **THEN** the system executes the requested operation directly against storage without performing in-process authorization queries
 
-### Requirement: Permission Event Publishing on Tenant Creation
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation for the tenant resource with relation `can_delete` on `tenant-service.permissions` topic when a new tenant is created.
+### Requirement: Permission Event Publishing on Self-Registration
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation for the tenant resource with relation `can_delete` on `tenant-service.permissions` topic when a tenant is created through self-registration. Tenants created by a platform admin via `CreateTenant` SHALL NOT publish permission events; their owners are granted through the Authorization Service API.
 
 #### Scenario: Self-registration creates tenant and publishes owner permission
 - **WHEN** a user completes self-registration triggering tenant creation
 - **THEN** the system saves the tenant and membership to storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<identity_id>`, relation `can_delete`, and object `tenant:<tenant_id>` keyed by `tenant_id` to Kafka
 
+#### Scenario: Admin tenant creation publishes no permission events
+- **WHEN** a platform admin creates a tenant via `CreateTenant`
+- **THEN** the system saves the tenant to storage and publishes no permission events
+
 ### Requirement: Permission Event Publishing on Member Provisioning and Invites
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation for the assigned role when a member is added or invited to a tenant, mapping roles to fine-grained permissions on the tenant resource (`owner` to `can_delete`, `admin` to `can_edit`, and `member` to `can_view`).
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation with relation `can_view` on the tenant resource when a member is provisioned into or invited to a tenant.
 
-#### Scenario: Provisioning user into tenant publishes permission event
-- **WHEN** an admin or owner provisions a user into a tenant with a given role
-- **THEN** the system creates the membership record in storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<user_id>`, mapped relation (`can_delete`, `can_edit`, or `can_view`), and mapped object keyed by `tenant_id` to Kafka
+#### Scenario: Provisioning user into tenant publishes view permission
+- **WHEN** a caller provisions a user into a tenant
+- **THEN** the system creates the membership record in storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<user_id>`, relation `can_view`, and object `tenant:<tenant_id>` keyed by `tenant_id` to Kafka
 
-### Requirement: Permission Event Publishing on Role Update
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing atomic `WRITE` for the new role's permission and `DELETE` for the prior role's permission when a member's role is updated, mapping roles to fine-grained permissions on the tenant resource (`owner` -> `can_delete`, `admin` -> `can_edit`, `member` -> `can_view`).
+#### Scenario: Inviting an existing member is idempotent
+- **WHEN** a caller invites a user who is already a member of the tenant
+- **THEN** the system keeps the existing membership, publishes an envelope with op `WRITE` and relation `can_view` for that user, and returns a new invitation link
 
-#### Scenario: Demoting owner to member emits write can_view and delete can_delete ops
-- **WHEN** a tenant owner is demoted to member role
-- **THEN** the system updates storage and asynchronously publishes an envelope containing op `WRITE` for `can_view` on `tenant:<tenant_id>` and op `DELETE` for `can_delete` on `tenant:<tenant_id>` for that user keyed by `tenant_id`
+### Requirement: Elevated Permissions Are Not Assigned by the Tenant Service
+The system SHALL NOT accept a membership role or any other caller-supplied permission level, and SHALL NOT expose an operation to change a member's permissions. Permissions above `can_view` for existing members SHALL be managed through the Authorization Service API.
 
-#### Scenario: Promoting member to owner emits write can_delete and delete can_view ops
-- **WHEN** a tenant member is promoted to owner role
-- **THEN** the system updates storage and asynchronously publishes an envelope containing op `WRITE` for `can_delete` on `tenant:<tenant_id>` and op `DELETE` for `can_view` on `tenant:<tenant_id>` for that user keyed by `tenant_id`
-
+#### Scenario: Invite and provision requests carry no role
+- **WHEN** a caller invites or provisions a user into a tenant
+- **THEN** the request contains only the tenant ID and email, and the only permission published is `can_view`
 
 ### Requirement: Permission Event Publishing on Tenant Deletion
-The system SHALL asynchronously publish `PermissionUpdateEnvelope` events keyed by tenant ID containing `DELETE` operations for all members of the tenant when a tenant is deleted.
+The system SHALL asynchronously publish `PermissionUpdateEnvelope` events keyed by tenant ID containing `DELETE` operations for relations `can_view`, `can_edit`, and `can_delete` on the tenant resource for every member of the tenant when a tenant is deleted. The system SHALL include all members regardless of page size and SHALL split operations into envelopes of at most 100 operations.
 
 #### Scenario: Tenant deletion emits delete permission ops for members
 - **WHEN** a tenant is deleted
-- **THEN** the system removes the tenant and memberships from storage and asynchronously publishes delete permission events to Kafka for all tenant members keyed by `tenant_id`
+- **THEN** the system lists every membership (across all pages) before removing the tenant and memberships from storage, and asynchronously publishes `DELETE` operations for `can_view`, `can_edit`, and `can_delete` for each member keyed by `tenant_id`
+
+#### Scenario: Large tenant deletion is split into multiple envelopes
+- **WHEN** a tenant is deleted and the revocation requires more than 100 operations
+- **THEN** the system publishes multiple envelopes keyed by `tenant_id`, each containing at most 100 operations
 
 ### Requirement: STS Bearer Token Verification
 The system SHALL verify incoming bearer JWT tokens issued by STS using keys from the configured JWKS endpoint, supporting both RS256 and ES256 signing algorithms.

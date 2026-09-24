@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -110,14 +111,15 @@ func NewKafkaPublisherWithWriter(
 	}
 }
 
-// Publish builds a PermissionUpdateEnvelope, keys the message by tenantID for FIFO ordering,
-// and publishes asynchronously via the underlying Kafka writer.
+// Publish builds one or more PermissionUpdateEnvelopes, keys the messages by tenantID for
+// FIFO ordering, and publishes asynchronously via the underlying Kafka writer.
+// Operations are split into envelopes of at most MaxOperationsPerEnvelope operations.
 func (p *KafkaPublisher) Publish(ctx context.Context, tenantID string, ops ...*v1.PermissionOperation) {
 	if p == nil || p.writer == nil || len(ops) == 0 {
 		return
 	}
 
-	envelope, msg, err := p.buildMessage(ctx, tenantID, ops...)
+	msgs, err := p.buildMessages(ctx, tenantID, ops...)
 	if err != nil {
 		p.logger.Errorw("failed to marshal permission update envelope",
 			"tenant_id", tenantID,
@@ -129,10 +131,10 @@ func (p *KafkaPublisher) Publish(ctx context.Context, tenantID string, ops ...*v
 	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), p.publishTimeout)
 	defer cancel()
 
-	if err := p.writer.WriteMessages(writeCtx, msg); err != nil {
+	if err := p.writer.WriteMessages(writeCtx, msgs...); err != nil {
 		p.logger.Errorw("failed to write kafka message",
 			"tenant_id", tenantID,
-			"message_id", envelope.MessageId,
+			"messages_count", len(msgs),
 			"error", err,
 		)
 	}
@@ -144,7 +146,7 @@ func (p *KafkaPublisher) PublishSync(ctx context.Context, tenantID string, ops .
 		return nil
 	}
 
-	_, msg, err := p.buildMessage(ctx, tenantID, ops...)
+	msgs, err := p.buildMessages(ctx, tenantID, ops...)
 	if err != nil {
 		return fmt.Errorf("build permission message: %w", err)
 	}
@@ -152,26 +154,42 @@ func (p *KafkaPublisher) PublishSync(ctx context.Context, tenantID string, ops .
 	writeCtx, cancel := context.WithTimeout(ctx, p.publishTimeout)
 	defer cancel()
 
-	if err := p.writer.WriteMessages(writeCtx, msg); err != nil {
+	if err := p.writer.WriteMessages(writeCtx, msgs...); err != nil {
 		return fmt.Errorf("write kafka message: %w", err)
 	}
 
 	return nil
 }
 
+// buildMessages splits ops into chunks of at most MaxOperationsPerEnvelope and builds
+// one Kafka message per chunk. All messages share the tenantID key, so they land on the
+// same partition and are consumed in order.
+func (p *KafkaPublisher) buildMessages(
+	ctx context.Context,
+	tenantID string,
+	ops ...*v1.PermissionOperation,
+) ([]kafka.Message, error) {
+	msgs := make([]kafka.Message, 0, (len(ops)+MaxOperationsPerEnvelope-1)/MaxOperationsPerEnvelope)
+	for chunk := range slices.Chunk(ops, MaxOperationsPerEnvelope) {
+		msg, err := p.buildMessage(ctx, tenantID, chunk...)
+		if err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, msg)
+	}
+	return msgs, nil
+}
+
 func (p *KafkaPublisher) buildMessage(
 	ctx context.Context,
 	tenantID string,
 	ops ...*v1.PermissionOperation,
-) (*v1.PermissionUpdateEnvelope, kafka.Message, error) {
-	msgID := uuid.NewString()
-	idempotencyKey := uuid.NewString()
-
+) (kafka.Message, error) {
 	envelope := &v1.PermissionUpdateEnvelope{
 		Version:        "1.0",
 		Service:        p.service,
-		MessageId:      msgID,
-		IdempotencyKey: idempotencyKey,
+		MessageId:      uuid.NewString(),
+		IdempotencyKey: uuid.NewString(),
 		EventTime:      timestamppb.Now(),
 		Operations:     ops,
 	}
@@ -184,15 +202,13 @@ func (p *KafkaPublisher) buildMessage(
 
 	data, err := proto.Marshal(envelope)
 	if err != nil {
-		return nil, kafka.Message{}, fmt.Errorf("marshal envelope: %w", err)
+		return kafka.Message{}, fmt.Errorf("marshal envelope: %w", err)
 	}
 
-	msg := kafka.Message{
+	return kafka.Message{
 		Key:   []byte(tenantID),
 		Value: data,
-	}
-
-	return envelope, msg, nil
+	}, nil
 }
 
 // Close closes the underlying Kafka writer, which flushes any pending messages.
@@ -203,28 +219,39 @@ func (p *KafkaPublisher) Close() error {
 	return p.writer.Close()
 }
 
-// PermissionOpForRole constructs a *v1.PermissionOperation mapped for the given role.
-// In the authz model, roles are entirely replaced with fine-grained cascading permissions
-// on the tenant resource directly:
-// - "owner" maps to "can_delete" (cascades to can_edit and can_view)
-// - "admin" maps to "can_edit" (cascades to can_view)
-// - "member" maps to "can_view"
-func PermissionOpForRole(op v1.PermissionOp, identityID, role, tenantID string) *v1.PermissionOperation {
-	var relation string
-	switch role {
-	case "owner":
-		relation = "can_delete"
-	case "admin":
-		relation = "can_edit"
-	case "member":
-		relation = "can_view"
-	default:
-		relation = role
-	}
+// Tenant relations defined by the authorization service model for tenant-service.
+// Permissions cascade: can_delete implies can_edit, which implies can_view.
+const (
+	RelationCanView   = "can_view"
+	RelationCanEdit   = "can_edit"
+	RelationCanDelete = "can_delete"
+)
+
+// MaxOperationsPerEnvelope bounds the operations carried by a single envelope. The
+// authorization service applies each envelope as one OpenFGA Write, which by default
+// accepts at most 100 tuples.
+const MaxOperationsPerEnvelope = 100
+
+// tenantRelations lists every relation a user may hold directly on a tenant, whether
+// granted by the tenant service or through the authorization service API.
+var tenantRelations = []string{RelationCanView, RelationCanEdit, RelationCanDelete}
+
+// TenantPermissionOp builds a permission operation for a user on a tenant.
+func TenantPermissionOp(op v1.PermissionOp, identityID, relation, tenantID string) *v1.PermissionOperation {
 	return &v1.PermissionOperation{
 		Op:       op,
 		Subject:  "user:" + identityID,
 		Relation: relation,
 		Object:   "tenant:" + tenantID,
 	}
+}
+
+// RevokeTenantPermissionOps builds DELETE operations for every relation a user may hold
+// on a tenant. The authorization service ignores deletes for tuples that do not exist.
+func RevokeTenantPermissionOps(identityID, tenantID string) []*v1.PermissionOperation {
+	ops := make([]*v1.PermissionOperation, 0, len(tenantRelations))
+	for _, relation := range tenantRelations {
+		ops = append(ops, TenantPermissionOp(v1.PermissionOp_PERMISSION_OP_DELETE, identityID, relation, tenantID))
+	}
+	return ops
 }
