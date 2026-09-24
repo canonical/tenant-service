@@ -10,7 +10,7 @@ interceptor, achieving parity with the HTTP `db.TransactionMiddleware`.
 
 ---
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Mutating gRPC unary RPCs execute within a database transaction
 The system SHALL wrap all mutating gRPC unary RPC handlers in a database transaction that commits on success and rolls back on error. Read-only RPCs SHALL bypass transaction wrapping entirely.
