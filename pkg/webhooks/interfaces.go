@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/canonical/tenant-service/internal/types"
-	"github.com/ory/hydra/v2/oauth2"
 )
 
 // StorageInterface defines the storage operations required by the webhooks package.
@@ -27,6 +26,6 @@ type AuthorizerInterface interface {
 // ServiceInterface defines the webhook service operations.
 type ServiceInterface interface {
 	HandleRegistration(ctx context.Context, identityID, email string) error
-	HandleTokenHook(ctx context.Context, req *oauth2.TokenHookRequest) (*TokenHookResponse, error)
+	HandleTokenHook(ctx context.Context, req *TokenHookRequest) (*TokenHookResponse, error)
 	HandleLoginHook(ctx context.Context, identityID, email, tenantID string) error
 }

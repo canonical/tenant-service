@@ -9,7 +9,7 @@ interceptor, achieving parity with the HTTP `LogFormatter` behaviour.
 
 ---
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: gRPC calls are logged with severity-aware log levels
 The system SHALL log every gRPC unary and streaming RPC call with the full method name, gRPC status code, and duration. The log level SHALL reflect the severity of the outcome: server-side error codes (`Internal`, `Unknown`, `Unavailable`, `DataLoss`, `DeadlineExceeded`) SHALL be logged at **Error** level; all other outcomes (including client errors such as `NotFound` or `InvalidArgument`) SHALL be logged at **Debug** level. The log entry SHALL be emitted after handler completion.
