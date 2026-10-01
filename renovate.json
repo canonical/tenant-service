@@ -81,6 +81,11 @@
       "matchPackageNames": ["github.com/openfga/go-sdk"],
       "allowedVersions": "v0.3.7",
       "automerge": false
+    },
+    {  // Remove once tenant service is upgraded to new API contract
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["github.com/canonical/identity-platform-api"],
+      "enabled": false
     }
   ]
 }
