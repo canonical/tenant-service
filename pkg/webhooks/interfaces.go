@@ -14,14 +14,8 @@ import (
 // It is a subset of the internal/storage interface.
 type StorageInterface interface {
 	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
-	AddMember(ctx context.Context, tenantID, userID, role string) (string, error)
+	AddMember(ctx context.Context, tenantID, userID string) (string, error)
 	GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
-}
-
-// AuthorizerInterface defines the authorization operations required by the webhooks package.
-// It is a subset of the internal/authorization interface.
-type AuthorizerInterface interface {
-	AssignTenantOwner(ctx context.Context, tenantID, userID string) error
 }
 
 // ServiceInterface defines the webhook service operations.

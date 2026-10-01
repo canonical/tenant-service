@@ -47,10 +47,10 @@ sequenceDiagram
     WebhookSvc->>DB: INSERT INTO tenants<br/>(id=uuid_v7, name="alice@example.com's Org", enabled=false)
     DB-->>WebhookSvc: tenant{id, name, created_at, enabled=false}
 
-    WebhookSvc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id, role="owner")
+    WebhookSvc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id)
     DB-->>WebhookSvc: membership row created
 
-    WebhookSvc->>FGA: WriteTuple<br/>(user:{identityID}, owner, tenant:{tenantID})
+    WebhookSvc->>FGA: WriteTuple<br/>(user:{identityID}, can_delete, tenant:{tenantID})
     FGA-->>WebhookSvc: OK
 
     WebhookSvc-->>MW: nil (success)
@@ -324,7 +324,7 @@ sequenceDiagram
     participant KratosAdmin as Kratos Admin API
     participant DB as PostgreSQL
 
-    Owner->>GW: POST /api/v0/tenants/{id}/invites<br/>{email: "alice@example.com", role: "member"}<br/>Authorization: Bearer <token>
+    Owner->>GW: POST /api/v0/tenants/{id}/invites<br/>{email: "alice@example.com"}<br/>Authorization: Bearer <token>
 
     GW->>AuthMW: Validate JWT
     AuthMW->>AuthMW: VerifyToken(token) → extract sub as userID
@@ -333,8 +333,8 @@ sequenceDiagram
     GW->>MW: Begin DB transaction (non-GET)
 
     MW->>Handler: InviteMember(ctx, req)
-    Handler->>Handler: Validate tenantId, email, role non-empty
-    Handler->>Svc: InviteMember(ctx, tenantId, email, role)
+    Handler->>Handler: Validate tenantId, email
+    Handler->>Svc: InviteMember(ctx, tenantId, email)
 
     Svc->>FGA: CheckTenantAccess(callerID, "owner", tenant:{tenantId})
     FGA-->>Svc: Allowed
@@ -347,7 +347,7 @@ sequenceDiagram
         KratosAdmin-->>Svc: 201 Created {id: "new-uuid"}
     end
 
-    Svc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id, role)
+    Svc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id)
     alt Duplicate key — re-invite case
         DB-->>Svc: ErrDuplicateKey (23505)
         Note over Svc: Silently continue — idempotent re-invite
@@ -355,11 +355,8 @@ sequenceDiagram
         DB-->>Svc: membership row created
     end
 
-    alt role == "owner"
-        Svc->>FGA: WriteTuple(user:{identityID}, owner, tenant:{tenantId})
-    else role == "member" or "admin"
-        Svc->>FGA: WriteTuple(user:{identityID}, member, tenant:{tenantId})
-    end
+    Svc->>FGA: WriteTuple(user:{identityID}, can_view, tenant:{tenantId})
+    Note over Svc,FGA: Elevated permissions (can_edit, can_delete) are granted<br/>through the authorization service API, not the tenant service
     FGA-->>Svc: OK
 
     Svc->>KratosAdmin: POST /identities/{identityID}/recovery/code<br/>{expires_in: invitationLifetime}
@@ -377,8 +374,9 @@ sequenceDiagram
 
 An internal admin bootstraps a new enterprise tenant. This is a **one-time setup flow**: it
 solves the bootstrap problem where no owner exists yet and therefore nobody can call
-`InviteMember` (Flow 4). Once `ProvisionUser` has assigned the first owner, all subsequent
-membership changes should go through `InviteMember`. `ProvisionUser` is restricted to the
+`InviteMember` (Flow 4). `ProvisionUser` adds the first member with `can_view`; the platform
+admin then grants that member `can_delete` through the authorization service API. All
+subsequent membership changes should go through `InviteMember`. `ProvisionUser` is restricted to the
 internal network and does not require the caller to hold any per-tenant relation in OpenFGA.
 
 **Caller:** Internal Admin (internal network only)
@@ -416,15 +414,15 @@ sequenceDiagram
     MW->>DB: COMMIT
     GW-->>Admin: 201 OK {id: "t-100", name: "Acme Corp", enabled: true}
 
-    Note over Admin,GW: Step 2 — Provision an Owner
+    Note over Admin,GW: Step 2 — Provision the first member
 
-    Admin->>GW: POST /api/v0/tenants/t-100/users<br/>{email: "alice@acme.com", role: "owner"}<br/>Authorization: Bearer <token>
+    Admin->>GW: POST /api/v0/tenants/t-100/users<br/>{email: "alice@acme.com"}<br/>Authorization: Bearer <token>
     GW->>AuthMW: Validate JWT → extract userID
     AuthMW-->>GW: Proceed
     GW->>MW: Begin DB transaction
 
     MW->>Handler: ProvisionUser(ctx, req)
-    Handler->>Svc: ProvisionUser(ctx, "t-100", "alice@acme.com", "owner")
+    Handler->>Svc: ProvisionUser(ctx, "t-100", "alice@acme.com")
 
     Svc->>KratosAdmin: GET /identities?credentials_identifier=alice@acme.com
 
@@ -435,10 +433,10 @@ sequenceDiagram
         KratosAdmin-->>Svc: 201 Created {id: "new-uuid"}
     end
 
-    Svc->>DB: INSERT INTO memberships<br/>(tenant_id="t-100", kratos_identity_id, role="owner")
+    Svc->>DB: INSERT INTO memberships<br/>(tenant_id="t-100", kratos_identity_id)
     DB-->>Svc: membership created
 
-    Svc->>FGA: WriteTuple(user:{identityID}, owner, tenant:t-100)
+    Svc->>FGA: WriteTuple(user:{identityID}, can_view, tenant:t-100)
     FGA-->>Svc: OK
 
     Svc->>KratosAdmin: POST /identities/{identityID}/recovery/code<br/>{expires_in: invitationLifetime}
@@ -448,6 +446,9 @@ sequenceDiagram
     Handler-->>GW: ProvisionUserResponse{status: "provisioned", link, code}
     MW->>DB: COMMIT
     GW-->>Admin: 200 OK {status: "provisioned", link, code}
+
+    Note over Admin,GW: Step 3 — Grant ownership via the authorization service API
+    Note over Admin: Grant user:{identityID} can_delete on tenant:t-100
 ```
 
 ### Invite vs Provision — when to use which
@@ -458,13 +459,13 @@ FGA tuple, generate recovery link). The difference is **who can call them** and 
 | | Flow 4 — Invite Member | Flow 5 — Provision User |
 |---|---|---|
 | **Caller** | Tenant Owner (public internet) | Internal Admin (internal network only) |
-| **Pre-condition** | Tenant must already have an owner | No ownership pre-condition — this *creates* the owner |
+| **Pre-condition** | Tenant must already have an owner | No ownership pre-condition — this adds the first member, who is then granted ownership via the authorization service |
 | **Authorisation** | OpenFGA ownership check required | Network boundary enforces access; no per-tenant check |
 | **Idempotency** | Safe — duplicate membership silently ignored | Not safe — fails on duplicate key |
 | **Use case** | Growing an existing team | One-time bootstrap of a new enterprise tenant |
 
-> **Implementation note:** the shared logic (find-or-create identity, add membership, assign FGA
-> role, generate recovery link) should be extracted into a single private service method to prevent
+> **Implementation note:** the shared logic (find-or-create identity, add membership, grant
+> `can_view`, generate recovery link) should be extracted into a single private service method to prevent
 > the two flows from drifting apart. Currently `ProvisionUser` is missing the recovery link step
 > that `InviteMember` already has.
 

@@ -32,12 +32,10 @@ type EnvSpec struct {
 	DBMaxConnLifetime time.Duration `envconfig:"db_max_conn_lifetime" default:"1h"`
 	DBMaxConnIdleTime time.Duration `envconfig:"db_max_conn_idle_time" default:"30m"`
 
-	AuthorizationEnabled bool   `envconfig:"authorization_enabled" default:"false"`
-	OpenfgaApiScheme     string `envconfig:"openfga_api_scheme" default:""`
-	OpenfgaApiHost       string `envconfig:"openfga_api_host"`
-	OpenfgaApiToken      string `envconfig:"openfga_api_token"`
-	OpenfgaStoreId       string `envconfig:"openfga_store_id"`
-	OpenfgaModelId       string `envconfig:"openfga_authorization_model_id" default:""`
+	KafkaEnabled          bool     `envconfig:"kafka_enabled" default:"false"`
+	KafkaBrokers          []string `envconfig:"kafka_brokers"`
+	KafkaPermissionsTopic string   `envconfig:"kafka_permissions_topic" default:"tenant-service.permissions"`
+	KafkaClientID         string   `envconfig:"kafka_client_id" default:"tenant-service"`
 
 	AuthenticationEnabled         bool   `envconfig:"authentication_enabled" default:"true"`
 	AuthenticationIssuer          string `envconfig:"authentication_issuer"`

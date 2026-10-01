@@ -208,9 +208,6 @@ func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenan
 			pageSize := in.PageSize
 			params.PageSize = &pageSize
 		}
-		if in.Role != nil {
-			params.Role = in.Role
-		}
 		if in.Email != nil {
 			params.Email = in.Email
 		}
@@ -223,19 +220,6 @@ func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenan
 		}
 	}
 	resp, err := c.client.TenantServiceListTenantUsers(ctx, in.GetTenantId(), params)
-	if err := c.handleRequest(resp, err, out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *httpTenantClient) UpdateTenantUser(ctx context.Context, in *v0.UpdateTenantUserRequest, opts ...grpc.CallOption) (*v0.UpdateTenantUserResponse, error) {
-	out := new(v0.UpdateTenantUserResponse)
-	bodyBytes, err := protojson.Marshal(in)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-	resp, err := c.client.TenantServiceUpdateTenantUserWithBody(ctx, in.GetTenantId(), in.GetUserId(), "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}

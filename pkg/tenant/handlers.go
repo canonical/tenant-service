@@ -81,16 +81,12 @@ func (h *Handler) InviteMember(ctx context.Context, req *v0.InviteMemberRequest)
 	if _, err := mail.ParseAddress(req.Email); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid email: %v", err)
 	}
-	if strings.TrimSpace(req.Role) == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "role is required")
-	}
 
-	link, code, err := h.service.InviteMember(ctx, req.TenantId, req.Email, req.Role)
+	link, code, err := h.service.InviteMember(ctx, req.TenantId, req.Email)
 	if err != nil {
 		h.logger.Errorw("failed to invite member",
 			"tenant_id", req.TenantId,
 			"email", req.Email,
-			"role", req.Role,
 			"error", err,
 		)
 		// In a real app, you might map specific error types to gRPC codes here
@@ -254,11 +250,10 @@ func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserReques
 		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
-	if err := h.service.ProvisionUser(ctx, req.TenantId, req.Email, req.Role); err != nil {
+	if err := h.service.ProvisionUser(ctx, req.TenantId, req.Email); err != nil {
 		h.logger.Errorw("failed to provision user",
 			"tenant_id", req.TenantId,
 			"email", req.Email,
-			"role", req.Role,
 			"error", err,
 		)
 		return nil, status.Errorf(codes.Internal, "failed to provision user: %v", err)
@@ -266,40 +261,6 @@ func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserReques
 
 	return &v0.ProvisionUserResponse{
 		Status: "provisioned",
-	}, nil
-}
-
-func (h *Handler) UpdateTenantUser(ctx context.Context, req *v0.UpdateTenantUserRequest) (*v0.UpdateTenantUserResponse, error) {
-	ctx, span := h.tracer.Start(ctx, "tenant.Handler.UpdateTenantUser")
-	defer span.End()
-
-	if err := h.validator.Validate(req); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
-	if _, err := uuid.Parse(req.UserId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: must be a valid UUID")
-	}
-
-	user, err := h.service.UpdateTenantUser(ctx, req.TenantId, req.UserId, req.Role)
-	if err != nil {
-		h.logger.Errorw("failed to update tenant user",
-			"tenant_id", req.TenantId,
-			"user_id", req.UserId,
-			"role", req.Role,
-			"error", err,
-		)
-		return nil, status.Errorf(codes.Internal, "failed to update tenant user: %v", err)
-	}
-
-	return &v0.UpdateTenantUserResponse{
-		User: &v0.TenantUser{
-			UserId: user.UserID,
-			Role:   user.Role,
-			Email:  user.Email,
-		},
 	}, nil
 }
 
@@ -341,9 +302,6 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 	}
 
 	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}
-	if req.Role != nil {
-		opts = append(opts, types.WithRole(*req.Role))
-	}
 	if req.IdentityId != nil {
 		opts = append(opts, types.WithIdentityID(*req.IdentityId))
 	} else if req.Email != nil {
@@ -363,7 +321,6 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 		pbUsers[i] = &v0.TenantUser{
 			UserId: u.UserID,
 			Email:  u.Email,
-			Role:   u.Role,
 		}
 	}
 

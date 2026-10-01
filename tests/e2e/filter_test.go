@@ -29,7 +29,6 @@ func TestFilters_HTTP(t *testing.T) {
 	defer client.Close()
 
 	t.Run("TenantFilter/Enabled", func(t *testing.T) { testFilterByEnabled(t, client) })
-	t.Run("TenantUserFilter/Role", func(t *testing.T) { testFilterUsersByRole(t, client) })
 	t.Run("TenantUserFilter/Email", func(t *testing.T) { testFilterUsersByEmail(t, client) })
 	t.Run("TenantUserFilter/IdentityID", func(t *testing.T) { testFilterUsersByIdentityID(t, client) })
 }
@@ -43,7 +42,6 @@ func TestFilters_GRPC(t *testing.T) {
 	defer client.Close()
 
 	t.Run("TenantFilter/Enabled", func(t *testing.T) { testFilterByEnabled(t, client) })
-	t.Run("TenantUserFilter/Role", func(t *testing.T) { testFilterUsersByRole(t, client) })
 	t.Run("TenantUserFilter/Email", func(t *testing.T) { testFilterUsersByEmail(t, client) })
 	t.Run("TenantUserFilter/IdentityID", func(t *testing.T) { testFilterUsersByIdentityID(t, client) })
 }
@@ -109,52 +107,6 @@ func testFilterByEnabled(t *testing.T, client TenantClient) {
 	assertNotContainsTenant(t, disabledTenants, enabledID, "enabled=false results must not include enabled tenant")
 }
 
-// testFilterUsersByRole verifies that filter.role restricts ListTenantUsers results
-// to only members with the matching role.
-func testFilterUsersByRole(t *testing.T, client TenantClient) {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	tenantName := fmt.Sprintf("e2e-filter-role-%d", time.Now().UnixNano())
-	tenantID, err := client.CreateTenant(ctx, tenantName)
-	if err != nil {
-		t.Fatalf("CreateTenant(%q): %v", tenantName, err)
-	}
-	t.Cleanup(func() {
-		cleanCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = client.DeleteTenant(cleanCtx, tenantID)
-	})
-
-	ownerEmail := fmt.Sprintf("e2e-owner-%d@example.com", time.Now().UnixNano())
-	memberEmail := fmt.Sprintf("e2e-member-%d@example.com", time.Now().UnixNano())
-
-	if err := client.ProvisionTenantUser(ctx, tenantID, ownerEmail, "owner"); err != nil {
-		t.Fatalf("ProvisionTenantUser(owner): %v", err)
-	}
-	if err := client.ProvisionTenantUser(ctx, tenantID, memberEmail, "member"); err != nil {
-		t.Fatalf("ProvisionTenantUser(member): %v", err)
-	}
-
-	// Filter by role=owner: only the owner must appear.
-	owners, err := client.ListTenantUsersFiltered(ctx, tenantID, TenantUserFilterOptions{Role: "owner"})
-	if err != nil {
-		t.Fatalf("ListTenantUsersFiltered(role=owner): %v", err)
-	}
-	assertContainsUser(t, owners, ownerEmail, "role=owner must include the owner")
-	assertNotContainsUser(t, owners, memberEmail, "role=owner must not include the member")
-
-	// Filter by role=member: only the member must appear.
-	members, err := client.ListTenantUsersFiltered(ctx, tenantID, TenantUserFilterOptions{Role: "member"})
-	if err != nil {
-		t.Fatalf("ListTenantUsersFiltered(role=member): %v", err)
-	}
-	assertContainsUser(t, members, memberEmail, "role=member must include the member")
-	assertNotContainsUser(t, members, ownerEmail, "role=member must not include the owner")
-}
-
 // testFilterUsersByEmail verifies that filter.email restricts ListTenantUsers to
 // the single member whose email matches.
 func testFilterUsersByEmail(t *testing.T, client TenantClient) {
@@ -178,10 +130,10 @@ func testFilterUsersByEmail(t *testing.T, client TenantClient) {
 	aliceEmail := fmt.Sprintf("e2e-alice-%d@example.com", now)
 	bobEmail := fmt.Sprintf("e2e-bob-%d@example.com", now)
 
-	if err := client.ProvisionTenantUser(ctx, tenantID, aliceEmail, "member"); err != nil {
+	if err := client.ProvisionTenantUser(ctx, tenantID, aliceEmail); err != nil {
 		t.Fatalf("ProvisionTenantUser(alice): %v", err)
 	}
-	if err := client.ProvisionTenantUser(ctx, tenantID, bobEmail, "member"); err != nil {
+	if err := client.ProvisionTenantUser(ctx, tenantID, bobEmail); err != nil {
 		t.Fatalf("ProvisionTenantUser(bob): %v", err)
 	}
 
@@ -230,10 +182,10 @@ func testFilterUsersByIdentityID(t *testing.T, client TenantClient) {
 	aliceEmail := fmt.Sprintf("e2e-alice-id-%d@example.com", now)
 	bobEmail := fmt.Sprintf("e2e-bob-id-%d@example.com", now)
 
-	if err := client.ProvisionTenantUser(ctx, tenantID, aliceEmail, "member"); err != nil {
+	if err := client.ProvisionTenantUser(ctx, tenantID, aliceEmail); err != nil {
 		t.Fatalf("ProvisionTenantUser(alice): %v", err)
 	}
-	if err := client.ProvisionTenantUser(ctx, tenantID, bobEmail, "member"); err != nil {
+	if err := client.ProvisionTenantUser(ctx, tenantID, bobEmail); err != nil {
 		t.Fatalf("ProvisionTenantUser(bob): %v", err)
 	}
 
