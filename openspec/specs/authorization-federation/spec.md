@@ -1,8 +1,10 @@
+# authorization-federation Specification
+
 ## Purpose
 
 Defines the contract for federating `tenant-service` with the Canonical Identity Platform Authorization Service, delegating access checks to upstream gateway infrastructure and publishing permission lifecycle events to Kafka.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Ingress Authorization Delegation
 The system SHALL execute incoming tenant and member operations without executing in-process OpenFGA authorization checks, relying on upstream API Gateway and Authorization Service enforcement.
@@ -72,4 +74,3 @@ The system SHALL configure Istio Gateway rules to bypass external authorization 
 #### Scenario: Self-inspection endpoint validates caller JWT directly
 - **WHEN** a request arrives for `GET /api/v0/me/tenants` bypassing external authorization at the Istio Gateway
 - **THEN** the system validates the caller's JWT bearer token, extracts the user ID from the `sub` claim, and returns tenants associated with that user ID
-
