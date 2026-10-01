@@ -12,6 +12,9 @@
     "helpers:pinGitHubActionDigests",
     ":enablePreCommit"
   ],
+  "postUpdateOptions": [
+    "gomodTidyAll"
+  ],
   "enabledManagers": ["gomod", "github-actions", "npm", "docker-compose", "kubernetes", "pre-commit"],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
