@@ -10,7 +10,6 @@ import (
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/go-chi/chi/v5"
-	"github.com/ory/hydra/v2/oauth2"
 )
 
 // API implements HTTP handler endpoints for webhooks.
@@ -50,7 +49,7 @@ func (a *API) RegisterEndpoints(mux *chi.Mux) {
 }
 
 func (a *API) tokenHook(w http.ResponseWriter, r *http.Request) {
-	req := new(oauth2.TokenHookRequest)
+	req := new(TokenHookRequest)
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		a.logger.Errorw("token hook: invalid request body", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

@@ -9,7 +9,7 @@ achieving parity with the HTTP monitoring middleware without introducing custom 
 
 ---
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: gRPC server emits standard Prometheus metrics
 The system SHALL emit standard Prometheus metrics for all gRPC unary and streaming server calls using `go-grpc-prometheus`. The metrics SHALL include call counts, handling duration histograms, and per-status-code counters with labels for service name, method name, call type, and gRPC status code.

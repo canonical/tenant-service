@@ -12,7 +12,6 @@ import (
 	"github.com/canonical/tenant-service/internal/permissions"
 	storagePkg "github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/types"
-	"github.com/ory/hydra/v2/oauth2"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/mock/gomock"
 )
@@ -154,17 +153,17 @@ func TestService_HandleTokenHook(t *testing.T) {
 		KratosIdentityID: userID,
 	}
 
-	makeSession := func(subject string, extra map[string]interface{}) *oauth2.TokenHookRequest {
-		s := oauth2.NewSession(subject)
+	makeSession := func(subject string, extra map[string]interface{}) *TokenHookRequest {
+		s := NewSession(subject)
 		if extra != nil {
 			s.Extra = extra
 		}
-		return &oauth2.TokenHookRequest{Session: s}
+		return &TokenHookRequest{Session: s}
 	}
 
 	testCases := []struct {
 		name         string
-		request      *oauth2.TokenHookRequest
+		request      *TokenHookRequest
 		setupMocks   func(*MockStorageInterface, *MockLoggerInterface)
 		expectedErr  bool
 		validateResp func(*testing.T, *TokenHookResponse)
@@ -234,15 +233,15 @@ func TestService_HandleTokenHook(t *testing.T) {
 		},
 		{
 			name: "error - no user id in session",
-			request: &oauth2.TokenHookRequest{
-				Session: oauth2.NewSession(""),
+			request: &TokenHookRequest{
+				Session: NewSession(""),
 			},
 			setupMocks:  func(*MockStorageInterface, *MockLoggerInterface) {},
 			expectedErr: true,
 		},
 		{
 			name:        "error - nil session",
-			request:     &oauth2.TokenHookRequest{},
+			request:     &TokenHookRequest{},
 			setupMocks:  func(*MockStorageInterface, *MockLoggerInterface) {},
 			expectedErr: true,
 		},

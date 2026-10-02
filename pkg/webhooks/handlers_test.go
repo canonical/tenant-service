@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/ory/hydra/v2/oauth2"
 	"go.uber.org/mock/gomock"
 )
 
@@ -32,8 +31,8 @@ func TestAPI_TokenHook(t *testing.T) {
 	}{
 		{
 			name: "success",
-			requestBody: &oauth2.TokenHookRequest{
-				Session: oauth2.NewSession("user-123"),
+			requestBody: &TokenHookRequest{
+				Session: NewSession("user-123"),
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				response := &TokenHookResponse{
@@ -70,8 +69,8 @@ func TestAPI_TokenHook(t *testing.T) {
 		},
 		{
 			name: "service error",
-			requestBody: &oauth2.TokenHookRequest{
-				Session: oauth2.NewSession("user-123"),
+			requestBody: &TokenHookRequest{
+				Session: NewSession("user-123"),
 			},
 			setupMocks: func(mockSvc *MockServiceInterface, mockLogger *MockLoggerInterface) {
 				mockSvc.EXPECT().HandleTokenHook(gomock.Any(), gomock.Any()).Return(nil, errors.New("service error"))
