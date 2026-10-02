@@ -1,6 +1,6 @@
 module github.com/canonical/tenant-service/tests/e2e
 
-go 1.26.1
+go 1.26.6
 
 require (
 	github.com/canonical/identity-platform-api v0.0.0-20260924175044-8c1a27b95cef
@@ -9,7 +9,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/ory/hydra-client-go/v2 v2.2.1
 	github.com/testcontainers/testcontainers-go/modules/compose v0.36.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0-dev.0.20260825072537-93e31b48545e
 	google.golang.org/protobuf v1.36.12
 )
 
