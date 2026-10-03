@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v2.11
+    image: traefik:v3.7
     restart: unless-stopped
     ports:
       - "80:80"
