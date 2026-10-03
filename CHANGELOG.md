@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.4.0](https://github.com/canonical/tenant-service/compare/v0.3.1...v0.4.0) (2026-10-03)
+
+
+### Features
+
+* **ci:** shift-left vulnerability check & release quarantine gate ([c15d4f0](https://github.com/canonical/tenant-service/commit/c15d4f0d85bd53f8496084ced0e060b1dabc72fc))
+* **ci:** shift-left vulnerability check & release quarantine gate ([#112](https://github.com/canonical/tenant-service/issues/112)) ([70fec42](https://github.com/canonical/tenant-service/commit/70fec4299ac78284bbb247ed0f84f181cc718b2a))
+* federate with authorization service ([f125c01](https://github.com/canonical/tenant-service/commit/f125c0172cf6287e00b2ee6101f2e2695a72ad5b))
+
+
+### Bug Fixes
+
+* **deps:** update go deps ([d4ec300](https://github.com/canonical/tenant-service/commit/d4ec3007e73aaec3664bf2ec13b0687da730edfc))
+* **deps:** update go deps ([c4f7451](https://github.com/canonical/tenant-service/commit/c4f7451d5d82207beafeb947273a1372c13e1946))
+* **deps:** update go deps (excluding identity-platform-api) ([c8bc58e](https://github.com/canonical/tenant-service/commit/c8bc58e08159bdeccc0206d759e0588505532b2d))
+* **deps:** update go deps (minor) ([#25](https://github.com/canonical/tenant-service/issues/25)) ([7662cbe](https://github.com/canonical/tenant-service/commit/7662cbe2a302f54d21bb4290002f2172468e95ee))
+* **deps:** update go deps (patch) ([#33](https://github.com/canonical/tenant-service/issues/33)) ([de4ada0](https://github.com/canonical/tenant-service/commit/de4ada0952f358fe0c8ff513f32010f5b627920b))
+* **deps:** update go deps (supersedes [#25](https://github.com/canonical/tenant-service/issues/25)) ([#115](https://github.com/canonical/tenant-service/issues/115)) ([9327660](https://github.com/canonical/tenant-service/commit/93276600fe989f3c108f26516a597b1aca965ef3))
+* **deps:** update module github.com/ory/client-go to v1.22.79 ([9794088](https://github.com/canonical/tenant-service/commit/9794088251d70c8df22825729b2604a0373fccc3))
+* **deps:** update module github.com/ory/client-go to v1.22.79 ([#127](https://github.com/canonical/tenant-service/issues/127)) ([11d16aa](https://github.com/canonical/tenant-service/commit/11d16aac457a740e85b777730d2b847e4b262fe1))
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace to v1.45.0 [security] ([6dcdf51](https://github.com/canonical/tenant-service/commit/6dcdf51d24c9742a20775ea14b94f050cc7c921e))
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc to v1.45.0 [security] ([13cdc79](https://github.com/canonical/tenant-service/commit/13cdc795977be2c3616ce669a767daef77bdb910))
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp to v1.45.0 [security] ([77b3f38](https://github.com/canonical/tenant-service/commit/77b3f38b0b2138045187d88a0392fdfb8a35c879))
+
 ## [0.3.1](https://github.com/canonical/tenant-service/compare/v0.3.0...v0.3.1) (2026-08-13)
 
 
