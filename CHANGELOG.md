@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.4.0](https://github.com/canonical/tenant-service/compare/v0.3.1...v0.4.0) (2026-10-07)
+
+
+### Features
+
+* **ci:** shift-left vulnerability check & release quarantine gate ([c15d4f0](https://github.com/canonical/tenant-service/commit/c15d4f0d85bd53f8496084ced0e060b1dabc72fc))
+* **ci:** shift-left vulnerability check & release quarantine gate ([#112](https://github.com/canonical/tenant-service/issues/112)) ([70fec42](https://github.com/canonical/tenant-service/commit/70fec4299ac78284bbb247ed0f84f181cc718b2a))
+* federate with authorization service ([f125c01](https://github.com/canonical/tenant-service/commit/f125c0172cf6287e00b2ee6101f2e2695a72ad5b))
+
+
+### Bug Fixes
+
+* create invited identities with Kratos's default schema ([edb3925](https://github.com/canonical/tenant-service/commit/edb3925b054b9d52aaad6d41a4542e0e25cd0219))
+* create invited identities with Kratos's default schema ([#124](https://github.com/canonical/tenant-service/issues/124)) ([91fb175](https://github.com/canonical/tenant-service/commit/91fb175e558b87a75e6d59b1478987a17f79a870))
+* **deps:** update go deps ([d4ec300](https://github.com/canonical/tenant-service/commit/d4ec3007e73aaec3664bf2ec13b0687da730edfc))
+* **deps:** update go deps ([c4f7451](https://github.com/canonical/tenant-service/commit/c4f7451d5d82207beafeb947273a1372c13e1946))
+* **deps:** update go deps (excluding identity-platform-api) ([c8bc58e](https://github.com/canonical/tenant-service/commit/c8bc58e08159bdeccc0206d759e0588505532b2d))
+* **deps:** update go deps (minor) ([#25](https://github.com/canonical/tenant-service/issues/25)) ([7662cbe](https://github.com/canonical/tenant-service/commit/7662cbe2a302f54d21bb4290002f2172468e95ee))
+* **deps:** update go deps (patch) ([#33](https://github.com/canonical/tenant-service/issues/33)) ([de4ada0](https://github.com/canonical/tenant-service/commit/de4ada0952f358fe0c8ff513f32010f5b627920b))
+* **deps:** update go deps (supersedes [#25](https://github.com/canonical/tenant-service/issues/25)) ([#115](https://github.com/canonical/tenant-service/issues/115)) ([9327660](https://github.com/canonical/tenant-service/commit/93276600fe989f3c108f26516a597b1aca965ef3))
+* **deps:** update go deps to fad4113 ([7778743](https://github.com/canonical/tenant-service/commit/7778743f70c353c17cd93d0b976fe4f21712bad2))
+* **deps:** update go deps to fad4113 ([#134](https://github.com/canonical/tenant-service/issues/134)) ([e865ec3](https://github.com/canonical/tenant-service/commit/e865ec3ee48266ab17ea4752b061f421631f3185))
+* **deps:** update module github.com/exaring/otelpgx to v0.12.1 ([213acc2](https://github.com/canonical/tenant-service/commit/213acc2be5a514c9c0361da0090244794e5d63d0))
+* **deps:** update module github.com/exaring/otelpgx to v0.12.1 ([#136](https://github.com/canonical/tenant-service/issues/136)) ([652c265](https://github.com/canonical/tenant-service/commit/652c265059044a99a7a89a9fb9f9ff5375073dac))
+* **deps:** update module github.com/ory/client-go to v1.22.79 ([9794088](https://github.com/canonical/tenant-service/commit/9794088251d70c8df22825729b2604a0373fccc3))
+* **deps:** update module github.com/ory/client-go to v1.22.79 ([#127](https://github.com/canonical/tenant-service/issues/127)) ([11d16aa](https://github.com/canonical/tenant-service/commit/11d16aac457a740e85b777730d2b847e4b262fe1))
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace to v1.45.0 [security] ([6dcdf51](https://github.com/canonical/tenant-service/commit/6dcdf51d24c9742a20775ea14b94f050cc7c921e))
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc to v1.45.0 [security] ([13cdc79](https://github.com/canonical/tenant-service/commit/13cdc795977be2c3616ce669a767daef77bdb910))
+* **deps:** update module go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp to v1.45.0 [security] ([77b3f38](https://github.com/canonical/tenant-service/commit/77b3f38b0b2138045187d88a0392fdfb8a35c879))
+
 ## [0.3.1](https://github.com/canonical/tenant-service/compare/v0.3.0...v0.3.1) (2026-08-13)
 
 
