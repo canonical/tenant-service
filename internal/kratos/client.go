@@ -74,9 +74,11 @@ func (c *Client) CreateIdentity(ctx context.Context, email string) (string, erro
 		"email": email,
 	}
 
+	// No schema id: Kratos uses its configured default schema, whatever a
+	// deployment names it (the identity charm's is social_user_v0, and a
+	// schema named "default" is refused with 400).
 	createIdentityBody := ory.CreateIdentityBody{
-		SchemaId: "default", // default schema
-		Traits:   traits,
+		Traits: traits,
 	}
 
 	identity, _, err := c.client.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(createIdentityBody).Execute()
