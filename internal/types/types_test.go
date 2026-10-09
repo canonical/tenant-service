@@ -60,3 +60,56 @@ func TestResolvePageSize(t *testing.T) {
 		})
 	}
 }
+
+func TestTenantSSOPolicy_Derived(t *testing.T) {
+	active := []SSOBinding{{ConnectionID: "a", Active: true}, {ConnectionID: "b"}}
+	inactive := []SSOBinding{{ConnectionID: "b"}}
+
+	testCases := []struct {
+		name        string
+		p           *TenantSSOPolicy
+		enforcement string
+		ids         int
+		applies     map[string]bool
+		autoJoin    map[string]bool
+		invitation  map[string]bool
+	}{
+		{name: "no policy", p: nil, enforcement: EnforcementOff, applies: map[string]bool{"x.example": true, "": true}, autoJoin: map[string]bool{"x.example": false}, invitation: map[string]bool{"x.example": true, "": true}},
+		{name: "stored required, nothing active", p: &TenantSSOPolicy{Enforcement: EnforcementRequired, AutoJoin: true, Domains: []string{"x.example"}, Bindings: inactive},
+			enforcement: EnforcementOff, applies: map[string]bool{"x.example": true, "y.example": false}, autoJoin: map[string]bool{"x.example": false}, invitation: map[string]bool{"x.example": true, "y.example": true}},
+		{name: "optional, no domains", p: &TenantSSOPolicy{Enforcement: EnforcementOptional, Bindings: active},
+			enforcement: EnforcementOptional, ids: 1, applies: map[string]bool{"y.example": true, "": true}, autoJoin: map[string]bool{"y.example": false}, invitation: map[string]bool{"y.example": true}},
+		{name: "optional with domains", p: &TenantSSOPolicy{Enforcement: EnforcementOptional, Domains: []string{"x.example"}, Bindings: active},
+			enforcement: EnforcementOptional, ids: 1, applies: map[string]bool{"x.example": true, "y.example": false}, autoJoin: map[string]bool{"x.example": false}, invitation: map[string]bool{"x.example": true, "y.example": true}},
+		{name: "required, no domains", p: &TenantSSOPolicy{Enforcement: EnforcementRequired, Bindings: active},
+			enforcement: EnforcementRequired, ids: 1, applies: map[string]bool{"y.example": true}, autoJoin: map[string]bool{"y.example": false}, invitation: map[string]bool{"y.example": true}},
+		{name: "required with auto-join", p: &TenantSSOPolicy{Enforcement: EnforcementRequired, AutoJoin: true, Domains: []string{"x.example"}, Bindings: active},
+			enforcement: EnforcementRequired, ids: 1, applies: map[string]bool{"x.example": true, "y.example": false, "": false}, autoJoin: map[string]bool{"x.example": true, "y.example": false}, invitation: map[string]bool{"x.example": true, "y.example": false, "": false}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.p.EffectiveEnforcement(); got != tc.enforcement {
+				t.Errorf("enforcement: want %q, got %q", tc.enforcement, got)
+			}
+			if got := len(tc.p.ActiveConnectionIDs()); got != tc.ids {
+				t.Errorf("active ids: want %d, got %d", tc.ids, got)
+			}
+			for domain, want := range tc.applies {
+				if got := tc.p.AppliesToDomain(domain); got != want {
+					t.Errorf("applies to %q: want %v, got %v", domain, want, got)
+				}
+			}
+			for domain, want := range tc.autoJoin {
+				if got := tc.p.AutoJoinAdmitsDomain(domain); got != want {
+					t.Errorf("auto-join admits %q: want %v, got %v", domain, want, got)
+				}
+			}
+			for domain, want := range tc.invitation {
+				if got := tc.p.InvitationAdmitsDomain(domain); got != want {
+					t.Errorf("an invitation admits %q: want %v, got %v", domain, want, got)
+				}
+			}
+		})
+	}
+}
