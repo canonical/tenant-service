@@ -16,6 +16,13 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for TenantMFARequirement.
+const (
+	MFAREQUIREMENTNONE        TenantMFARequirement = "MFA_REQUIREMENT_NONE"
+	MFAREQUIREMENTREQUIRED    TenantMFARequirement = "MFA_REQUIREMENT_REQUIRED"
+	MFAREQUIREMENTUNSPECIFIED TenantMFARequirement = "MFA_REQUIREMENT_UNSPECIFIED"
+)
+
 // TenantServiceInviteMemberBody defines model for TenantServiceInviteMemberBody.
 type TenantServiceInviteMemberBody struct {
 	Email *string `json:"email,omitempty"`
@@ -24,6 +31,13 @@ type TenantServiceInviteMemberBody struct {
 // TenantServiceProvisionUserBody defines model for TenantServiceProvisionUserBody.
 type TenantServiceProvisionUserBody struct {
 	Email *string `json:"email,omitempty"`
+}
+
+// TenantServicePutTenantMFAPolicyBody defines model for TenantServicePutTenantMFAPolicyBody.
+type TenantServicePutTenantMFAPolicyBody struct {
+	// Requirement MFARequirement is what a tenant asks of a company or public sign-in: MFA
+	// only at REQUIRED. Every other first factor always needs MFA.
+	Requirement *TenantMFARequirement `json:"requirement,omitempty"`
 }
 
 // TenantServiceUpdateTenantBody defines model for TenantServiceUpdateTenantBody.
@@ -48,10 +62,27 @@ type TenantDeleteTenantResponse struct {
 	Status  *int32  `json:"status,omitempty"`
 }
 
+// TenantGetTenantMFAPolicyResponse defines model for tenantGetTenantMFAPolicyResponse.
+type TenantGetTenantMFAPolicyResponse struct {
+	// Policy TenantMFAPolicy is a tenant's MFA policy: one value per tenant, last write
+	// wins; changes are audited in the log.
+	Policy *TenantTenantMFAPolicy `json:"policy,omitempty"`
+}
+
 // TenantInviteMemberResponse defines model for tenantInviteMemberResponse.
 type TenantInviteMemberResponse struct {
-	Code   *string `json:"code,omitempty"`
-	Link   *string `json:"link,omitempty"`
+	Code *string `json:"code,omitempty"`
+
+	// Link Recovery link and code: only for a new account at a tenant that does not
+	// require company sign-in. Empty otherwise (the membership alone, or a
+	// pending invitation).
+	Link *string `json:"link,omitempty"`
+
+	// Status "invited": a membership: a new account at a tenant that does not require
+	// company sign-in, with a recovery link and code; or an account that is a
+	// member already, with neither. "pending": a pending invitation and no
+	// membership: an existing account that is not a member, or a new address
+	// at a REQUIRED tenant, which gets no account either.
 	Status *string `json:"status,omitempty"`
 }
 
@@ -79,13 +110,28 @@ type TenantListUserTenantsResponse struct {
 
 // TenantLookupTenantsResponse defines model for tenantLookupTenantsResponse.
 type TenantLookupTenantsResponse struct {
+	// Tenants The account's personal tenant first.
 	Tenants *[]TenantTenant `json:"tenants,omitempty"`
 }
+
+// TenantMFARequirement MFARequirement is what a tenant asks of a company or public sign-in: MFA
+// only at REQUIRED. Every other first factor always needs MFA.
+type TenantMFARequirement string
 
 // TenantProvisionUserResponse defines model for tenantProvisionUserResponse.
 type TenantProvisionUserResponse struct {
 	Status *string `json:"status,omitempty"`
 }
+
+// TenantPutTenantMFAPolicyResponse defines model for tenantPutTenantMFAPolicyResponse.
+type TenantPutTenantMFAPolicyResponse struct {
+	// Policy TenantMFAPolicy is a tenant's MFA policy: one value per tenant, last write
+	// wins; changes are audited in the log.
+	Policy *TenantTenantMFAPolicy `json:"policy,omitempty"`
+}
+
+// TenantRemoveTenantUserResponse defines model for tenantRemoveTenantUserResponse.
+type TenantRemoveTenantUserResponse = map[string]interface{}
 
 // TenantTenant defines model for tenantTenant.
 type TenantTenant struct {
@@ -99,6 +145,15 @@ type TenantTenant struct {
 type TenantTenantInput struct {
 	Enabled *bool   `json:"enabled,omitempty"`
 	Name    *string `json:"name,omitempty"`
+}
+
+// TenantTenantMFAPolicy TenantMFAPolicy is a tenant's MFA policy: one value per tenant, last write
+// wins; changes are audited in the log.
+type TenantTenantMFAPolicy struct {
+	// Requirement MFARequirement is what a tenant asks of a company or public sign-in: MFA
+	// only at REQUIRED. Every other first factor always needs MFA.
+	Requirement *TenantMFARequirement `json:"requirement,omitempty"`
+	TenantId    *string               `json:"tenant_id,omitempty"`
 }
 
 // TenantTenantUser defines model for tenantTenantUser.
@@ -171,6 +226,9 @@ type TenantServiceUpdateTenantJSONRequestBody = TenantServiceUpdateTenantBody
 
 // TenantServiceInviteMemberJSONRequestBody defines body for TenantServiceInviteMember for application/json ContentType.
 type TenantServiceInviteMemberJSONRequestBody = TenantServiceInviteMemberBody
+
+// TenantServicePutTenantMFAPolicyJSONRequestBody defines body for TenantServicePutTenantMFAPolicy for application/json ContentType.
+type TenantServicePutTenantMFAPolicyJSONRequestBody = TenantServicePutTenantMFAPolicyBody
 
 // TenantServiceProvisionUserJSONRequestBody defines body for TenantServiceProvisionUser for application/json ContentType.
 type TenantServiceProvisionUserJSONRequestBody = TenantServiceProvisionUserBody
@@ -275,6 +333,14 @@ type ClientInterface interface {
 
 	TenantServiceInviteMember(ctx context.Context, tenantId string, body TenantServiceInviteMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// TenantServiceGetTenantMFAPolicy request
+	TenantServiceGetTenantMFAPolicy(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TenantServicePutTenantMFAPolicyWithBody request with any body
+	TenantServicePutTenantMFAPolicyWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	TenantServicePutTenantMFAPolicy(ctx context.Context, tenantId string, body TenantServicePutTenantMFAPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// TenantServiceListTenantUsers request
 	TenantServiceListTenantUsers(ctx context.Context, tenantId string, params *TenantServiceListTenantUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -282,6 +348,9 @@ type ClientInterface interface {
 	TenantServiceProvisionUserWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	TenantServiceProvisionUser(ctx context.Context, tenantId string, body TenantServiceProvisionUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TenantServiceRemoveTenantUser request
+	TenantServiceRemoveTenantUser(ctx context.Context, tenantId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TenantServiceListUserTenants request
 	TenantServiceListUserTenants(ctx context.Context, userId string, params *TenantServiceListUserTenantsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -407,6 +476,42 @@ func (c *Client) TenantServiceInviteMember(ctx context.Context, tenantId string,
 	return c.Client.Do(req)
 }
 
+func (c *Client) TenantServiceGetTenantMFAPolicy(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServiceGetTenantMFAPolicyRequest(c.Server, tenantId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TenantServicePutTenantMFAPolicyWithBody(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServicePutTenantMFAPolicyRequestWithBody(c.Server, tenantId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TenantServicePutTenantMFAPolicy(ctx context.Context, tenantId string, body TenantServicePutTenantMFAPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServicePutTenantMFAPolicyRequest(c.Server, tenantId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) TenantServiceListTenantUsers(ctx context.Context, tenantId string, params *TenantServiceListTenantUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTenantServiceListTenantUsersRequest(c.Server, tenantId, params)
 	if err != nil {
@@ -433,6 +538,18 @@ func (c *Client) TenantServiceProvisionUserWithBody(ctx context.Context, tenantI
 
 func (c *Client) TenantServiceProvisionUser(ctx context.Context, tenantId string, body TenantServiceProvisionUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTenantServiceProvisionUserRequest(c.Server, tenantId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TenantServiceRemoveTenantUser(ctx context.Context, tenantId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTenantServiceRemoveTenantUserRequest(c.Server, tenantId, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -818,6 +935,87 @@ func NewTenantServiceInviteMemberRequestWithBody(server string, tenantId string,
 	return req, nil
 }
 
+// NewTenantServiceGetTenantMFAPolicyRequest generates requests for TenantServiceGetTenantMFAPolicy
+func NewTenantServiceGetTenantMFAPolicyRequest(server string, tenantId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s/mfa-policy", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewTenantServicePutTenantMFAPolicyRequest calls the generic TenantServicePutTenantMFAPolicy builder with application/json body
+func NewTenantServicePutTenantMFAPolicyRequest(server string, tenantId string, body TenantServicePutTenantMFAPolicyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTenantServicePutTenantMFAPolicyRequestWithBody(server, tenantId, "application/json", bodyReader)
+}
+
+// NewTenantServicePutTenantMFAPolicyRequestWithBody generates requests for TenantServicePutTenantMFAPolicy with any type of body
+func NewTenantServicePutTenantMFAPolicyRequestWithBody(server string, tenantId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s/mfa-policy", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewTenantServiceListTenantUsersRequest generates requests for TenantServiceListTenantUsers
 func NewTenantServiceListTenantUsersRequest(server string, tenantId string, params *TenantServiceListTenantUsersParams) (*http.Request, error) {
 	var err error
@@ -985,6 +1183,47 @@ func NewTenantServiceProvisionUserRequestWithBody(server string, tenantId string
 	return req, nil
 }
 
+// NewTenantServiceRemoveTenantUserRequest generates requests for TenantServiceRemoveTenantUser
+func NewTenantServiceRemoveTenantUserRequest(server string, tenantId string, userId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "tenant_id", runtime.ParamLocationPath, tenantId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "user_id", runtime.ParamLocationPath, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v0/tenants/%s/users/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewTenantServiceListUserTenantsRequest generates requests for TenantServiceListUserTenants
 func NewTenantServiceListUserTenantsRequest(server string, userId string, params *TenantServiceListUserTenantsParams) (*http.Request, error) {
 	var err error
@@ -1111,6 +1350,14 @@ type ClientWithResponsesInterface interface {
 
 	TenantServiceInviteMemberWithResponse(ctx context.Context, tenantId string, body TenantServiceInviteMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceInviteMemberResponse, error)
 
+	// TenantServiceGetTenantMFAPolicyWithResponse request
+	TenantServiceGetTenantMFAPolicyWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceGetTenantMFAPolicyResponse, error)
+
+	// TenantServicePutTenantMFAPolicyWithBodyWithResponse request with any body
+	TenantServicePutTenantMFAPolicyWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServicePutTenantMFAPolicyResponse, error)
+
+	TenantServicePutTenantMFAPolicyWithResponse(ctx context.Context, tenantId string, body TenantServicePutTenantMFAPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServicePutTenantMFAPolicyResponse, error)
+
 	// TenantServiceListTenantUsersWithResponse request
 	TenantServiceListTenantUsersWithResponse(ctx context.Context, tenantId string, params *TenantServiceListTenantUsersParams, reqEditors ...RequestEditorFn) (*TenantServiceListTenantUsersResponse, error)
 
@@ -1118,6 +1365,9 @@ type ClientWithResponsesInterface interface {
 	TenantServiceProvisionUserWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServiceProvisionUserResponse, error)
 
 	TenantServiceProvisionUserWithResponse(ctx context.Context, tenantId string, body TenantServiceProvisionUserJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServiceProvisionUserResponse, error)
+
+	// TenantServiceRemoveTenantUserWithResponse request
+	TenantServiceRemoveTenantUserWithResponse(ctx context.Context, tenantId string, userId string, reqEditors ...RequestEditorFn) (*TenantServiceRemoveTenantUserResponse, error)
 
 	// TenantServiceListUserTenantsWithResponse request
 	TenantServiceListUserTenantsWithResponse(ctx context.Context, userId string, params *TenantServiceListUserTenantsParams, reqEditors ...RequestEditorFn) (*TenantServiceListUserTenantsResponse, error)
@@ -1305,6 +1555,61 @@ func (r TenantServiceInviteMemberResponse) StatusCode() int {
 	return 0
 }
 
+type TenantServiceGetTenantMFAPolicyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TenantGetTenantMFAPolicyResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSON404      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r TenantServiceGetTenantMFAPolicyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TenantServiceGetTenantMFAPolicyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type TenantServicePutTenantMFAPolicyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TenantPutTenantMFAPolicyResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSON404      *TypesErrorResponse
+	JSON409      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r TenantServicePutTenantMFAPolicyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TenantServicePutTenantMFAPolicyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type TenantServiceListTenantUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1351,6 +1656,33 @@ func (r TenantServiceProvisionUserResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r TenantServiceProvisionUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type TenantServiceRemoveTenantUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TenantRemoveTenantUserResponse
+	JSON400      *TypesErrorResponse
+	JSON401      *TypesErrorResponse
+	JSON403      *TypesErrorResponse
+	JSON404      *TypesErrorResponse
+	JSONDefault  *TypesErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r TenantServiceRemoveTenantUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TenantServiceRemoveTenantUserResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1470,6 +1802,32 @@ func (c *ClientWithResponses) TenantServiceInviteMemberWithResponse(ctx context.
 	return ParseTenantServiceInviteMemberResponse(rsp)
 }
 
+// TenantServiceGetTenantMFAPolicyWithResponse request returning *TenantServiceGetTenantMFAPolicyResponse
+func (c *ClientWithResponses) TenantServiceGetTenantMFAPolicyWithResponse(ctx context.Context, tenantId string, reqEditors ...RequestEditorFn) (*TenantServiceGetTenantMFAPolicyResponse, error) {
+	rsp, err := c.TenantServiceGetTenantMFAPolicy(ctx, tenantId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTenantServiceGetTenantMFAPolicyResponse(rsp)
+}
+
+// TenantServicePutTenantMFAPolicyWithBodyWithResponse request with arbitrary body returning *TenantServicePutTenantMFAPolicyResponse
+func (c *ClientWithResponses) TenantServicePutTenantMFAPolicyWithBodyWithResponse(ctx context.Context, tenantId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TenantServicePutTenantMFAPolicyResponse, error) {
+	rsp, err := c.TenantServicePutTenantMFAPolicyWithBody(ctx, tenantId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTenantServicePutTenantMFAPolicyResponse(rsp)
+}
+
+func (c *ClientWithResponses) TenantServicePutTenantMFAPolicyWithResponse(ctx context.Context, tenantId string, body TenantServicePutTenantMFAPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*TenantServicePutTenantMFAPolicyResponse, error) {
+	rsp, err := c.TenantServicePutTenantMFAPolicy(ctx, tenantId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTenantServicePutTenantMFAPolicyResponse(rsp)
+}
+
 // TenantServiceListTenantUsersWithResponse request returning *TenantServiceListTenantUsersResponse
 func (c *ClientWithResponses) TenantServiceListTenantUsersWithResponse(ctx context.Context, tenantId string, params *TenantServiceListTenantUsersParams, reqEditors ...RequestEditorFn) (*TenantServiceListTenantUsersResponse, error) {
 	rsp, err := c.TenantServiceListTenantUsers(ctx, tenantId, params, reqEditors...)
@@ -1494,6 +1852,15 @@ func (c *ClientWithResponses) TenantServiceProvisionUserWithResponse(ctx context
 		return nil, err
 	}
 	return ParseTenantServiceProvisionUserResponse(rsp)
+}
+
+// TenantServiceRemoveTenantUserWithResponse request returning *TenantServiceRemoveTenantUserResponse
+func (c *ClientWithResponses) TenantServiceRemoveTenantUserWithResponse(ctx context.Context, tenantId string, userId string, reqEditors ...RequestEditorFn) (*TenantServiceRemoveTenantUserResponse, error) {
+	rsp, err := c.TenantServiceRemoveTenantUser(ctx, tenantId, userId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTenantServiceRemoveTenantUserResponse(rsp)
 }
 
 // TenantServiceListUserTenantsWithResponse request returning *TenantServiceListUserTenantsResponse
@@ -1883,6 +2250,135 @@ func ParseTenantServiceInviteMemberResponse(rsp *http.Response) (*TenantServiceI
 	return response, nil
 }
 
+// ParseTenantServiceGetTenantMFAPolicyResponse parses an HTTP response from a TenantServiceGetTenantMFAPolicyWithResponse call
+func ParseTenantServiceGetTenantMFAPolicyResponse(rsp *http.Response) (*TenantServiceGetTenantMFAPolicyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TenantServiceGetTenantMFAPolicyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantGetTenantMFAPolicyResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTenantServicePutTenantMFAPolicyResponse parses an HTTP response from a TenantServicePutTenantMFAPolicyWithResponse call
+func ParseTenantServicePutTenantMFAPolicyResponse(rsp *http.Response) (*TenantServicePutTenantMFAPolicyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TenantServicePutTenantMFAPolicyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantPutTenantMFAPolicyResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseTenantServiceListTenantUsersResponse parses an HTTP response from a TenantServiceListTenantUsersWithResponse call
 func ParseTenantServiceListTenantUsersResponse(rsp *http.Response) (*TenantServiceListTenantUsersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1978,6 +2474,67 @@ func ParseTenantServiceProvisionUserResponse(rsp *http.Response) (*TenantService
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTenantServiceRemoveTenantUserResponse parses an HTTP response from a TenantServiceRemoveTenantUserWithResponse call
+func ParseTenantServiceRemoveTenantUserResponse(rsp *http.Response) (*TenantServiceRemoveTenantUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TenantServiceRemoveTenantUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TenantRemoveTenantUserResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest TypesErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest TypesErrorResponse

@@ -22,6 +22,11 @@ import (
 
 const (
 	defaultTxTimeout = time.Second * 60
+
+	// Server-side timeouts, set on every connection of the pool.
+	lockTimeout      = "2s"
+	statementTimeout = "5s"
+	idleInTxTimeout  = "15s"
 )
 
 type TxContextKey struct{}
@@ -148,6 +153,15 @@ func TxFromContext(ctx context.Context) TxInterface {
 	return nil
 }
 
+// InTx reports whether the statements of ctx run in a transaction: its lazy
+// transaction has begun, or it carries one.
+func InTx(ctx context.Context) bool {
+	if lt := lazyTxFromContext(ctx); lt != nil && lt.isStarted() {
+		return true
+	}
+	return TxFromContext(ctx) != nil
+}
+
 // lazyTxFromContext extracts a lazy transaction holder from the context.
 func lazyTxFromContext(ctx context.Context) *lazyTx {
 	if lt, ok := ctx.Value(lazyTxContextKey).(*lazyTx); ok {
@@ -227,6 +241,9 @@ func NewDBClient(cfg Config, tracer tracing.TracingInterface, monitor monitoring
 	config.MaxConnLifetime = cfg.MaxConnLifetime
 	config.MaxConnLifetimeJitter = cfg.MaxConnLifetime / 10 // Add 10% jitter to avoid thundering herd
 	config.MaxConnIdleTime = cfg.MaxConnIdleTime
+	config.ConnConfig.RuntimeParams["lock_timeout"] = lockTimeout
+	config.ConnConfig.RuntimeParams["statement_timeout"] = statementTimeout
+	config.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = idleInTxTimeout
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
