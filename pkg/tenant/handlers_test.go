@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	v0 "github.com/canonical/identity-platform-api/v0/tenant"
 	"github.com/canonical/tenant-service/internal/types"
 	"github.com/canonical/tenant-service/pkg/authentication"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
@@ -67,7 +69,7 @@ func TestHandler_InviteMember(t *testing.T) {
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
 				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com").
-					Return("https://link", "code123", nil)
+					Return(&types.Invitation{Link: "https://link", Code: "code123"}, nil)
 			},
 			wantErr: false,
 		},
@@ -79,7 +81,7 @@ func TestHandler_InviteMember(t *testing.T) {
 			},
 			setupMocks: func(mockSvc *MockServiceInterface) {
 				mockSvc.EXPECT().InviteMember(gomock.Any(), "11111111-1111-1111-1111-111111111111", "user@example.com").
-					Return("", "", errors.New("service error"))
+					Return(nil, errors.New("service error"))
 			},
 			wantErr:  true,
 			wantCode: codes.Internal,
@@ -1115,4 +1117,125 @@ func TestHandler_ListTenantUsers_WithFilter(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newTestHandler builds a Handler whose tracer accepts any span.
+func newTestHandler(t *testing.T) (*Handler, *MockServiceInterface) {
+	svc, tracer, monitor, logger := newHandlerMocks(t)
+	return NewHandler(svc, testValidator, tracer, monitor, logger), svc
+}
+
+// newHandlerMocks returns what a handler is built with; the tracer accepts
+// any span.
+func newHandlerMocks(t *testing.T) (*MockServiceInterface, *MockTracingInterface, *MockMonitorInterface, *MockLoggerInterface) {
+	ctrl := gomock.NewController(t)
+	svc := NewMockServiceInterface(ctrl)
+	tracer := NewMockTracingInterface(ctrl)
+	logger := NewMockLoggerInterface(ctrl)
+	setupLoggerMock(ctrl, logger)
+	tracer.EXPECT().Start(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(c context.Context, _ string, _ ...trace.SpanStartOption) (context.Context, trace.Span) {
+			return c, trace.SpanFromContext(c)
+		}).AnyTimes()
+	return svc, tracer, NewMockMonitorInterface(ctrl), logger
+}
+
+func TestHandler_RemoveTenantUser(t *testing.T) {
+	tenantID := "11111111-1111-1111-1111-111111111111"
+	userID := "22222222-2222-2222-2222-222222222222"
+
+	tests := []struct {
+		name     string
+		request  *v0.RemoveTenantUserRequest
+		svcErr   error
+		callsSvc bool
+		wantCode codes.Code
+	}{
+		{name: "success", request: &v0.RemoveTenantUserRequest{TenantId: tenantID, UserId: userID}, callsSvc: true, wantCode: codes.OK},
+		{name: "not a member", request: &v0.RemoveTenantUserRequest{TenantId: tenantID, UserId: userID}, callsSvc: true, svcErr: fmt.Errorf("%w: x", ErrMemberNotFound), wantCode: codes.NotFound},
+		{name: "service error", request: &v0.RemoveTenantUserRequest{TenantId: tenantID, UserId: userID}, callsSvc: true, svcErr: errors.New("boom"), wantCode: codes.Internal},
+		{name: "invalid user_id", request: &v0.RemoveTenantUserRequest{TenantId: tenantID, UserId: "nope"}, wantCode: codes.InvalidArgument},
+		{name: "invalid tenant_id", request: &v0.RemoveTenantUserRequest{TenantId: "nope", UserId: userID}, wantCode: codes.InvalidArgument},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockSvc := NewMockServiceInterface(ctrl)
+			mockTracer := NewMockTracingInterface(ctrl)
+			mockLogger := NewMockLoggerInterface(ctrl)
+			setupLoggerMock(ctrl, mockLogger)
+
+			h := NewHandler(mockSvc, testValidator, mockTracer, NewMockMonitorInterface(ctrl), mockLogger)
+			mockTracer.EXPECT().Start(gomock.Any(), "tenant.Handler.RemoveTenantUser").
+				Return(context.Background(), trace.SpanFromContext(context.Background()))
+			if tt.callsSvc {
+				mockSvc.EXPECT().RemoveTenantUser(gomock.Any(), tenantID, tt.request.UserId).Return(tt.svcErr)
+			}
+
+			_, err := h.RemoveTenantUser(context.Background(), tt.request)
+			if got := status.Code(err); got != tt.wantCode {
+				t.Fatalf("code %v, want %v (err %v)", got, tt.wantCode, err)
+			}
+		})
+	}
+}
+
+// A database timeout tells the caller to try again, not that the service is
+// broken.
+func TestHandler_LookupTenants_DatabaseTimeout(t *testing.T) {
+	h, svc := newTestHandler(t)
+	svc.EXPECT().LookupTenantsByEmail(gomock.Any(), "hank@hooli.example").
+		Return(nil, fmt.Errorf("failed to list tenants: %w", &pgconn.PgError{Code: "57014"}))
+
+	_, err := h.LookupTenants(context.Background(), &v0.LookupTenantsRequest{Email: "hank@hooli.example"})
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("want Unavailable, got %v", err)
+	}
+}
+
+func TestHandler_ProvisionUser_Rules(t *testing.T) {
+	req := &v0.ProvisionUserRequest{TenantId: tTenant, Email: "hank@hooli.example"}
+
+	t.Run("already a member", func(t *testing.T) {
+		h, svc := newTestHandler(t)
+		svc.EXPECT().ProvisionUser(gomock.Any(), tTenant, "hank@hooli.example").Return(ErrAlreadyMember)
+		_, err := h.ProvisionUser(context.Background(), req)
+		if status.Code(err) != codes.AlreadyExists {
+			t.Fatalf("want AlreadyExists, got %v", err)
+		}
+	})
+
+	t.Run("personal tenant", func(t *testing.T) {
+		h, svc := newTestHandler(t)
+		svc.EXPECT().ProvisionUser(gomock.Any(), tTenant, "hank@hooli.example").Return(ErrPersonalTenant)
+		_, err := h.ProvisionUser(context.Background(), req)
+		if status.Code(err) != codes.FailedPrecondition || reasonOf(err) != "PERSONAL_TENANT" {
+			t.Fatalf("got %v", err)
+		}
+	})
+}
+
+func TestHandler_InviteMember_Rules(t *testing.T) {
+	req := &v0.InviteMemberRequest{TenantId: tTenant, Email: "bob@initech.example"}
+
+	t.Run("domain not allowed", func(t *testing.T) {
+		h, svc := newTestHandler(t)
+		svc.EXPECT().InviteMember(gomock.Any(), tTenant, "bob@initech.example").Return(nil, ErrDomainNotAllowed)
+		_, err := h.InviteMember(context.Background(), req)
+		if status.Code(err) != codes.InvalidArgument || reasonOf(err) != "DOMAIN_NOT_ALLOWED" {
+			t.Fatalf("got %v", err)
+		}
+	})
+
+	t.Run("membership only", func(t *testing.T) {
+		h, svc := newTestHandler(t)
+		svc.EXPECT().InviteMember(gomock.Any(), gomock.Any(), gomock.Any()).Return(&types.Invitation{}, nil)
+		resp, err := h.InviteMember(context.Background(), req)
+		if err != nil || resp.Link != "" || resp.Code != "" || resp.Status != "invited" {
+			t.Fatalf("got %+v, %v", resp, err)
+		}
+	})
 }

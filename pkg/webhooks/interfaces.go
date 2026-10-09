@@ -12,9 +12,12 @@ import (
 // StorageInterface defines the storage operations required by the webhooks package.
 // It is a subset of the internal/storage interface.
 type StorageInterface interface {
-	CreateTenant(ctx context.Context, t *types.Tenant) (*types.Tenant, error)
-	AddMember(ctx context.Context, tenantID, userID string) (string, error)
 	GetActiveMemberByTenantAndUserID(ctx context.Context, tenantID, userID string) (*types.Membership, error)
+}
+
+// PersonalTenantCreatorInterface defines the tenant service operations required by the webhooks package.
+type PersonalTenantCreatorInterface interface {
+	CreatePersonalTenant(ctx context.Context, identityID, email string) (*types.Tenant, bool, error)
 }
 
 // ServiceInterface defines the webhook service operations.
