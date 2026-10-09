@@ -21,6 +21,9 @@ import (
 	"github.com/canonical/tenant-service/migrations"
 )
 
+// migrateLockTimeout bounds a migration's wait for a table lock.
+const migrateLockTimeout = "3s"
+
 // migrateCmd performs DB migrations
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
@@ -98,6 +101,7 @@ func migrate(cmd *cobra.Command, dsn, command, format string, version int) error
 	if err != nil {
 		return fmt.Errorf("DSN validation failed, shutting down, err: %v", err)
 	}
+	config.RuntimeParams["lock_timeout"] = migrateLockTimeout
 
 	db := stdlib.OpenDB(*config)
 

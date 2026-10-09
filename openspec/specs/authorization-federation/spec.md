@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the contract for federating `tenant-service` with the Canonical Identity Platform Authorization Service, delegating access checks to upstream gateway infrastructure and publishing permission lifecycle events to Kafka.
-
 ## Requirements
-
 ### Requirement: Ingress Authorization Delegation
 The system SHALL execute incoming tenant and member operations without executing in-process OpenFGA authorization checks, relying on upstream API Gateway and Authorization Service enforcement.
 
@@ -25,15 +23,24 @@ The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed
 - **THEN** the system saves the tenant to storage and publishes no permission events
 
 ### Requirement: Permission Event Publishing on Member Provisioning and Invites
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation with relation `can_view` on the tenant resource when a member is provisioned into or invited to a tenant.
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event keyed by tenant ID containing a `WRITE` operation with relation `can_view` on the tenant resource when it creates a membership: when a user is provisioned into a tenant, when an invitation creates the account of a new address together with its membership, and when a user joins a tenant by signing in to it (`JoinTenant`). An invitation that creates no membership SHALL publish nothing: a pending invitation publishes when it is accepted, and inviting a member publishes nothing.
 
 #### Scenario: Provisioning user into tenant publishes view permission
 - **WHEN** a caller provisions a user into a tenant
 - **THEN** the system creates the membership record in storage and asynchronously publishes an envelope with op `WRITE`, subject `user:<user_id>`, relation `can_view`, and object `tenant:<tenant_id>` keyed by `tenant_id` to Kafka
 
+#### Scenario: Inviting a new address publishes view permission
+- **WHEN** a caller invites an address with no account to a tenant that does not require company sign-in
+- **THEN** the system creates the account and the membership, returns an invitation link, and publishes an envelope with op `WRITE` and relation `can_view` for that account
+
+#### Scenario: A pending invitation publishes when it is accepted
+- **WHEN** a caller invites an address whose account is not a member of the tenant, or a new address to a tenant that requires company sign-in
+- **THEN** the system stores a pending invitation, returns no invitation link and publishes nothing
+- **AND** when the user signs in to the tenant and `JoinTenant` creates the membership, the system publishes an envelope with op `WRITE` and relation `can_view` for that user
+
 #### Scenario: Inviting an existing member is idempotent
 - **WHEN** a caller invites a user who is already a member of the tenant
-- **THEN** the system keeps the existing membership, publishes an envelope with op `WRITE` and relation `can_view` for that user, and returns a new invitation link
+- **THEN** the system keeps the existing membership, publishes nothing and returns no invitation link
 
 ### Requirement: Elevated Permissions Are Not Assigned by the Tenant Service
 The system SHALL NOT accept a membership role or any other caller-supplied permission level, and SHALL NOT expose an operation to change a member's permissions. Permissions above `can_view` for existing members SHALL be managed through the Authorization Service API.
@@ -74,3 +81,4 @@ The system SHALL configure Istio Gateway rules to bypass external authorization 
 #### Scenario: Self-inspection endpoint validates caller JWT directly
 - **WHEN** a request arrives for `GET /api/v0/me/tenants` bypassing external authorization at the Istio Gateway
 - **THEN** the system validates the caller's JWT bearer token, extracts the user ID from the `sub` claim, and returns tenants associated with that user ID
+

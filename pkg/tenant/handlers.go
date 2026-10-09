@@ -82,22 +82,23 @@ func (h *Handler) InviteMember(ctx context.Context, req *v0.InviteMemberRequest)
 		return nil, status.Errorf(codes.InvalidArgument, "invalid email: %v", err)
 	}
 
-	link, code, err := h.service.InviteMember(ctx, req.TenantId, req.Email)
+	invitation, err := h.service.InviteMember(ctx, req.TenantId, req.Email)
 	if err != nil {
-		h.logger.Errorw("failed to invite member",
+		return nil, failed(h.logger, err, "failed to invite member",
 			"tenant_id", req.TenantId,
 			"email", req.Email,
-			"error", err,
 		)
-		// In a real app, you might map specific error types to gRPC codes here
-		return nil, status.Errorf(codes.Internal, "failed to invite member: %v", err)
 	}
 
-	return &v0.InviteMemberResponse{
+	resp := &v0.InviteMemberResponse{
 		Status: "invited",
-		Link:   link,
-		Code:   code,
-	}, nil
+		Link:   invitation.Link,
+		Code:   invitation.Code,
+	}
+	if invitation.Pending {
+		resp.Status = "pending"
+	}
+	return resp, nil
 }
 
 func (h *Handler) ListMyTenants(ctx context.Context, req *v0.ListMyTenantsRequest) (*v0.ListMyTenantsResponse, error) {
@@ -211,8 +212,7 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 
 	tenant, err := h.service.UpdateTenant(ctx, updateData, req.UpdateMask.Paths)
 	if err != nil {
-		h.logger.Errorw("failed to update tenant", "tenant_id", req.TenantId, "error", err)
-		return nil, status.Errorf(codes.Internal, "failed to update tenant: %v", err)
+		return nil, failed(h.logger, err, "failed to update tenant", "tenant_id", req.TenantId)
 	}
 
 	return &v0.UpdateTenantResponse{
@@ -251,17 +251,36 @@ func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserReques
 	}
 
 	if err := h.service.ProvisionUser(ctx, req.TenantId, req.Email); err != nil {
-		h.logger.Errorw("failed to provision user",
+		return nil, failed(h.logger, err, "failed to provision user",
 			"tenant_id", req.TenantId,
 			"email", req.Email,
-			"error", err,
 		)
-		return nil, status.Errorf(codes.Internal, "failed to provision user: %v", err)
 	}
 
 	return &v0.ProvisionUserResponse{
 		Status: "provisioned",
 	}, nil
+}
+
+func (h *Handler) RemoveTenantUser(ctx context.Context, req *v0.RemoveTenantUserRequest) (*v0.RemoveTenantUserResponse, error) {
+	ctx, span := h.tracer.Start(ctx, "tenant.Handler.RemoveTenantUser")
+	defer span.End()
+
+	if err := h.validator.Validate(req); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+	if _, err := uuid.Parse(req.TenantId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
+	}
+	if _, err := uuid.Parse(req.UserId); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: must be a valid UUID")
+	}
+
+	if err := h.service.RemoveTenantUser(ctx, req.TenantId, req.UserId); err != nil {
+		return nil, failed(h.logger, err, "failed to remove tenant user", "tenant_id", req.TenantId, "user_id", req.UserId)
+	}
+
+	return &v0.RemoveTenantUserResponse{}, nil
 }
 
 func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRequest) (*v0.ListUserTenantsResponse, error) {
@@ -361,8 +380,7 @@ func (h *Handler) LookupTenants(ctx context.Context, req *v0.LookupTenantsReques
 		tenants, err = h.service.LookupTenantsByEmail(ctx, req.Email)
 	}
 	if err != nil {
-		h.logger.Errorw("failed to look up tenants", "error", err)
-		return nil, status.Errorf(codes.Internal, "failed to look up tenants")
+		return nil, failed(h.logger, err, "failed to look up tenants")
 	}
 
 	return &v0.LookupTenantsResponse{

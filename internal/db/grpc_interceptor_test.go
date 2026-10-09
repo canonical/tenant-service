@@ -103,7 +103,7 @@ func TestTransactionUnaryInterceptor(t *testing.T) {
 			},
 			handlerResp: "response",
 			handlerErr:  nil,
-			expected:    result{resp: nil, err: status.Error(codes.Internal, "transaction failed: commit failed")},
+			expected:    result{resp: nil, err: status.Error(codes.Internal, "transaction failed")},
 		},
 	}
 

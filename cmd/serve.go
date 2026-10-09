@@ -54,6 +54,9 @@ func serve() error {
 	if err := envconfig.Process("", specs); err != nil {
 		panic(fmt.Errorf("issues with environment sourcing: %s", err))
 	}
+	if specs.InvitationLifetime <= 0 {
+		return fmt.Errorf("invitation lifetime must be positive, got %s", specs.InvitationLifetime)
+	}
 
 	logger := logging.NewLogger(specs.LogLevel)
 	logger.Debugf("env vars: port=%d, grpc_port=%d, log_level=%s, debug=%v, tracing_enabled=%v, kafka_enabled=%v, authentication_enabled=%v",
@@ -161,6 +164,8 @@ func serve() error {
 	}
 
 	tenantHandler := tenant.NewHandler(tenantService, validator, tracer, monitor, logger)
+	signInHandler := tenant.NewSignInHandler(tenantService, validator, tracer, monitor, logger)
+	ssoPolicyHandler := tenant.NewSSOPolicyHandler(tenantService, validator, tracer, monitor, logger)
 
 	// Start gRPC server
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", specs.GRPCPort))
@@ -168,7 +173,7 @@ func serve() error {
 		logger.Fatalf("failed to listen on grpc port: %v", err)
 	}
 
-	readOnlyMethods, err := grpcutil.ReadOnlyMethods(v0.TenantService_ServiceDesc)
+	readOnlyMethods, err := grpcReadOnlyMethods()
 	if err != nil {
 		logger.Fatalf("failed to resolve read-only gRPC methods: %v", err)
 	}
@@ -192,6 +197,8 @@ func serve() error {
 		),
 	)
 	v0.RegisterTenantServiceServer(grpcServer, tenantHandler)
+	v0.RegisterTenantSignInServiceServer(grpcServer, signInHandler)
+	v0.RegisterTenantSSOPolicyServiceServer(grpcServer, ssoPolicyHandler)
 	grpc_prometheus.Register(grpcServer)
 
 	go func() {
@@ -207,7 +214,7 @@ func serve() error {
 		authMiddleware,
 		s,
 		dbClient,
-		publisher,
+		tenantService,
 		tracer,
 		monitor,
 		logger,
@@ -246,6 +253,22 @@ func serve() error {
 	}
 
 	return serverError
+}
+
+// grpcReadOnlyMethods returns the RPCs that run without a database transaction:
+// those mapped to HTTP GET, and the reads that are gRPC only and so have no
+// HTTP verb to be recognised by. None of the latter writes, and the two on the
+// sign-in path wait on Kratos before or between their reads.
+func grpcReadOnlyMethods() (map[string]bool, error) {
+	methods, err := grpcutil.ReadOnlyMethods(v0.TenantService_ServiceDesc)
+	if err != nil {
+		return nil, err
+	}
+	methods[v0.TenantSignInService_ListSignInTenants_FullMethodName] = true
+	methods[v0.TenantSignInService_GetSignInContext_FullMethodName] = true
+	methods[v0.TenantSSOPolicyService_GetTenantSSOPolicy_FullMethodName] = true
+
+	return methods, nil
 }
 
 func main() {
