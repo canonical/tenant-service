@@ -15,7 +15,7 @@ type EnvSpec struct {
 
 	KratosAdminURL string `envconfig:"kratos_admin_url" required:"true"`
 
-	InvitationLifetime string `envconfig:"invitation_lifetime" default:"24h"`
+	InvitationLifetime time.Duration `envconfig:"invitation_lifetime" default:"24h"`
 
 	LogLevel string `envconfig:"log_level" default:"error"`
 	Debug    bool   `envconfig:"debug" default:"false"`

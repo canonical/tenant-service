@@ -25,6 +25,10 @@ test: mocks vet
 	cat test_source.json | grep -v "mock_*" | tee test.json
 .PHONY: test
 
+test-unit: mocks vet
+	$(GO) test ./... -short
+.PHONY: test-unit
+
 test-e2e:
 	cd tests/e2e && $(GO) test -v .
 .PHONY: test-e2e
