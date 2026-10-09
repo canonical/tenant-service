@@ -226,6 +226,15 @@ func (c *httpTenantClient) ListTenantUsers(ctx context.Context, in *v0.ListTenan
 	return out, nil
 }
 
+func (c *httpTenantClient) RemoveTenantUser(ctx context.Context, in *v0.RemoveTenantUserRequest, opts ...grpc.CallOption) (*v0.RemoveTenantUserResponse, error) {
+	out := new(v0.RemoveTenantUserResponse)
+	resp, err := c.client.TenantServiceRemoveTenantUser(ctx, in.GetTenantId(), in.GetUserId())
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *httpTenantClient) LookupTenants(ctx context.Context, in *v0.LookupTenantsRequest, opts ...grpc.CallOption) (*v0.LookupTenantsResponse, error) {
 	out := new(v0.LookupTenantsResponse)
 	params := &httpclient.TenantServiceLookupTenantsParams{}
@@ -240,6 +249,28 @@ func (c *httpTenantClient) LookupTenants(ctx context.Context, in *v0.LookupTenan
 		}
 	}
 	resp, err := c.client.TenantServiceLookupTenants(ctx, params)
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *httpTenantClient) GetTenantMFAPolicy(ctx context.Context, in *v0.GetTenantMFAPolicyRequest, opts ...grpc.CallOption) (*v0.GetTenantMFAPolicyResponse, error) {
+	out := new(v0.GetTenantMFAPolicyResponse)
+	resp, err := c.client.TenantServiceGetTenantMFAPolicy(ctx, in.GetTenantId())
+	if err := c.handleRequest(resp, err, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *httpTenantClient) SetTenantMFAPolicy(ctx context.Context, in *v0.SetTenantMFAPolicyRequest, opts ...grpc.CallOption) (*v0.SetTenantMFAPolicyResponse, error) {
+	out := new(v0.SetTenantMFAPolicyResponse)
+	bodyBytes, err := protojson.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+	resp, err := c.client.TenantServiceSetTenantMFAPolicyWithBody(ctx, in.GetTenantId(), "application/json", bytes.NewReader(bodyBytes))
 	if err := c.handleRequest(resp, err, out); err != nil {
 		return nil, err
 	}
