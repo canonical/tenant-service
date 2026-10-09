@@ -7,11 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
 	v1 "github.com/canonical/authorization-service/api/v1"
+	"github.com/canonical/tenant-service/internal/kratos"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/permissions"
@@ -27,7 +30,7 @@ type Service struct {
 	storage            StorageInterface
 	publisher          permissions.Publisher
 	kratos             KratosClientInterface
-	invitationLifetime string
+	invitationLifetime time.Duration
 	tracer             tracing.TracingInterface
 	monitor            monitoring.MonitorInterface
 	logger             logging.LoggerInterface
@@ -38,7 +41,7 @@ func NewService(
 	storage StorageInterface,
 	publisher permissions.Publisher,
 	kratos KratosClientInterface,
-	invitationLifetime string,
+	invitationLifetime time.Duration,
 	tracer tracing.TracingInterface,
 	monitor monitoring.MonitorInterface,
 	logger logging.LoggerInterface,
@@ -91,7 +94,7 @@ func (s *Service) ListTenants(ctx context.Context, opts ...types.ListOption) ([]
 	return tenants, nextPageToken, nil
 }
 
-func (s *Service) InviteMember(ctx context.Context, tenantID, email string) (string, string, error) {
+func (s *Service) InviteMember(ctx context.Context, tenantID, email string) (*types.Invitation, error) {
 	ctx, span := s.tracer.Start(ctx, "tenant.Service.InviteMember")
 	defer span.End()
 
@@ -102,62 +105,86 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email string) (str
 		"actor", actor,
 	)
 
-	// 1. Ensure Identity Exists in Kratos
+	// 1. Check the Identity in Kratos, before the first statement: the
+	// request's transaction begins there, and should not stay open meanwhile.
 	identityID, err := s.kratos.GetIdentityIDByEmail(ctx, email)
 	if err != nil {
 		s.recordError(span, "failed to check identity existence", err,
 			"tenant_id", tenantID,
 			"email", email,
 		)
-		return "", "", fmt.Errorf("failed to check identity")
+		return nil, fmt.Errorf("failed to check identity")
 	}
 
-	if identityID == "" {
-		s.logger.Infow("creating new identity for invited email",
+	tenant, err := s.getTenant(ctx, span, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if tenant.IsPersonal() {
+		s.recordError(span, "invitation refused: personal tenant", ErrPersonalTenant, "tenant_id", tenantID)
+		return nil, ErrPersonalTenant
+	}
+
+	policy, err := s.getSSOPolicy(ctx, span, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	required := policy.RequiresSSO()
+	if !policy.InvitationAdmitsDomain(emailDomain(email)) {
+		s.recordError(span, "invitation refused: address outside the tenant's domains", ErrDomainNotAllowed,
 			"tenant_id", tenantID,
 			"email", email,
 		)
-		identityID, err = s.kratos.CreateIdentity(ctx, email)
-		if err != nil {
-			s.recordError(span, "failed to create identity for invited email", err,
-				"tenant_id", tenantID,
-				"email", email,
-			)
-			return "", "", fmt.Errorf("failed to provision user")
-		}
+		return nil, ErrDomainNotAllowed
 	}
 
-	// 2. Add Member to Database (idempotent for duplicate key)
-	if _, err := s.storage.AddMember(ctx, tenantID, identityID); err != nil {
-		if !errors.Is(err, storage.ErrDuplicateKey) {
-			s.recordError(span, "failed to add member to storage", err,
+	if identityID != "" {
+		// An existing account is never sent a recovery link: it would hand the
+		// account over to whoever holds the invitation.
+		_, err := s.storage.GetMemberByTenantAndUserID(ctx, tenantID, identityID)
+		if err == nil {
+			return &types.Invitation{}, nil
+		}
+		if !errors.Is(err, storage.ErrNotFound) {
+			s.recordError(span, "failed to check membership", err,
 				"tenant_id", tenantID,
 				"user_id", identityID,
 			)
-			return "", "", fmt.Errorf("failed to add member")
+			return nil, fmt.Errorf("failed to check membership: %w", err)
 		}
-		// If duplicate (already a member), we proceed to send recovery link as a re-invite.
+		return s.invitePending(ctx, span, tenantID, email, actor)
+	}
+	if required {
+		return s.invitePending(ctx, span, tenantID, email, actor)
 	}
 
-	// 3. Grant view access asynchronously via Kafka. Elevated permissions are
-	// managed through the authorization service API. Re-inviting an existing
-	// member is safe: duplicate writes are ignored by the authorization service.
-	s.publisher.Publish(ctx, tenantID, permissions.TenantPermissionOp(
-		v1.PermissionOp_PERMISSION_OP_WRITE,
-		identityID,
-		permissions.RelationCanView,
-		tenantID,
-	))
+	// 2. Create the Identity and its Recovery Link, before the first write:
+	// no row stays locked while Kratos answers.
+	s.logger.Infow("creating new identity for invited email",
+		"tenant_id", tenantID,
+		"email", email,
+	)
+	identityID, err = s.kratos.CreateIdentity(ctx, email)
+	if err != nil {
+		s.recordError(span, "failed to create identity for invited email", err,
+			"tenant_id", tenantID,
+			"email", email,
+		)
+		return nil, fmt.Errorf("failed to provision user")
+	}
 
-	// 4. Generate Kratos Recovery Link
-	// We use the configured lifetime for the link
-	link, code, err := s.kratos.CreateRecoveryLink(ctx, identityID, s.invitationLifetime)
+	link, code, err := s.kratos.CreateRecoveryLink(ctx, identityID, s.invitationLifetime.String())
 	if err != nil {
 		s.recordError(span, "failed to create recovery link", err,
 			"tenant_id", tenantID,
 			"user_id", identityID,
 		)
-		return "", "", fmt.Errorf("failed to generate invitation link")
+		return nil, fmt.Errorf("failed to generate invitation link")
+	}
+
+	// 3. Add Member to Database
+	if err := s.addMember(ctx, span, tenantID, identityID, email); err != nil {
+		return nil, err
 	}
 
 	s.logger.Infow("member invited successfully",
@@ -167,7 +194,26 @@ func (s *Service) InviteMember(ctx context.Context, tenantID, email string) (str
 	)
 	s.logger.Security().AdminAction(actor, "invite_member", "tenant.Service.InviteMember", tenantID+":"+email)
 	s.incrementCounter("invitation_sent")
-	return link, code, nil
+	return &types.Invitation{Link: link, Code: code}, nil
+}
+
+// invitePending leaves the membership to the user's sign-in to the tenant.
+func (s *Service) invitePending(ctx context.Context, span trace.Span, tenantID, email, actor string) (*types.Invitation, error) {
+	if err := s.storage.AddInvitation(ctx, tenantID, strings.ToLower(email), s.invitationLifetime); err != nil {
+		s.recordError(span, "failed to add invitation", err,
+			"tenant_id", tenantID,
+			"email", email,
+		)
+		return nil, fmt.Errorf("failed to add invitation: %w", err)
+	}
+
+	s.logger.Infow("pending invitation recorded",
+		"tenant_id", tenantID,
+		"email", email,
+	)
+	s.logger.Security().AdminAction(actor, "invite_member_pending", "tenant.Service.InviteMember", tenantID+":"+email)
+	s.incrementCounter("invitation_pending")
+	return &types.Invitation{Pending: true}, nil
 }
 
 func (s *Service) CreateTenant(ctx context.Context, name string) (*types.Tenant, error) {
@@ -193,6 +239,90 @@ func (s *Service) CreateTenant(ctx context.Context, name string) (*types.Tenant,
 	return created, nil
 }
 
+// CreatePersonalTenant returns identityID's personal tenant and whether it
+// created it. An account that belongs to an enabled tenant or has a pending
+// invitation gets none (ErrHasTenant): an invitation waits for the user to
+// sign in to its tenant. With no email, the account's is read from Kratos.
+func (s *Service) CreatePersonalTenant(ctx context.Context, identityID, email string) (*types.Tenant, bool, error) {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.CreatePersonalTenant")
+	defer span.End()
+
+	actor, _ := authentication.GetUserID(ctx)
+	s.logger.Debugw("creating personal tenant",
+		"identity_id", identityID,
+		"actor", actor,
+	)
+
+	if email == "" {
+		// Kratos before the first statement, as in InviteMember.
+		identity, err := s.getIdentity(ctx, span, identityID)
+		if err != nil {
+			return nil, false, err
+		}
+		email = identityEmail(identity)
+	}
+
+	existing, err := s.storage.GetPersonalTenantByUserID(ctx, identityID)
+	if err == nil {
+		return existing, false, nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		s.recordError(span, "failed to get personal tenant", err, "identity_id", identityID)
+		return nil, false, fmt.Errorf("failed to get personal tenant: %w", err)
+	}
+
+	invited, err := s.storage.ListInvitedTenantsByEmail(ctx, strings.ToLower(email), emailDomain(email), "")
+	if err != nil {
+		s.recordError(span, "failed to list invited tenants", err, "identity_id", identityID)
+		return nil, false, fmt.Errorf("failed to list invited tenants: %w", err)
+	}
+	if len(invited) > 0 {
+		return nil, false, ErrHasTenant
+	}
+
+	// Only enabled tenants count: an account whose tenants are all disabled
+	// has nowhere to sign in.
+	tenants, err := s.storage.ListTenantsByUserID(ctx, identityID, types.WithEnabled(true))
+	if err != nil {
+		s.recordError(span, "failed to list tenants for identity", err, "identity_id", identityID)
+		return nil, false, fmt.Errorf("failed to list tenants: %w", err)
+	}
+	if len(tenants) > 0 {
+		return nil, false, ErrHasTenant
+	}
+
+	tenant, created, err := s.storage.CreatePersonalTenant(ctx, identityID, types.PersonalTenantName(email))
+	if err != nil {
+		s.recordError(span, "failed to create personal tenant", err, "identity_id", identityID)
+		return nil, false, fmt.Errorf("failed to create personal tenant: %w", err)
+	}
+	if !created {
+		// A concurrent call created it first, and published its permission.
+		return tenant, false, nil
+	}
+
+	if _, err := s.storage.AddMember(ctx, tenant.ID, identityID); err != nil {
+		s.recordError(span, "failed to add member to personal tenant", err,
+			"tenant_id", tenant.ID,
+			"identity_id", identityID,
+		)
+		return nil, false, fmt.Errorf("failed to add member: %w", err)
+	}
+
+	// Grant the account full control of its tenant asynchronously via Kafka.
+	s.publisher.Publish(ctx, tenant.ID, permissions.TenantPermissionOp(
+		v1.PermissionOp_PERMISSION_OP_WRITE,
+		identityID,
+		permissions.RelationCanDelete,
+		tenant.ID,
+	))
+
+	s.logger.Infow("personal tenant created", "tenant_id", tenant.ID, "identity_id", identityID)
+	s.logger.Security().AdminAction(actor, "create_personal_tenant", "tenant.Service.CreatePersonalTenant", tenant.ID)
+	s.incrementCounter("personal_tenant_created")
+	return tenant, true, nil
+}
+
 func (s *Service) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths []string) (*types.Tenant, error) {
 	ctx, span := s.tracer.Start(ctx, "admin.UpdateTenant")
 	defer span.End()
@@ -207,6 +337,9 @@ func (s *Service) UpdateTenant(ctx context.Context, tenant *types.Tenant, paths 
 
 	updated, err := s.storage.GetTenantByID(ctx, tenant.ID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, ErrTenantNotFound
+		}
 		s.recordError(span, "failed to get updated tenant", err, "tenant_id", tenant.ID)
 		return nil, fmt.Errorf("failed to get updated tenant: %w", err)
 	}
@@ -265,7 +398,7 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email string) err
 		"actor", actor,
 	)
 
-	// 1. Find or Create Identity
+	// 1. Find the Identity, before the first statement as in InviteMember
 	identityID, err := s.kratos.GetIdentityIDByEmail(ctx, email)
 	if err != nil {
 		s.recordError(span, "failed to look up identity", err,
@@ -274,6 +407,31 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email string) err
 		)
 		return err
 	}
+
+	tenant, err := s.getTenant(ctx, span, tenantID)
+	if err != nil {
+		return err
+	}
+	if tenant.IsPersonal() {
+		s.recordError(span, "provisioning refused: personal tenant", ErrPersonalTenant, "tenant_id", tenantID)
+		return ErrPersonalTenant
+	}
+
+	if identityID != "" {
+		_, err := s.storage.GetMemberByTenantAndUserID(ctx, tenantID, identityID)
+		if err == nil {
+			return ErrAlreadyMember
+		}
+		if !errors.Is(err, storage.ErrNotFound) {
+			s.recordError(span, "failed to check membership", err,
+				"tenant_id", tenantID,
+				"user_id", identityID,
+			)
+			return fmt.Errorf("failed to check membership: %w", err)
+		}
+	}
+
+	// 2. Create the Identity if absent, for a tenant that exists
 	if identityID == "" {
 		s.logger.Infow("creating new identity for provisioned user",
 			"tenant_id", tenantID,
@@ -289,23 +447,10 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email string) err
 		}
 	}
 
-	// 2. Add to Storage
-	if _, err := s.storage.AddMember(ctx, tenantID, identityID); err != nil {
-		s.recordError(span, "failed to add provisioned member to storage", err,
-			"tenant_id", tenantID,
-			"user_id", identityID,
-		)
-		return fmt.Errorf("failed to add member to storage: %w", err)
+	// 3. Add to Storage
+	if err := s.addMember(ctx, span, tenantID, identityID, email); err != nil {
+		return err
 	}
-
-	// 3. Grant view access asynchronously via Kafka. Elevated permissions are
-	// managed through the authorization service API.
-	s.publisher.Publish(ctx, tenantID, permissions.TenantPermissionOp(
-		v1.PermissionOp_PERMISSION_OP_WRITE,
-		identityID,
-		permissions.RelationCanView,
-		tenantID,
-	))
 
 	s.logger.Infow("user provisioned",
 		"tenant_id", tenantID,
@@ -315,6 +460,140 @@ func (s *Service) ProvisionUser(ctx context.Context, tenantID, email string) err
 	s.logger.Security().AdminAction(actor, "provision_user", "tenant.Service.ProvisionUser", tenantID+":"+email)
 	s.incrementCounter("user_provisioned")
 	return nil
+}
+
+// JoinTenant makes the account a member of the tenant when the tenant admits
+// its address by a pending invitation, which is spent, or by auto-join
+// (ErrNotAdmitted otherwise). An account that is a member already is success.
+func (s *Service) JoinTenant(ctx context.Context, tenantID, identityID string) error {
+	ctx, span := s.tracer.Start(ctx, "tenant.Service.JoinTenant")
+	defer span.End()
+
+	actor, _ := authentication.GetUserID(ctx)
+	s.logger.Debugw("joining tenant",
+		"tenant_id", tenantID,
+		"identity_id", identityID,
+		"actor", actor,
+	)
+
+	// 1. Read the Identity, before the first statement as in InviteMember
+	identity, err := s.getIdentity(ctx, span, identityID)
+	if err != nil {
+		return err
+	}
+	email := identityEmail(identity)
+
+	tenant, err := s.getTenant(ctx, span, tenantID)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.storage.GetMemberByTenantAndUserID(ctx, tenantID, identityID)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		s.recordError(span, "failed to check membership", err,
+			"tenant_id", tenantID,
+			"user_id", identityID,
+		)
+		return fmt.Errorf("failed to check membership: %w", err)
+	}
+
+	// 2. Check what admits the address
+	policy, err := s.getSSOPolicy(ctx, span, tenantID)
+	if err != nil {
+		return err
+	}
+	invitation, autoJoin, err := s.admission(ctx, span, tenant, policy, strings.ToLower(email))
+	if err != nil {
+		return err
+	}
+	admittedBy := ""
+	switch {
+	case invitation:
+		admittedBy = "invitation"
+	case autoJoin:
+		admittedBy = "auto_join"
+	default:
+		s.recordError(span, "join refused: address not admitted", ErrNotAdmitted,
+			"tenant_id", tenantID,
+			"email", email,
+		)
+		return ErrNotAdmitted
+	}
+
+	// 3. Add to Storage
+	if err := s.addMember(ctx, span, tenantID, identityID, email); err != nil {
+		if errors.Is(err, ErrAlreadyMember) {
+			// A concurrent call added it first.
+			return nil
+		}
+		return err
+	}
+
+	s.logger.Infow("user joined tenant",
+		"tenant_id", tenantID,
+		"user_id", identityID,
+		"email", email,
+		"admitted_by", admittedBy,
+	)
+	s.logger.Security().AdminAction(actor, "join_tenant", "tenant.Service.JoinTenant", tenantID+":"+email)
+	s.incrementCounter("tenant_joined")
+	return nil
+}
+
+// addMember makes identityID a member of the tenant (ErrAlreadyMember when it
+// is one), deletes the invitation of email and grants view access.
+func (s *Service) addMember(ctx context.Context, span trace.Span, tenantID, identityID, email string) error {
+	if _, err := s.storage.AddMember(ctx, tenantID, identityID); err != nil {
+		if errors.Is(err, storage.ErrDuplicateKey) {
+			return ErrAlreadyMember
+		}
+		s.recordError(span, "failed to add member to storage", err,
+			"tenant_id", tenantID,
+			"user_id", identityID,
+		)
+		return fmt.Errorf("failed to add member: %w", err)
+	}
+	// The membership supersedes a pending invitation: left behind, it would
+	// admit the user again after a removal.
+	if err := s.storage.DeleteInvitation(ctx, tenantID, strings.ToLower(email)); err != nil {
+		s.recordError(span, "failed to delete invitation", err, "tenant_id", tenantID)
+		return fmt.Errorf("failed to delete invitation: %w", err)
+	}
+
+	// Grant view access asynchronously via Kafka. Elevated permissions are
+	// managed through the authorization service API.
+	s.publisher.Publish(ctx, tenantID, permissions.TenantPermissionOp(
+		v1.PermissionOp_PERMISSION_OP_WRITE,
+		identityID,
+		permissions.RelationCanView,
+		tenantID,
+	))
+
+	return nil
+}
+
+// admission reports what admits email to tenant at a sign-in: a pending
+// invitation, auto-join. A disabled tenant and a personal tenant admit nobody.
+// An invitation admits an address only while InviteMember would still invite
+// it: the tenant may have required SSO, or got its domains, since.
+func (s *Service) admission(ctx context.Context, span trace.Span, tenant *types.Tenant, policy *types.TenantSSOPolicy, email string) (invitation, autoJoin bool, err error) {
+	if !tenant.Enabled || tenant.IsPersonal() {
+		return false, false, nil
+	}
+
+	if email != "" {
+		invitation, err = s.storage.HasInvitationByTenantAndEmail(ctx, tenant.ID, email)
+		if err != nil {
+			s.recordError(span, "failed to get invitation", err, "tenant_id", tenant.ID)
+			return false, false, fmt.Errorf("failed to get invitation: %w", err)
+		}
+	}
+
+	domain := emailDomain(email)
+	return invitation && policy.InvitationAdmitsDomain(domain), policy.AutoJoinAdmitsDomain(domain), nil
 }
 
 func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, includeEmails bool, opts ...types.ListOption) ([]*types.TenantUser, string, error) {
@@ -378,6 +657,52 @@ func (s *Service) ListTenantUsers(ctx context.Context, tenantID string, includeE
 	return users, nextPageToken, nil
 }
 
+// RemoveTenantUser revokes every relation the member may hold on the tenant:
+// which ones were granted through the authorization service is not known here.
+func (s *Service) RemoveTenantUser(ctx context.Context, tenantID, userID string) error {
+	ctx, span := s.tracer.Start(ctx, "admin.RemoveTenantUser")
+	defer span.End()
+
+	actor, _ := authentication.GetUserID(ctx)
+	s.logger.Debugw("removing tenant user",
+		"tenant_id", tenantID,
+		"user_id", userID,
+		"actor", actor,
+	)
+
+	tenant, err := s.getTenant(ctx, span, tenantID)
+	if err != nil {
+		return err
+	}
+	// Its account would be locked out of a personal tenant for good.
+	if tenant.IsPersonal() {
+		s.recordError(span, "removal refused: personal tenant", ErrPersonalTenant,
+			"tenant_id", tenantID,
+			"user_id", userID,
+		)
+		return ErrPersonalTenant
+	}
+
+	if err := s.storage.DeleteMember(ctx, tenantID, userID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("%w: user %s in tenant %s", ErrMemberNotFound, userID, tenantID)
+		}
+		s.recordError(span, "failed to remove member from storage", err,
+			"tenant_id", tenantID,
+			"user_id", userID,
+		)
+		return fmt.Errorf("failed to remove member: %w", err)
+	}
+
+	// Revoke asynchronously via Kafka; the authorization service ignores
+	// deletes of tuples that do not exist.
+	s.publisher.Publish(ctx, tenantID, permissions.RevokeTenantPermissionOps(userID, tenantID)...)
+
+	s.logger.Infow("tenant user removed", "tenant_id", tenantID, "user_id", userID)
+	s.logger.Security().AdminAction(actor, "remove_tenant_user", "tenant.Service.RemoveTenantUser", tenantID+":"+userID)
+	return nil
+}
+
 func (s *Service) incrementCounter(operation string) {
 	if err := s.monitor.IncrementCounter(map[string]string{"operation": operation}); err != nil {
 		s.logger.Warnf("failed to increment counter %s: %v", operation, err)
@@ -432,4 +757,30 @@ func (s *Service) LookupTenantsByIdentityID(ctx context.Context, identityID stri
 
 	s.logger.Debugw("lookup: tenants found", "count", len(tenants))
 	return tenants, nil
+}
+
+// getTenant returns the tenant, ErrTenantNotFound when it does not exist.
+func (s *Service) getTenant(ctx context.Context, span trace.Span, tenantID string) (*types.Tenant, error) {
+	tenant, err := s.storage.GetTenantByID(ctx, tenantID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, ErrTenantNotFound
+		}
+		s.recordError(span, "failed to get tenant", err, "tenant_id", tenantID)
+		return nil, fmt.Errorf("failed to get tenant: %w", err)
+	}
+	return tenant, nil
+}
+
+// getIdentity returns the identity, ErrIdentityNotFound when it does not exist.
+func (s *Service) getIdentity(ctx context.Context, span trace.Span, identityID string) (*ory.Identity, error) {
+	identity, err := s.kratos.GetIdentity(ctx, identityID)
+	if err != nil {
+		if errors.Is(err, kratos.ErrNotFound) {
+			return nil, ErrIdentityNotFound
+		}
+		s.recordError(span, "failed to get identity", err, "identity_id", identityID)
+		return nil, fmt.Errorf("failed to get identity: %w", err)
+	}
+	return identity, nil
 }

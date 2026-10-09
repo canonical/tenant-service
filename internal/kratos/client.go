@@ -5,14 +5,23 @@ package kratos
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/tracing"
 	ory "github.com/ory/client-go"
 )
+
+// ErrNotFound is returned by GetIdentity when Kratos has no such identity.
+var ErrNotFound = errors.New("identity not found")
+
+// requestTimeout bounds one call to Kratos. Two calls in a row stay under the
+// database's idle-in-transaction timeout.
+const requestTimeout = 5 * time.Second
 
 type ClientInterface interface {
 	GetIdentityIDByEmail(ctx context.Context, email string) (string, error)
@@ -32,6 +41,7 @@ type Client struct {
 func NewClient(kratosAdminURL string, tracer tracing.TracingInterface, monitor monitoring.MonitorInterface, logger logging.LoggerInterface) *Client {
 	conf := ory.NewConfiguration()
 	conf.Servers = ory.ServerConfigurations{{URL: kratosAdminURL}}
+	conf.HTTPClient = &http.Client{Timeout: requestTimeout}
 	return &Client{
 		client:  ory.NewAPIClient(conf),
 		tracer:  tracer,
@@ -93,8 +103,11 @@ func (c *Client) GetIdentity(ctx context.Context, id string) (*ory.Identity, err
 	ctx, span := c.tracer.Start(ctx, "kratos.GetIdentity")
 	defer span.End()
 
-	identity, _, err := c.client.IdentityAPI.GetIdentity(ctx, id).Execute()
+	identity, r, err := c.client.IdentityAPI.GetIdentity(ctx, id).Execute()
 	if err != nil {
+		if r != nil && r.StatusCode == http.StatusNotFound {
+			return nil, ErrNotFound
+		}
 		return nil, fmt.Errorf("failed to get identity: %w", err)
 	}
 

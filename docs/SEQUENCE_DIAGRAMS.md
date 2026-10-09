@@ -12,8 +12,10 @@ This document describes the end-to-end user flows for the Tenant Service, as def
 ## Flow 1 — Self-Service Registration
 
 A new user registers via the Login UI. Kratos fires the Tenant API webhook **after** the identity
-has already been persisted. The Tenant API creates a disabled "shadow tenant" and assigns the user
-as owner in both PostgreSQL and OpenFGA. If the webhook fails, the Kratos identity still exists but
+has already been persisted. The Tenant API creates the user's personal tenant, enabled, and assigns
+the user as owner in both PostgreSQL and OpenFGA. An account that already belongs to an enabled
+tenant, or whose address has a pending invitation to one (Flow 4), gets no personal tenant: the
+webhook answers 200 and creates nothing. If the webhook fails, the Kratos identity still exists but
 has no membership — an "orphaned identity". These are automatically remediated by the login hook
 (Flow 2) via lazy reconciliation. See [ADR 0008](adr/0008-tenant-aware-login.md).
 
@@ -44,8 +46,9 @@ sequenceDiagram
     WebhookSvc->>WebhookSvc: Validate identityID and email are non-empty
     Note over WebhookSvc: Returns error if either is missing
 
-    WebhookSvc->>DB: INSERT INTO tenants<br/>(id=uuid_v7, name="alice@example.com's Org", enabled=false)
-    DB-->>WebhookSvc: tenant{id, name, created_at, enabled=false}
+    Note over WebhookSvc,DB: Nothing is created for an account that has a personal tenant,<br/>belongs to an enabled tenant or has a pending invitation
+    WebhookSvc->>DB: INSERT INTO tenants<br/>(id=uuid_v7, name="alice@example.com's Org", enabled=true,<br/>personal_identity_id=identityID)
+    DB-->>WebhookSvc: tenant{id, name, created_at, enabled=true}
 
     WebhookSvc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id)
     DB-->>WebhookSvc: membership row created
@@ -302,9 +305,19 @@ sequenceDiagram
 
 A Tenant Owner invites an additional user to their tenant. The caller must already hold the
 `owner` relation on the tenant in OpenFGA — this flow cannot be used to assign the *first* owner
-(see Flow 5 for that). The Tenant API finds or creates the invitee's Kratos identity, creates a
-membership, writes the FGA tuple, and returns a Kratos recovery link + code as the invitation.
-Re-inviting an existing member is safe and idempotent.
+(see Flow 5 for that). What the invitation does depends on the invitee and on the tenant:
+
+| Invitee | Tenant | Outcome | Response |
+|---|---|---|---|
+| Already a member | any | Nothing changes | `status: "invited"`, no link |
+| Existing account, not a member | any | A **pending invitation**: no membership and no `can_view` until the user signs in to the tenant | `status: "pending"` |
+| New address | requires company sign-in | A **pending invitation** and **no account**: Kratos registers the account at the user's first company sign-in | `status: "pending"` |
+| New address | any other | A new Kratos identity, the membership, `can_view`, and a Kratos recovery link + code as the invitation | `status: "invited"`, link, code |
+
+An existing account is never sent a recovery link: it would hand the account over to whoever
+holds the invitation. A pending invitation expires after `INVITATION_LIFETIME`, and inviting the
+same address again renews it. A personal tenant refuses invitations, and a tenant that requires
+company sign-in and lists domains refuses an address outside them (`DOMAIN_NOT_ALLOWED`).
 
 **Caller:** Tenant Owner (public internet, JWT-authenticated)
 **Systems:** Tenant Owner → Tenant API → OpenFGA → Kratos Admin → PostgreSQL
@@ -340,32 +353,101 @@ sequenceDiagram
     FGA-->>Svc: Allowed
 
     Svc->>KratosAdmin: GET /identities?credentials_identifier=alice@example.com
-    alt Identity exists
-        KratosAdmin-->>Svc: [identity{id: "existing-uuid"}]
-    else Identity does not exist (empty list)
-        Svc->>KratosAdmin: POST /admin/identities<br/>{schema_id: "default", traits: {email: "alice@example.com"}}
+    KratosAdmin-->>Svc: [identity{id: "existing-uuid"}] or empty list
+
+    Svc->>DB: SELECT the tenant and its SSO policy
+    DB-->>Svc: tenant, policy
+    Note over Svc: Refused for a personal tenant, and for an address outside<br/>the domains of a tenant that requires company sign-in
+
+    alt Existing account, already a member
+        Svc->>DB: SELECT membership (tenant_id, kratos_identity_id)
+        DB-->>Svc: membership
+        Svc-->>Handler: Invitation{}
+        Handler-->>GW: InviteMemberResponse{status: "invited"}
+    else Existing account, not a member
+        Svc->>DB: INSERT INTO tenant_invitations<br/>(tenant_id, email, expires_at)<br/>ON CONFLICT renew expires_at
+        Note over Svc,DB: No membership and no can_view yet:<br/>both wait for the user to sign in to the tenant
+        Svc-->>Handler: Invitation{Pending: true}
+        Handler-->>GW: InviteMemberResponse{status: "pending"}
+    else New address, tenant requires company sign-in
+        Svc->>DB: INSERT INTO tenant_invitations<br/>(tenant_id, email, expires_at)<br/>ON CONFLICT renew expires_at
+        Note over Svc,KratosAdmin: No account is created: Kratos registers it<br/>at the user's first company sign-in
+        Svc-->>Handler: Invitation{Pending: true}
+        Handler-->>GW: InviteMemberResponse{status: "pending"}
+    else New address, any other tenant
+        Svc->>KratosAdmin: POST /admin/identities<br/>{traits: {email: "alice@example.com"}}
         KratosAdmin-->>Svc: 201 Created {id: "new-uuid"}
-    end
+        Svc->>KratosAdmin: POST /identities/{identityID}/recovery/code<br/>{expires_in: invitationLifetime}
+        KratosAdmin-->>Svc: {recovery_link, recovery_code}
 
-    Svc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id)
-    alt Duplicate key — re-invite case
-        DB-->>Svc: ErrDuplicateKey (23505)
-        Note over Svc: Silently continue — idempotent re-invite
-    else Success
+        Svc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id)
         DB-->>Svc: membership row created
+        Svc->>DB: DELETE FROM tenant_invitations<br/>(tenant_id, email)
+
+        Svc->>FGA: WriteTuple(user:{identityID}, can_view, tenant:{tenantId})
+        Note over Svc,FGA: Elevated permissions (can_edit, can_delete) are granted<br/>through the authorization service API, not the tenant service
+        FGA-->>Svc: OK
+
+        Svc-->>Handler: Invitation{Link, Code}
+        Handler-->>GW: InviteMemberResponse{status: "invited", link, code}
     end
 
-    Svc->>FGA: WriteTuple(user:{identityID}, can_view, tenant:{tenantId})
-    Note over Svc,FGA: Elevated permissions (can_edit, can_delete) are granted<br/>through the authorization service API, not the tenant service
-    FGA-->>Svc: OK
-
-    Svc->>KratosAdmin: POST /identities/{identityID}/recovery/code<br/>{expires_in: invitationLifetime}
-    KratosAdmin-->>Svc: {recovery_link, recovery_code}
-
-    Svc-->>Handler: link, code, nil
-    Handler-->>GW: InviteMemberResponse{status: "invited", link, code}
     MW->>DB: COMMIT transaction
-    GW-->>Owner: 200 OK {status: "invited", link, code}
+    GW-->>Owner: 200 OK {status, link, code}
+```
+
+### Accepting a pending invitation
+
+A pending invitation becomes a membership when the user signs in to the tenant. Until then
+`ListSignInTenants` lists the tenant with `invited`, and `GetSignInContext` answers
+`invitation_admits` for the address. Once the sign-in passes, the account joins the tenant through
+`JoinTenant`, which spends the invitation and grants `can_view`. `JoinTenant` names an account: an
+address that has none yet is registered by Kratos at its first company sign-in. Signing in to the tenant
+is the only way an invitation is accepted: an account that registers another way while its
+address has a pending invitation gets no personal tenant at registration (Flow 1) and no
+membership either, until it signs in to the tenant. `JoinTenant` admits an address by auto-join
+in the same way: the tenant requires company sign-in, has auto-join on and lists the address's
+domain.
+
+**Caller:** Internal services, at a sign-in to the tenant (gRPC only, no HTTP mapping)
+**Systems:** Caller → Tenant API → Kratos Admin → PostgreSQL → OpenFGA
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Caller as Internal caller
+    participant Handler as tenant.SignInHandler
+    participant Svc as tenant.Service
+    participant KratosAdmin as Kratos Admin API
+    participant DB as PostgreSQL
+    participant FGA as OpenFGA
+
+    Caller->>Handler: JoinTenant{tenant_id, identity_id} (gRPC)
+    Handler->>Svc: JoinTenant(ctx, tenantId, identityId)
+
+    Svc->>KratosAdmin: GET /identities/{identityId}
+    alt Unknown identity
+        KratosAdmin-->>Svc: 404 Not Found
+        Svc-->>Caller: NOT_FOUND
+    else Account exists
+        KratosAdmin-->>Svc: identity{id, traits: {email: "alice@example.com"}}
+        Svc->>DB: SELECT membership (tenant_id, kratos_identity_id)
+        alt Already a member
+            DB-->>Svc: membership
+            Svc-->>Caller: JoinTenantResponse{}
+        else Admitted by a pending invitation or by auto-join
+            Svc->>DB: SELECT unexpired invitation (tenant_id, email) and the SSO policy
+            DB-->>Svc: invitation or auto-join admits the address
+            Svc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id)
+            Svc->>DB: DELETE FROM tenant_invitations<br/>(tenant_id, email)
+            Svc->>FGA: WriteTuple(user:{identityID}, can_view, tenant:{tenantId})
+            FGA-->>Svc: OK
+            Svc-->>Caller: JoinTenantResponse{}
+        else Not admitted
+            DB-->>Svc: no invitation, auto-join does not admit the address
+            Svc-->>Caller: FAILED_PRECONDITION NOT_ADMITTED
+        end
+    end
 ```
 
 ---
@@ -453,15 +535,17 @@ sequenceDiagram
 
 ### Invite vs Provision — when to use which
 
-Both flows share the same core mechanics (find-or-create Kratos identity, insert membership, write
-FGA tuple, generate recovery link). The difference is **who can call them** and **when**:
+For a new address at a tenant that does not require company sign-in, both flows share the same
+core mechanics (create the Kratos identity, insert membership, write FGA tuple). Otherwise an
+invitation stays pending until the user signs in to the tenant (Flow 4), while provisioning
+adds the membership at once. The difference is **who can call them** and **when**:
 
 | | Flow 4 — Invite Member | Flow 5 — Provision User |
 |---|---|---|
 | **Caller** | Tenant Owner (public internet) | Internal Admin (internal network only) |
 | **Pre-condition** | Tenant must already have an owner | No ownership pre-condition — this adds the first member, who is then granted ownership via the authorization service |
 | **Authorisation** | OpenFGA ownership check required | Network boundary enforces access; no per-tenant check |
-| **Idempotency** | Safe — duplicate membership silently ignored | Not safe — fails on duplicate key |
+| **Idempotency** | Safe — inviting a member changes nothing, inviting again renews a pending invitation | Not safe — fails with `ALREADY_EXISTS` for a member |
 | **Use case** | Growing an existing team | One-time bootstrap of a new enterprise tenant |
 
 > **Implementation note:** the shared logic (find-or-create identity, add membership, grant

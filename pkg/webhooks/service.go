@@ -11,38 +11,36 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	v1 "github.com/canonical/authorization-service/api/v1"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
-	"github.com/canonical/tenant-service/internal/permissions"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
-	"github.com/canonical/tenant-service/internal/types"
+	"github.com/canonical/tenant-service/pkg/tenant"
 )
 
 // Service provides webhook business logic.
 type Service struct {
-	storage   StorageInterface
-	publisher permissions.Publisher
-	tracer    tracing.TracingInterface
-	monitor   monitoring.MonitorInterface
-	logger    logging.LoggerInterface
+	storage         StorageInterface
+	personalTenants PersonalTenantCreatorInterface
+	tracer          tracing.TracingInterface
+	monitor         monitoring.MonitorInterface
+	logger          logging.LoggerInterface
 }
 
 // NewService creates a new webhook service.
 func NewService(
 	storage StorageInterface,
-	publisher permissions.Publisher,
+	personalTenants PersonalTenantCreatorInterface,
 	tracer tracing.TracingInterface,
 	monitor monitoring.MonitorInterface,
 	logger logging.LoggerInterface,
 ) *Service {
 	return &Service{
-		storage:   storage,
-		publisher: publisher,
-		tracer:    tracer,
-		monitor:   monitor,
-		logger:    logger,
+		storage:         storage,
+		personalTenants: personalTenants,
+		tracer:          tracer,
+		monitor:         monitor,
+		logger:          logger,
 	}
 }
 
@@ -83,42 +81,27 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 		return err
 	}
 
-	// 1. Create a tenant named '{Email}'s Org'
-	tenantName := fmt.Sprintf("%s's Org", email)
-
-	tenant := &types.Tenant{
-		Name:    tenantName,
-		Enabled: false,
+	// A user who belongs to a tenant, or has a pending invitation to one,
+	// gets no personal tenant: ErrHasTenant.
+	newTenant, created, err := s.personalTenants.CreatePersonalTenant(ctx, identityID, email)
+	if errors.Is(err, tenant.ErrHasTenant) {
+		s.logger.Infow("registration: the account belongs to a tenant or is invited to one, no personal tenant", "identity_id", identityID)
+		s.recordRegistrationMetric("webhook_registration_success")
+		return nil
 	}
-
-	newTenant, err := s.storage.CreateTenant(ctx, tenant)
 	if err != nil {
-		s.recordError(span, "failed to create tenant on registration", err,
+		s.recordError(span, "failed to create personal tenant on registration", err,
 			"identity_id", identityID,
 			"email", email,
 		)
 		s.recordRegistrationMetric("webhook_registration_failure")
 		return fmt.Errorf("failed to create tenant: %w", err)
 	}
-
-	// 2. Add the user as a member
-	_, err = s.storage.AddMember(ctx, newTenant.ID, identityID)
-	if err != nil {
-		s.recordError(span, "failed to add owner member on registration", err,
-			"tenant_id", newTenant.ID,
-			"identity_id", identityID,
-		)
-		s.recordRegistrationMetric("webhook_registration_failure")
-		return fmt.Errorf("failed to add member: %w", err)
+	if !created {
+		s.logger.Debugw("personal tenant already provisioned", "tenant_id", newTenant.ID, "identity_id", identityID)
+		s.recordRegistrationMetric("webhook_registration_success")
+		return nil
 	}
-
-	// 3. Grant the registering user full control of their tenant asynchronously via Kafka
-	s.publisher.Publish(ctx, newTenant.ID, permissions.TenantPermissionOp(
-		v1.PermissionOp_PERMISSION_OP_WRITE,
-		identityID,
-		permissions.RelationCanDelete,
-		newTenant.ID,
-	))
 
 	s.logger.Infow("tenant provisioned on registration",
 		"tenant_id", newTenant.ID,

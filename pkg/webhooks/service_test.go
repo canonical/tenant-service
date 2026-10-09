@@ -8,10 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	v1 "github.com/canonical/authorization-service/api/v1"
-	"github.com/canonical/tenant-service/internal/permissions"
 	storagePkg "github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/types"
+	tenantpkg "github.com/canonical/tenant-service/pkg/tenant"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/mock/gomock"
 )
@@ -37,38 +36,32 @@ func setupLoggerMock(ctrl *gomock.Controller, mockLogger *MockLoggerInterface) *
 func TestService_HandleRegistration(t *testing.T) {
 	identityID := "identity-123"
 	email := "user@example.com"
-	tenant := &types.Tenant{ID: "tenant-123", Name: "user@example.com's Org", Enabled: false}
+	tenant := &types.Tenant{ID: "tenant-123", Name: "user@example.com's Org", Enabled: true}
 
 	testCases := []struct {
 		name        string
 		identityID  string
 		email       string
-		setupMocks  func(*MockStorageInterface, *permissions.MockPublisher, *MockLoggerInterface, *MockMonitorInterface)
+		setupMocks  func(*MockStorageInterface, *MockPersonalTenantCreatorInterface, *MockLoggerInterface, *MockMonitorInterface)
 		expectedErr bool
 	}{
 		{
 			name:       "success",
 			identityID: identityID,
 			email:      email,
-			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockPersonalTenants *MockPersonalTenantCreatorInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_success"}).Return(nil).Times(1)
-				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, t *types.Tenant) (*types.Tenant, error) {
-						if t.Name != "user@example.com's Org" {
-							return nil, errors.New("wrong tenant name")
-						}
-						if t.Enabled {
-							return nil, errors.New("tenant should start disabled")
-						}
-						return tenant, nil
-					})
-				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID).Return("member-id", nil)
-				mockPublisher.EXPECT().Publish(gomock.Any(), tenant.ID, &v1.PermissionOperation{
-					Op:       v1.PermissionOp_PERMISSION_OP_WRITE,
-					Subject:  "user:" + identityID,
-					Relation: permissions.RelationCanDelete,
-					Object:   "tenant:" + tenant.ID,
-				}).Times(1)
+				mockPersonalTenants.EXPECT().CreatePersonalTenant(gomock.Any(), identityID, email).Return(tenant, true, nil)
+			},
+			expectedErr: false,
+		},
+		{
+			name:       "personal tenant exists already - nothing redone",
+			identityID: identityID,
+			email:      email,
+			setupMocks: func(mockStorage *MockStorageInterface, mockPersonalTenants *MockPersonalTenantCreatorInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_success"}).Return(nil).Times(1)
+				mockPersonalTenants.EXPECT().CreatePersonalTenant(gomock.Any(), identityID, email).Return(tenant, false, nil)
 			},
 			expectedErr: false,
 		},
@@ -76,7 +69,7 @@ func TestService_HandleRegistration(t *testing.T) {
 			name:       "error - empty email",
 			identityID: identityID,
 			email:      "",
-			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockPersonalTenants *MockPersonalTenantCreatorInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
 			},
 			expectedErr: true,
@@ -85,7 +78,7 @@ func TestService_HandleRegistration(t *testing.T) {
 			name:       "error - empty identity id",
 			identityID: "",
 			email:      email,
-			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockPersonalTenants *MockPersonalTenantCreatorInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
 			},
 			expectedErr: true,
@@ -94,22 +87,21 @@ func TestService_HandleRegistration(t *testing.T) {
 			name:       "error - failed to create tenant",
 			identityID: identityID,
 			email:      email,
-			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockPersonalTenants *MockPersonalTenantCreatorInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
 				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
-				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).Return(nil, errors.New("storage error"))
+				mockPersonalTenants.EXPECT().CreatePersonalTenant(gomock.Any(), identityID, email).Return(nil, false, errors.New("storage error"))
 			},
 			expectedErr: true,
 		},
 		{
-			name:       "error - failed to add member",
+			name:       "belongs to a tenant or is invited to one: no personal tenant",
 			identityID: identityID,
 			email:      email,
-			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
-				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_failure"}).Return(nil).Times(1)
-				mockStorage.EXPECT().CreateTenant(gomock.Any(), gomock.Any()).Return(tenant, nil)
-				mockStorage.EXPECT().AddMember(gomock.Any(), tenant.ID, identityID).Return("", errors.New("storage error"))
+			setupMocks: func(mockStorage *MockStorageInterface, mockPersonalTenants *MockPersonalTenantCreatorInterface, mockLogger *MockLoggerInterface, mockMonitor *MockMonitorInterface) {
+				mockMonitor.EXPECT().IncrementCounter(map[string]string{"operation": "webhook_registration_success"}).Return(nil).Times(1)
+				mockPersonalTenants.EXPECT().CreatePersonalTenant(gomock.Any(), identityID, email).Return(nil, false, tenantpkg.ErrHasTenant)
 			},
-			expectedErr: true,
+			expectedErr: false,
 		},
 	}
 
@@ -119,17 +111,17 @@ func TestService_HandleRegistration(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockStorage := NewMockStorageInterface(ctrl)
-			mockPublisher := permissions.NewMockPublisher(ctrl)
+			mockPersonalTenants := NewMockPersonalTenantCreatorInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockPublisher, mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockPersonalTenants, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "webhooks.Service.HandleRegistration").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
-			tc.setupMocks(mockStorage, mockPublisher, mockLogger, mockMonitor)
+			tc.setupMocks(mockStorage, mockPersonalTenants, mockLogger, mockMonitor)
 
 			err := s.HandleRegistration(context.Background(), tc.identityID, tc.email)
 
@@ -262,13 +254,13 @@ func TestService_HandleTokenHook(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockStorage := NewMockStorageInterface(ctrl)
-			mockPublisher := permissions.NewMockPublisher(ctrl)
+			mockPersonalTenants := NewMockPersonalTenantCreatorInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockPublisher, mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockPersonalTenants, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "webhooks.Service.HandleTokenHook").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
@@ -307,7 +299,7 @@ func TestService_HandleLoginHook(t *testing.T) {
 		identityID  string
 		email       string
 		tenantID    string
-		setupMocks  func(*MockStorageInterface, *permissions.MockPublisher, *MockMonitorInterface)
+		setupMocks  func(*MockStorageInterface, *MockPersonalTenantCreatorInterface, *MockMonitorInterface)
 		expectedErr bool
 		expectErrIs error
 	}{
@@ -316,7 +308,7 @@ func TestService_HandleLoginHook(t *testing.T) {
 			identityID: identityID,
 			email:      email,
 			tenantID:   tenantID,
-			setupMocks: func(mockStorage *MockStorageInterface, mockPublisher *permissions.MockPublisher, _ *MockMonitorInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, mockPersonalTenants *MockPersonalTenantCreatorInterface, _ *MockMonitorInterface) {
 				mockStorage.EXPECT().GetActiveMemberByTenantAndUserID(gomock.Any(), tenantID, identityID).
 					Return(membership, nil)
 			},
@@ -328,7 +320,7 @@ func TestService_HandleLoginHook(t *testing.T) {
 			tenantID:    tenantID,
 			expectedErr: true,
 			expectErrIs: ErrNotMember,
-			setupMocks: func(mockStorage *MockStorageInterface, _ *permissions.MockPublisher, _ *MockMonitorInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, _ *MockPersonalTenantCreatorInterface, _ *MockMonitorInterface) {
 				mockStorage.EXPECT().GetActiveMemberByTenantAndUserID(gomock.Any(), tenantID, identityID).
 					Return(nil, storagePkg.ErrNotFound)
 			},
@@ -338,7 +330,7 @@ func TestService_HandleLoginHook(t *testing.T) {
 			identityID: "",
 			email:      email,
 			tenantID:   tenantID,
-			setupMocks: func(*MockStorageInterface, *permissions.MockPublisher, *MockMonitorInterface) {},
+			setupMocks: func(*MockStorageInterface, *MockPersonalTenantCreatorInterface, *MockMonitorInterface) {},
 		},
 		{
 			name:        "error - storage error on GetActiveMember",
@@ -346,7 +338,7 @@ func TestService_HandleLoginHook(t *testing.T) {
 			email:       email,
 			tenantID:    tenantID,
 			expectedErr: true,
-			setupMocks: func(mockStorage *MockStorageInterface, _ *permissions.MockPublisher, _ *MockMonitorInterface) {
+			setupMocks: func(mockStorage *MockStorageInterface, _ *MockPersonalTenantCreatorInterface, _ *MockMonitorInterface) {
 				mockStorage.EXPECT().GetActiveMemberByTenantAndUserID(gomock.Any(), tenantID, identityID).
 					Return(nil, errors.New("db error"))
 			},
@@ -359,18 +351,18 @@ func TestService_HandleLoginHook(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockStorage := NewMockStorageInterface(ctrl)
-			mockPublisher := permissions.NewMockPublisher(ctrl)
+			mockPersonalTenants := NewMockPersonalTenantCreatorInterface(ctrl)
 			mockTracer := NewMockTracingInterface(ctrl)
 			mockLogger := NewMockLoggerInterface(ctrl)
 			setupLoggerMock(ctrl, mockLogger)
 			mockMonitor := NewMockMonitorInterface(ctrl)
 
-			s := NewService(mockStorage, mockPublisher, mockTracer, mockMonitor, mockLogger)
+			s := NewService(mockStorage, mockPersonalTenants, mockTracer, mockMonitor, mockLogger)
 
 			mockTracer.EXPECT().Start(gomock.Any(), "webhooks.Service.HandleLoginHook").
 				Return(context.Background(), trace.SpanFromContext(context.Background()))
 
-			tc.setupMocks(mockStorage, mockPublisher, mockMonitor)
+			tc.setupMocks(mockStorage, mockPersonalTenants, mockMonitor)
 
 			err := s.HandleLoginHook(context.Background(), tc.identityID, tc.email, tc.tenantID)
 
