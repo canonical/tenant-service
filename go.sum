@@ -91,8 +91,8 @@ github.com/oapi-codegen/nullable v1.1.0 h1:eAh8JVc5430VtYVnq00Hrbpag9PFRGWLjxR1/
 github.com/oapi-codegen/nullable v1.1.0/go.mod h1:KUZ3vUzkmEKY90ksAmit2+5juDIhIZhfDl+0PwOQlFY=
 github.com/oapi-codegen/runtime v1.7.0 h1:t7358VYPvNbWJ9gdAkIK/smVeHpBf6yp8VTsaZsb/7k=
 github.com/oapi-codegen/runtime v1.7.0/go.mod h1:GwV7hC2hviaMzj+ITfHVRESK5J2W/GefVwIND/bMGvU=
-github.com/ory/client-go v1.22.79 h1:qiPlvOwChZWQWMRmnvP0YbdTPDXsg/MeNrrhsWgyZPY=
-github.com/ory/client-go v1.22.79/go.mod h1:Wrl5ahzWgI815iijeZBJEczZwQrvCUV9ToBNfDJB4tQ=
+github.com/ory/client-go v1.22.81 h1:nR+8MCdEO2dbtC/Kn5+ZSIYqn1gIFytYMnkOFb5GTeg=
+github.com/ory/client-go v1.22.81/go.mod h1:Wrl5ahzWgI815iijeZBJEczZwQrvCUV9ToBNfDJB4tQ=
 github.com/pierrec/lz4/v4 v4.1.29 h1:CDQY6qZOLI4DW0Nx6R1vRrifrCeQHnNXkMb0hZWXFjg=
 github.com/pierrec/lz4/v4 v4.1.29/go.mod h1:EoQMVJgeeEOMsCqCzqFm2O0cJvljX2nGZjcRIPL34O4=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
