@@ -1,55 +1,71 @@
 ## Purpose
 
-Two operations change a tenant's members directly, without an invitation: a platform admin provisions a user into a tenant, and a tenant admin removes a member. Provisioning existed; this change makes it fit personal tenants and pending invitations and gives its refusals a status code a caller can act on. Removal is new: until now a membership ended only when its tenant was deleted.
+Two operations change the members of a tenant directly, without an invitation. A platform admin provisions a user into a tenant, and a tenant admin removes a member. Provisioning existed before. This change makes it fit personal tenants and pending invitations. It also gives its refusals a status code that a caller can act on. Removal is new. Until now, a membership ended only when the system deleted its tenant.
 
 Key decisions:
 
-- Provisioning stays the direct way in: it makes the address a member at once, creating the account if needed, and a pending invitation of that address is spent by it.
-- Removal revokes every relation the member may hold on the tenant: `can_view`, `can_edit` and `can_delete`. Revoking `can_view` alone, the one relation this service grants to a member, was turned down: a relation granted through the Authorization Service would outlive the membership, and this service does not know which were granted.
-- Removal ends the membership and nothing else: the account, its sessions and its other tenants are untouched.
+- Provisioning stays the direct way in. It makes the address a member at once, and it creates the account if needed. It also spends a pending invitation of that address.
+- Removal revokes every relation that the member can hold on the tenant: `can_view`, `can_edit` and `can_delete`. This service grants only `can_view` to a member. We turned down a removal that revokes `can_view` alone. In that case, a relation granted through the Authorization Service stays after the membership ends. This service does not know which relations were granted.
+- Removal ends the membership and nothing else. It does not change the account, its sessions or its other tenants.
 
-**Non-goals:** ending the removed user's sessions or tokens (the token webhook refuses the tenant the next time a token is issued); keeping a removed user out of a tenant whose auto-join admits their address; removing the owner of a personal tenant; membership roles.
+**Non-goals:**
+
+- Ending the sessions or tokens of the removed user. The token webhook refuses the tenant the next time a token is issued.
+- Keeping a removed user out of a tenant whose auto-join admits their address.
+- Removal of a personal tenant's owner.
+- Membership roles.
 
 ## ADDED Requirements
 
 ### Requirement: ProvisionUser makes an address a member at once
-The system SHALL handle `ProvisionUser` (`POST /api/v0/tenants/{tenant_id}/users`, called by platform admins through the gateway) by validating the request (`tenant_id` a UUID, `email` an address; otherwise `INVALID_ARGUMENT`), asking Kratos for the account of the address, and then, in this order:
+The system SHALL handle `ProvisionUser` (`POST /api/v0/tenants/{tenant_id}/users`, called by platform admins through the gateway). First, it SHALL validate the request. `tenant_id` must be a UUID and `email` must be an address. Otherwise the system SHALL answer `INVALID_ARGUMENT`. Then it SHALL ask Kratos for the account of the address. Then the system SHALL do these steps in this order:
 
 1. Answer `NOT_FOUND` for an unknown tenant.
-2. Refuse a personal tenant with `FAILED_PRECONDITION`, reason `PERSONAL_TENANT`.
-3. Answer `ALREADY_EXISTS` when the account is a member already, also when a concurrent call made it one first.
+2. Refuse a personal tenant with `FAILED_PRECONDITION` and reason `PERSONAL_TENANT`.
+3. Answer `ALREADY_EXISTS` when the account is a member already. This includes the case where a concurrent call made it a member first.
 4. Create the account in Kratos if the address has none.
-5. Create the membership, delete the address's invitation to the tenant if it has one, publish `can_view` for the account, and log the admin action `provision_user` with the resource `<tenant id>:<address>`.
+5. Create the membership, and delete the invitation of the address to the tenant if it has one. Then publish `can_view` for the account, and log the admin action `provision_user` with the resource `<tenant id>:<address>`.
 
-No account is created for a tenant that does not exist or is a personal tenant.
+The system creates no account for a tenant that does not exist or is a personal tenant.
 
 #### Scenario: A new address
 - **WHEN** a platform admin provisions an address with no account into an existing tenant
-- **THEN** the account is created, it is a member, and `can_view` is published
+- **THEN** the system creates the account and the account is a member
+- **AND** the system publishes `can_view`
 
 #### Scenario: An address with a pending invitation
 - **WHEN** the address has a pending invitation to the tenant
-- **THEN** it becomes a member and the invitation is deleted
+- **THEN** the address becomes a member and the system deletes the invitation
 
 #### Scenario: A member already
 - **WHEN** the address belongs to a member of the tenant
-- **THEN** the call fails with `ALREADY_EXISTS` and nothing is published
+- **THEN** the call fails with `ALREADY_EXISTS` and the system publishes nothing
 
 #### Scenario: Unknown tenant
 - **WHEN** no tenant has the `tenant_id` and the address has no account
-- **THEN** the call fails with `NOT_FOUND` and no account is created
+- **THEN** the call fails with `NOT_FOUND` and the system creates no account
 
 ### Requirement: RemoveTenantUser ends a membership
-The system SHALL remove a member from a tenant with `RemoveTenantUser` (`DELETE /api/v0/tenants/{tenant_id}/users/{user_id}`, called by tenant admins through the gateway). It SHALL, in this order: refuse a `tenant_id` or `user_id` that is not a UUID with `INVALID_ARGUMENT`; answer `NOT_FOUND` for an unknown tenant; refuse a personal tenant with `FAILED_PRECONDITION`, reason `PERSONAL_TENANT`; answer `NOT_FOUND` when the user is not a member; and otherwise delete the membership, publish the deletion of `can_view`, `can_edit` and `can_delete` on the tenant for the user, and log the admin action `remove_tenant_user` with the resource `<tenant id>:<user id>`. The removal does not ask Kratos and changes nothing but the membership.
+The system SHALL remove a member from a tenant with `RemoveTenantUser` (`DELETE /api/v0/tenants/{tenant_id}/users/{user_id}`, called by tenant admins through the gateway). The system SHALL do these steps in this order:
+
+1. Refuse a `tenant_id` or a `user_id` that is not a UUID with `INVALID_ARGUMENT`.
+2. Answer `NOT_FOUND` for an unknown tenant.
+3. Refuse a personal tenant with `FAILED_PRECONDITION` and reason `PERSONAL_TENANT`.
+4. Answer `NOT_FOUND` when the user is not a member.
+5. Otherwise delete the membership, and publish the deletion of `can_view`, `can_edit` and `can_delete` on the tenant for the user. Then log the admin action `remove_tenant_user` with the resource `<tenant id>:<user id>`.
+
+The removal does not ask Kratos. It changes only the membership.
 
 #### Scenario: A member is removed
 - **WHEN** a tenant admin removes a member of the tenant
-- **THEN** the membership is deleted and the deletion of all three relations is published for that user
+- **THEN** the system deletes the membership
+- **AND** the system publishes the deletion of all 3 relations for that user
 
 #### Scenario: Not a member
 - **WHEN** the user is not a member of the tenant
-- **THEN** the call fails with `NOT_FOUND` and nothing is published
+- **THEN** the call fails with `NOT_FOUND` and the system publishes nothing
 
 #### Scenario: A removed user at an auto-join tenant
-- **WHEN** the removed user's address is in the domains of a tenant with auto-join on, and `JoinTenant` is called for it again
+- **WHEN** the address of the removed user is in the domains of a tenant with auto-join on
+- **AND** `JoinTenant` is called for it again
 - **THEN** the user becomes a member again

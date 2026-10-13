@@ -36,7 +36,7 @@ Streaming RPCs are explicitly excluded from automatic transaction wrapping. Beca
 - **AND** no BEGIN/COMMIT overhead is incurred
 
 ### Requirement: Read-only methods are identified via HTTP annotations
-The system SHALL identify read-only gRPC methods by inspecting the `google.api.http` annotation on the proto method descriptor. Methods with a `get:` HTTP rule SHALL be classified as read-only. A method with no HTTP annotation SHALL be classified as mutating unless the server names it as read-only. The server SHALL name `ListSignInTenants`, `GetSignInContext` and `GetTenantSSOPolicy`: the three only read and are gRPC only, and the first two wait on Kratos before or between their reads. The interceptor SHALL apply to every gRPC service the server registers: `TenantService`, `TenantSignInService` and `TenantSSOPolicyService`.
+The system SHALL identify read-only gRPC methods by inspecting the `google.api.http` annotation on the proto method descriptor. Methods with a `get:` HTTP rule SHALL be classified as read-only. A method with no HTTP annotation SHALL be classified as mutating, unless the server names it as read-only. The server SHALL name `ListSignInTenants`, `GetSignInContext` and `GetTenantSSOPolicy` as read-only. These 3 methods only read and are gRPC only. The first 2 methods wait for Kratos before their reads or between their reads. The interceptor SHALL apply to every gRPC service that the server registers: `TenantService`, `TenantSignInService` and `TenantSSOPolicyService`.
 
 #### Scenario: Proto methods with GET annotation are read-only
 - **WHEN** the server starts and builds the read-only method set
@@ -45,12 +45,13 @@ The system SHALL identify read-only gRPC methods by inspecting the `google.api.h
 
 #### Scenario: gRPC-only reads are named as read-only
 - **WHEN** the server starts and builds the read-only method set
-- **THEN** `ListSignInTenants`, `GetSignInContext` and `GetTenantSSOPolicy` are included in it
-- **AND** the gRPC-only writes (`JoinTenant`, `CreatePersonalTenant`, `PutTenantSSOPolicy`, `SetTenantSSODomains`, `RemoveTenantSSOBinding`) are excluded and run in a transaction
+- **THEN** the read-only set includes `ListSignInTenants`, `GetSignInContext` and `GetTenantSSOPolicy`
+- **AND** the read-only set excludes the gRPC-only writes: `JoinTenant`, `CreatePersonalTenant`, `PutTenantSSOPolicy`, `SetTenantSSODomains` and `RemoveTenantSSOBinding`
+- **AND** the gRPC-only writes run in a transaction
 
 #### Scenario: A gRPC-only method that is not named
 - **WHEN** a method has no HTTP annotation and the server does not name it as read-only
-- **THEN** its handler runs in a transaction
+- **THEN** the handler of the method runs in a transaction
 
 #### Scenario: Full method name format is used for lookup
 - **WHEN** a gRPC call arrives at the interceptor
