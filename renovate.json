@@ -24,6 +24,10 @@
   "rebaseWhen": "behind-base-branch",
   "packageRules": [
     {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "additionalBranchPrefix": "auto-"
+    },
+    {
       "groupName": "github actions",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["major", "minor", "patch", "pin", "digest"],
@@ -47,8 +51,7 @@
           "^vanilla-framework"
       ],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "prPriority": 5,
-      "additionalBranchPrefix": "auto-"
+      "prPriority": 5
     },
     {
       "groupName": "internal UI dependencies",
@@ -64,8 +67,7 @@
     {
       "groupName": "Go deps",
       "matchManagers": ["gomod"],
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "additionalBranchPrefix": "auto-"
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"]
     },
     {
       "groupName": "Go deps",
@@ -83,7 +85,8 @@
       "matchManagers": ["gomod"],
       "matchPackageNames": ["github.com/openfga/go-sdk"],
       "allowedVersions": "v0.3.7",
-      "automerge": false
+      "automerge": false,
+      "additionalBranchPrefix": ""
     }
   ]
 }
