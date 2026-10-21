@@ -17,7 +17,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/oapi-codegen/runtime v1.7.0
-	github.com/ory/client-go v1.22.83
+	github.com/ory/client-go v1.22.85
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/segmentio/kafka-go v0.4.51
