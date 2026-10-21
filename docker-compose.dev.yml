@@ -286,7 +286,7 @@ services:
     labels:
       - "traefik.enable=false"
   dex:
-    image: dexidp/dex:v2.46.0
+    image: dexidp/dex:v2.46.1
     command: dex serve /etc/dex/config.yml
     volumes:
       - type: bind
