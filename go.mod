@@ -16,7 +16,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.32.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/oapi-codegen/runtime v1.7.0
+	github.com/oapi-codegen/runtime v1.8.0
 	github.com/ory/client-go v1.22.86
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/prometheus/client_golang v1.25.0
