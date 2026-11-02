@@ -13,8 +13,8 @@ require (
 	github.com/go-chi/cors v1.2.2
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.32.0
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.33.0
+	github.com/jackc/pgx/v5 v5.12.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/ory/client-go v1.22.87
