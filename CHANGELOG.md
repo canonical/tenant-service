@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/canonical/tenant-service/compare/v0.4.0...v0.4.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/pressly/goose/v3 to v3.30.1 ([b670ed2](https://github.com/canonical/tenant-service/commit/b670ed2daf33cd31ec1e0cddcf71a1d0866eb969))
+* **deps:** update module github.com/pressly/goose/v3 to v3.30.1 ([#187](https://github.com/canonical/tenant-service/issues/187)) ([4cdf345](https://github.com/canonical/tenant-service/commit/4cdf34595ac1c2abe2d0c0de4343d3a923b23cc3))
+
 ## [0.4.0](https://github.com/canonical/tenant-service/compare/v0.3.1...v0.4.0) (2026-11-11)
 
 
