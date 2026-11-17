@@ -35,9 +35,9 @@ The system SHALL store an MFA requirement for every tenant (`tenants.mfa_require
 - **AND** this is true for every SSO policy of the tenant
 
 ### Requirement: Reading and writing the MFA policy
-The system SHALL serve `GetTenantMFAPolicy` (`GET /api/v0/tenants/{tenant_id}/mfa-policy`) and `PutTenantMFAPolicy` (`PUT /api/v0/tenants/{tenant_id}/mfa-policy`) to tenant admins and platform admins through the gateway. Both RPCs SHALL refuse a `tenant_id` that is not a UUID with `INVALID_ARGUMENT`. Both RPCs SHALL answer `NOT_FOUND` for an unknown tenant.
+The system SHALL serve `GetTenantMFAPolicy` (`GET /api/v0/tenants/{tenant_id}/mfa-policy`) and `SetTenantMFAPolicy` (`PUT /api/v0/tenants/{tenant_id}/mfa-policy`) to tenant admins and platform admins through the gateway. Both RPCs SHALL refuse a `tenant_id` that is not a UUID with `INVALID_ARGUMENT`. Both RPCs SHALL answer `NOT_FOUND` for an unknown tenant.
 
-`PutTenantMFAPolicy` SHALL refuse a `requirement` other than `NONE` and `REQUIRED` with `INVALID_ARGUMENT`. It SHALL replace the stored value (last write wins) and return the new policy. It SHALL log the admin action `put_tenant_mfa_policy`. The record SHALL name the caller as the actor, the tenant id as the resource, and the values `before` and `after`.
+`SetTenantMFAPolicy` SHALL refuse a `requirement` other than `NONE` and `REQUIRED` with `INVALID_ARGUMENT`. It SHALL replace the stored value (last write wins) and return the new policy. It SHALL log the admin action `put_tenant_mfa_policy`. The record SHALL name the caller as the actor, the tenant id as the resource, and the values `before` and `after`.
 
 The service writes an admin-action record at log level `info`. At the default `LOG_LEVEL`, `error`, the service writes no record. A write that waits for the row of the tenant longer than the lock timeout fails with `ABORTED`.
 

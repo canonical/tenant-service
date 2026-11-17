@@ -1,6 +1,6 @@
 ## 1. API Contract and Dependencies
 
-- [x] 1.1 In `identity-platform-api`, in `proto/v0/tenant/model.proto` and `proto/v0/tenant/service.proto`, add the services `TenantSignInService` (`ListSignInTenants`, `GetSignInContext`, `JoinTenant`, `CreatePersonalTenant`) and `TenantSSOPolicyService` (`GetTenantSSOPolicy`, `PutTenantSSOPolicy`, `SetTenantSSODomains`, `RemoveTenantSSOBinding`), each without an HTTP mapping. Add `GetTenantMFAPolicy`, `PutTenantMFAPolicy` and `RemoveTenantUser` to `TenantService`, each with an HTTP mapping and declared OpenAPI responses. Document the `"pending"` status of `InviteMemberResponse`. Regenerate the Go and OpenAPI artifacts.
+- [x] 1.1 In `identity-platform-api`, in `proto/v0/tenant/model.proto` and `proto/v0/tenant/service.proto`, add the services `TenantSignInService` (`ListSignInTenants`, `GetSignInContext`, `JoinTenant`, `CreatePersonalTenant`) and `TenantSSOPolicyService` (`GetTenantSSOPolicy`, `SetTenantSSOPolicy`, `SetTenantSSODomains`, `RemoveTenantSSOBinding`), each without an HTTP mapping. Add `GetTenantMFAPolicy`, `SetTenantMFAPolicy` and `RemoveTenantUser` to `TenantService`, each with an HTTP mapping and declared OpenAPI responses. Document the `"pending"` status of `InviteMemberResponse`. Regenerate the Go and OpenAPI artifacts.
 - [x] 1.2 Update `go.mod` and `go.sum`. Require the commit of the pull request that adds the API change. The released version will replace this commit (see `design.md` Rollout). Add `github.com/testcontainers/testcontainers-go/modules/postgres` for the integration tests.
 - [x] 1.3 Update `tests/e2e/go.mod` and `tests/e2e/go.sum` to the dependency versions of the root module (testcontainers `v0.44.0`).
 
@@ -38,8 +38,8 @@
 
 - [x] 6.1 Add `pkg/tenant/errors.go` and `pkg/tenant/errors_test.go`. The first file has the service error with its gRPC code and reason, and the refusals. It also has the mapping of database timeouts to `ABORTED` and `UNAVAILABLE`.
 - [x] 6.2 Add `pkg/tenant/validation.go` and `pkg/tenant/validation_test.go`. The first file has the binding limit and duplicates, and the domain normalisation, syntax and limit. It also has the domain of an address.
-- [x] 6.3 Add `pkg/tenant/service_sso.go` with `GetTenantSSOPolicy`, `PutTenantSSOPolicy`, `SetTenantSSODomains`, `RemoveTenantSSOBinding`, `ListSignInTenants` and `GetSignInContext`. Each of the 3 writes runs under the tenant's row lock and checks the rules of the policy in order.
-- [x] 6.4 Add `pkg/tenant/service_mfa.go` with `GetTenantMFAPolicy` and `PutTenantMFAPolicy`. In that file and in `pkg/tenant/service_sso.go`, put the values before and after each policy write into its admin-action record.
+- [x] 6.3 Add `pkg/tenant/service_sso.go` with `GetTenantSSOPolicy`, `SetTenantSSOPolicy`, `SetTenantSSODomains`, `RemoveTenantSSOBinding`, `ListSignInTenants` and `GetSignInContext`. Each of the 3 writes runs under the tenant's row lock and checks the rules of the policy in order.
+- [x] 6.4 Add `pkg/tenant/service_mfa.go` with `GetTenantMFAPolicy` and `SetTenantMFAPolicy`. In that file and in `pkg/tenant/service_sso.go`, put the values before and after each policy write into its admin-action record.
 - [x] 6.5 In `pkg/tenant/service.go`, rework `InviteMember`. It has the 4 outcomes and calls Kratos before the first statement. It creates the account and the recovery link before the first write. Add `CreatePersonalTenant`, which uses the address that the caller gives, or reads the address from Kratos. Add `JoinTenant`, which reads the account from Kratos by id and then does the admission check for its address. Add `RemoveTenantUser`. Add a membership in one function for the 3 RPCs that add one. Make `ProvisionUser` refuse a personal tenant and a member, and spend the invitation. Answer `NOT_FOUND` for an unknown tenant in `UpdateTenant`.
 - [x] 6.6 Add `pkg/tenant/helpers.go`. It has memberships as sign-in tenants, the merge of candidates and the address of an identity. It also has a policy as an admin-action label. Extend `pkg/tenant/interfaces.go` with the new service, storage and Kratos methods.
 - [x] 6.7 Update and add unit tests in `pkg/tenant/service_test.go`, `pkg/tenant/service_sso_test.go` and `pkg/tenant/service_mfa_test.go`. Include the order of the Kratos call and the first statement, and the admin-action record of a policy write.
@@ -62,7 +62,7 @@
 - [x] 9.1 In `cmd/serve.go`, refuse a non-positive `INVITATION_LIFETIME`. Register `TenantSignInService` and `TenantSSOPolicyService` on the gRPC server, behind the same interceptors as `TenantService`. Do not register them on the gateway. Name `ListSignInTenants`, `GetSignInContext` and `GetTenantSSOPolicy` as read-only for the transaction interceptor. Wire the tenant service into the router.
 - [x] 9.2 Add `cmd/serve_test.go`. It tests that every RPC of the 3 services is read-only or runs in a transaction.
 - [x] 9.3 Regenerate `client/http/client.gen.go` from the API's OpenAPI document.
-- [x] 9.4 In `cmd/client_http.go`, add `RemoveTenantUser`, `GetTenantMFAPolicy` and `PutTenantMFAPolicy`.
+- [x] 9.4 In `cmd/client_http.go`, add `RemoveTenantUser`, `GetTenantMFAPolicy` and `SetTenantMFAPolicy`.
 - [x] 9.5 In `cmd/migrate.go`, open the migrate connection with `lock_timeout` 3 s.
 
 ## 10. Documentation and Tooling
