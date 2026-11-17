@@ -54,7 +54,7 @@ For every RPC that runs in a transaction, a commit that fails SHALL answer `INTE
 - **AND** the status has an `ErrorInfo` detail with reason `NOT_ADMITTED` and domain `tenant-service`
 
 #### Scenario: A policy write that cannot get the lock
-- **WHEN** `PutTenantSSOPolicy` waits for the tenant's row longer than the lock timeout
+- **WHEN** `SetTenantSSOPolicy` waits for the tenant's row longer than the lock timeout
 - **THEN** the call fails with `ABORTED`
 - **AND** the message says to try again
 
