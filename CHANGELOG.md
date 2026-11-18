@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.1](https://github.com/canonical/tenant-service/compare/v0.4.0...v0.4.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** update go deps ([7e8f652](https://github.com/canonical/tenant-service/commit/7e8f6524194cd117812a9e47d53c3d58613cff08))
+* **deps:** update go deps (minor) ([#190](https://github.com/canonical/tenant-service/issues/190)) ([5810ff0](https://github.com/canonical/tenant-service/commit/5810ff0cd808143cc3a5b7c8c97a9a548184fd40))
+* **deps:** update module buf.build/go/protovalidate to v1.4.1 ([9ccdad3](https://github.com/canonical/tenant-service/commit/9ccdad3dfd7ae547919522b511c465ea13ee9a3b))
+* **deps:** update module buf.build/go/protovalidate to v1.4.1 ([#198](https://github.com/canonical/tenant-service/issues/198)) ([fd6d122](https://github.com/canonical/tenant-service/commit/fd6d122e232aef75ea4b4e4d3ec48f6bd00416b3))
+* **deps:** update module github.com/ory/client-go to v1.22.94 ([bd0e6c2](https://github.com/canonical/tenant-service/commit/bd0e6c2aa00fc06274dd66afefe2b8a46c549d62))
+* **deps:** update module github.com/ory/client-go to v1.22.94 ([#193](https://github.com/canonical/tenant-service/issues/193)) ([dabe898](https://github.com/canonical/tenant-service/commit/dabe898351a3308b22756db9d0a96cf23ac5213f))
+* **deps:** update module github.com/ory/client-go to v1.22.95 ([3683ec5](https://github.com/canonical/tenant-service/commit/3683ec5068a2226693ff7a1316f5462c03d613d6))
+* **deps:** update module github.com/ory/client-go to v1.22.95 ([#194](https://github.com/canonical/tenant-service/issues/194)) ([2641237](https://github.com/canonical/tenant-service/commit/2641237b401d4824d50c8189f666d91760e1b330))
+* **deps:** update module github.com/pressly/goose/v3 to v3.30.1 ([b670ed2](https://github.com/canonical/tenant-service/commit/b670ed2daf33cd31ec1e0cddcf71a1d0866eb969))
+* **deps:** update module github.com/pressly/goose/v3 to v3.30.1 ([#187](https://github.com/canonical/tenant-service/issues/187)) ([4cdf345](https://github.com/canonical/tenant-service/commit/4cdf34595ac1c2abe2d0c0de4343d3a923b23cc3))
+
 ## [0.4.0](https://github.com/canonical/tenant-service/compare/v0.3.1...v0.4.0) (2026-11-11)
 
 
