@@ -3,7 +3,7 @@ module github.com/canonical/tenant-service
 go 1.26.6
 
 require (
-	buf.build/go/protovalidate v1.4.0
+	buf.build/go/protovalidate v1.4.1
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/canonical/authorization-service v1.0.0
 	github.com/canonical/identity-platform-api v0.0.0-20260924175044-8c1a27b95cef
@@ -43,8 +43,8 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.1 // indirect
-	cel.dev/cel-go v0.32.0 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2 // indirect
+	cel.dev/cel-go v0.33.2 // indirect
 	cel.dev/expr v0.25.3 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
