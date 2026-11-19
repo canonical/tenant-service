@@ -11,7 +11,7 @@ The system SHALL identify read-only gRPC methods by inspecting the `google.api.h
 #### Scenario: gRPC-only reads are named as read-only
 - **WHEN** the server starts and builds the read-only method set
 - **THEN** the read-only set includes `ListSignInTenants`, `GetSignInContext` and `GetTenantSSOPolicy`
-- **AND** the read-only set excludes the gRPC-only writes: `JoinTenant`, `CreatePersonalTenant`, `PutTenantSSOPolicy`, `SetTenantSSODomains` and `RemoveTenantSSOBinding`
+- **AND** the read-only set excludes the gRPC-only writes: `JoinTenant`, `CreatePersonalTenant`, `SetTenantSSOPolicy`, `SetTenantSSODomains` and `RemoveTenantSSOBinding`
 - **AND** the gRPC-only writes run in a transaction
 
 #### Scenario: A gRPC-only method that is not named

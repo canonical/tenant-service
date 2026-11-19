@@ -37,7 +37,7 @@ func TransactionUnaryInterceptor(db DBClientInterface, readOnlyMethods map[strin
 		}
 		if txErr != nil {
 			logger.Errorf("transaction failed for %s: %v", info.FullMethod, txErr)
-			return nil, status.Errorf(codes.Internal, "transaction failed: %v", txErr)
+			return nil, status.Error(codes.Internal, "transaction failed")
 		}
 		return resp, nil
 	}

@@ -55,8 +55,8 @@ The service is configured using environment variables.
 | `OTEL_HTTP_ENDPOINT` | OpenTelemetry HTTP Collector Endpoint | | No |
 | `TRACING_ENABLED` | Enable OpenTelemetry Tracing | `true` | No |
 | `KRATOS_ADMIN_URL` | Ory Kratos Admin API URL | | Yes |
-| `INVITATION_LIFETIME` | Duration an invitation remains valid | `24h` | No |
-| `LOG_LEVEL` | Logging Level | `error` | No |
+| `INVITATION_LIFETIME` | Duration an invitation remains valid; must be positive | `24h` | No |
+| `LOG_LEVEL` | Logging Level; admin-action records are written at `info` | `error` | No |
 | `DEBUG` | Enable Debug Mode | `false` | No |
 | `PORT` | HTTP Server Port | `8080` | No |
 | `GRPC_PORT` | gRPC Server Port | `50051` | No |
@@ -126,7 +126,11 @@ Use the CLI to simulate an invite. You need the Tenant ID from the previous step
 # Invite a user (email) to the tenant
 ./app tenant users invite <tenant-id> <email>
 # Example: ./app tenant users invite <uuid> bob@example.com
-# Invited users are granted can_view; elevated permissions are managed via the authorization service.
+# Status "invited": a new address gets an account, a recovery link and code, the membership and can_view.
+# Status "pending": an existing account, or a new address at a tenant that requires company sign-in,
+# becomes a member (and is granted can_view) when the user signs in to the tenant; the invitation
+# expires after INVITATION_LIFETIME.
+# Elevated permissions are managed via the authorization service.
 ```
 
 ### 3. Enterprise Onboarding

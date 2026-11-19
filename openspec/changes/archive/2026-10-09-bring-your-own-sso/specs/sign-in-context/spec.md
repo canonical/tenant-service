@@ -69,7 +69,7 @@ The system SHALL refuse a `GetSignInContext` call with `INVALID_ARGUMENT` in the
 - `tenant_id` is not a UUID.
 - The call has neither `email` nor `identity_id`.
 - The call has an `identity_id` that is not a UUID.
-- The call has only `email`, and it is not an address.
+- The call has an `email` that is not an address.
 
 The system SHALL answer `NOT_FOUND` for an unknown tenant and for an `identity_id` that Kratos does not know. An address with no account is not an error.
 

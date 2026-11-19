@@ -12,7 +12,6 @@ import (
 	"github.com/canonical/tenant-service/internal/http/types"
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
-	"github.com/canonical/tenant-service/internal/permissions"
 	"github.com/canonical/tenant-service/internal/storage"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/pkg/authentication"
@@ -32,7 +31,7 @@ func NewRouter(
 	authMiddleware *authentication.Middleware,
 	s storage.StorageInterface,
 	dbClient db.DBClientInterface,
-	publisher permissions.Publisher,
+	personalTenants webhooks.PersonalTenantCreatorInterface,
 	tracer tracing.TracingInterface,
 	monitor monitoring.MonitorInterface,
 	logger logging.LoggerInterface,
@@ -74,7 +73,7 @@ func NewRouter(
 
 	metrics.NewAPI(logger).RegisterEndpoints(router)
 	status.NewAPI(tracer, monitor, logger).RegisterEndpoints(router)
-	webhooks.NewAPI(webhooks.NewService(s, publisher, tracer, monitor, logger), webhookAuthMiddleware, logger).RegisterEndpoints(router)
+	webhooks.NewAPI(webhooks.NewService(s, personalTenants, tracer, monitor, logger), webhookAuthMiddleware, logger).RegisterEndpoints(router)
 
 	// Unauthenticated tenant lookup — used by the Login UI before the user has a token.
 	// See ADR 0008 for security trade-offs. Rate limiting should be enforced at the proxy/gateway layer.

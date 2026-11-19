@@ -90,7 +90,7 @@ The system SHALL refuse these calls for a personal tenant with `FAILED_PRECONDIT
 - `ProvisionUser`
 - `RemoveTenantUser`, because the removal locks its owner out of the tenant for good
 - `GetTenantSSOPolicy`
-- `PutTenantSSOPolicy`
+- `SetTenantSSOPolicy`
 - `SetTenantSSODomains`
 - `RemoveTenantSSOBinding`
 

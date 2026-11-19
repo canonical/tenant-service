@@ -16,12 +16,15 @@ var (
 	ErrDuplicateKey        = errors.New("duplicate key violation")
 	ErrForeignKeyViolation = errors.New("foreign key violation")
 	ErrInvalidPageToken    = errors.New("invalid page token")
+	ErrNoTransaction       = errors.New("row lock taken outside a transaction")
 )
 
 // PostgreSQL error codes
 const (
 	pgErrCodeUniqueViolation     = "23505"
 	pgErrCodeForeignKeyViolation = "23503"
+	pgErrCodeLockNotAvailable    = "55P03"
+	pgErrCodeQueryCanceled       = "57014"
 )
 
 // IsDuplicateKeyError checks if the error is a PostgreSQL unique constraint violation.
@@ -38,6 +41,24 @@ func IsForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		return pgErr.Code == pgErrCodeForeignKeyViolation
+	}
+	return false
+}
+
+// IsLockTimeout checks if the error is a PostgreSQL lock wait cut by lock_timeout.
+func IsLockTimeout(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == pgErrCodeLockNotAvailable
+	}
+	return false
+}
+
+// IsStatementTimeout checks if the error is a PostgreSQL statement cancelled by statement_timeout.
+func IsStatementTimeout(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == pgErrCodeQueryCanceled
 	}
 	return false
 }
