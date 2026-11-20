@@ -40,6 +40,46 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: on-failure
+  # Runs the published tenant-service image instead of the locally built binary
+  # (start.sh). Opt in with `docker compose -f docker-compose.dev.yml --profile app up -d`.
+  # Both use the same host ports as start.sh, so run only one of them at a time.
+  tenant-service-migrate:
+    image: ${TENANT_SERVICE_IMAGE:-ghcr.io/canonical/tenant-service:stable}
+    profiles: ["app"]
+    entrypoint: ["/usr/bin/tenant-service"]
+    command: ["migrate", "up"]
+    env_file:
+      - ./docker/tenant-service/tenant-service.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - intranet
+    labels:
+      - "traefik.enable=false"
+  tenant-service:
+    image: ${TENANT_SERVICE_IMAGE:-ghcr.io/canonical/tenant-service:stable}
+    profiles: ["app"]
+    entrypoint: ["/usr/bin/tenant-service"]
+    command: ["serve"]
+    env_file:
+      - ./docker/tenant-service/tenant-service.env
+    ports:
+      - "8000:8080" # HTTP
+      - "50051:50051" # gRPC
+    depends_on:
+      tenant-service-migrate:
+        condition: service_completed_successfully
+      kratos:
+        condition: service_started
+      hydra:
+        condition: service_started
+    restart: on-failure
+    networks:
+      - intranet
+    labels:
+      - "traefik.enable=false"
   hook-service-migrate:
     image: ghcr.io/canonical/hook-service:stable
     command: exec hook-service migrate --dsn "postgres://hooks:hooks@postgres:5432/hooks?sslmode=disable" up
