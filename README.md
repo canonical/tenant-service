@@ -24,6 +24,39 @@ authorization service. To publish them locally, start the authorization service'
 KAFKA_ENABLED=true ./start.sh
 ```
 
+## Running in Docker Compose
+
+`make dev` runs the service as a local binary and only the dependencies in Docker. To run the
+service itself as a container, the same way it runs in the portal compose stack, enable the `app`
+profile:
+
+```bash
+docker compose -f docker-compose.dev.yml --profile app up -d
+```
+
+This adds two services on top of the dependencies:
+
+- `tenant-service-migrate` runs `migrate up` once, reading `DSN` from the environment.
+- `tenant-service` runs `serve` on HTTP `localhost:8000` and gRPC `localhost:50051`.
+
+Both read [`docker/tenant-service/tenant-service.env`](docker/tenant-service/tenant-service.env).
+The image entrypoint must be overridden to `/usr/bin/tenant-service`, because the rock starts
+Pebble by default. Use `TENANT_SERVICE_IMAGE` to run another image, for example one built locally:
+
+```bash
+TENANT_SERVICE_IMAGE=my-registry/tenant-service:dev docker compose -f docker-compose.dev.yml --profile app up -d
+```
+
+JWT authentication is enabled and validates tokens issued by the local Hydra. To call the service,
+create a client (see `start.sh`), add its client id to `AUTHENTICATION_ALLOWED_SUBJECTS` in the env
+file, restart `tenant-service`, and pass a token to the CLI (the CLI adds the `Bearer ` prefix):
+
+```bash
+./app tenant list --token "$ACCESS_TOKEN"
+```
+
+The `app` profile and `make dev` use the same host ports, so run only one of them at a time.
+
 ## Kubernetes Development
 
 To run the full stack in a MicroK8s cluster using Skaffold:
