@@ -9,6 +9,33 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func TestResolveDSN(t *testing.T) {
+	tests := []struct {
+		name      string
+		flag      string
+		env       string
+		want      string
+		wantError bool
+	}{
+		{name: "flag wins over env", flag: "postgres://flag", env: "postgres://env", want: "postgres://flag"},
+		{name: "falls back to env", env: "postgres://env", want: "postgres://env"},
+		{name: "neither set", wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DSN", tt.env)
+			got, err := resolveDSN(tt.flag)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("resolveDSN() error = %v, wantError %v", err, tt.wantError)
+			}
+			if got != tt.want {
+				t.Errorf("resolveDSN() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCustomValidArgs(t *testing.T) {
 	tests := []struct {
 		name      string

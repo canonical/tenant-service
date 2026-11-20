@@ -78,6 +78,12 @@ func runMigrate() func(cmd *cobra.Command, args []string) {
 		dsn, _ := cmd.Flags().GetString("dsn")
 		format, _ := cmd.Flags().GetString("format")
 
+		dsn, err := resolveDSN(dsn)
+		if err != nil {
+			cmd.PrintErr(err)
+			os.Exit(1)
+		}
+
 		if err := migrate(cmd, dsn, command, format, version); err != nil {
 			cmd.PrintErr(err)
 			os.Exit(1)
@@ -86,11 +92,22 @@ func runMigrate() func(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	migrateCmd.Flags().String("dsn", "", "PostgreSQL DSN connection string")
+	migrateCmd.Flags().String("dsn", "", "PostgreSQL DSN connection string (defaults to the DSN environment variable)")
 	migrateCmd.Flags().StringP("format", "f", "text", "Output format (text or json)")
-	_ = migrateCmd.MarkFlagRequired("dsn")
 
 	rootCmd.AddCommand(migrateCmd)
+}
+
+// resolveDSN returns the --dsn flag value, falling back to the DSN environment
+// variable that `serve` reads, so both commands can share one env file.
+func resolveDSN(flagValue string) (string, error) {
+	if flagValue != "" {
+		return flagValue, nil
+	}
+	if dsn := os.Getenv("DSN"); dsn != "" {
+		return dsn, nil
+	}
+	return "", fmt.Errorf("a DSN is required: set the --dsn flag or the DSN environment variable")
 }
 
 func migrate(cmd *cobra.Command, dsn, command, format string, version int) error {
