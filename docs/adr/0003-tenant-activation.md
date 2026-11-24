@@ -4,7 +4,8 @@ Date: 2026-02-18
 
 ## Status
 
-Accepted
+Accepted. Amended on 2026-11-24: the registration webhook creates the tenant enabled, with no
+activation step. Self-registered tenants are usable at once.
 
 ## Context
 

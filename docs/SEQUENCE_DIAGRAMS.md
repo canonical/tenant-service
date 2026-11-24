@@ -12,7 +12,7 @@ This document describes the end-to-end user flows for the Tenant Service, as def
 ## Flow 1 — Self-Service Registration
 
 A new user registers via the Login UI. Kratos fires the Tenant API webhook **after** the identity
-has already been persisted. The Tenant API creates a disabled "shadow tenant" and assigns the user
+has already been persisted. The Tenant API creates an enabled "shadow tenant" and assigns the user
 as owner in both PostgreSQL and OpenFGA. If the webhook fails, the Kratos identity still exists but
 has no membership — an "orphaned identity". These are automatically remediated by the login hook
 (Flow 2) via lazy reconciliation. See [ADR 0008](adr/0008-tenant-aware-login.md).
@@ -44,8 +44,8 @@ sequenceDiagram
     WebhookSvc->>WebhookSvc: Validate identityID and email are non-empty
     Note over WebhookSvc: Returns error if either is missing
 
-    WebhookSvc->>DB: INSERT INTO tenants<br/>(id=uuid_v7, name="alice@example.com's Org", enabled=false)
-    DB-->>WebhookSvc: tenant{id, name, created_at, enabled=false}
+    WebhookSvc->>DB: INSERT INTO tenants<br/>(id=uuid_v7, name="alice@example.com's Org", enabled=true)
+    DB-->>WebhookSvc: tenant{id, name, created_at, enabled=true}
 
     WebhookSvc->>DB: INSERT INTO memberships<br/>(tenant_id, kratos_identity_id)
     DB-->>WebhookSvc: membership row created
