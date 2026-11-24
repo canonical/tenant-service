@@ -37,7 +37,7 @@ func setupLoggerMock(ctrl *gomock.Controller, mockLogger *MockLoggerInterface) *
 func TestService_HandleRegistration(t *testing.T) {
 	identityID := "identity-123"
 	email := "user@example.com"
-	tenant := &types.Tenant{ID: "tenant-123", Name: "user@example.com's Org", Enabled: false}
+	tenant := &types.Tenant{ID: "tenant-123", Name: "user@example.com's Org", Enabled: true}
 
 	testCases := []struct {
 		name        string
@@ -57,8 +57,8 @@ func TestService_HandleRegistration(t *testing.T) {
 						if t.Name != "user@example.com's Org" {
 							return nil, errors.New("wrong tenant name")
 						}
-						if t.Enabled {
-							return nil, errors.New("tenant should start disabled")
+						if !t.Enabled {
+							return nil, errors.New("tenant should start enabled")
 						}
 						return tenant, nil
 					})

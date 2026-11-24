@@ -88,7 +88,7 @@ func (s *Service) HandleRegistration(ctx context.Context, identityID, email stri
 
 	tenant := &types.Tenant{
 		Name:    tenantName,
-		Enabled: false,
+		Enabled: true,
 	}
 
 	newTenant, err := s.storage.CreateTenant(ctx, tenant)
