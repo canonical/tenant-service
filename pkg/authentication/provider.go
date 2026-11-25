@@ -7,13 +7,18 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
+// requestTimeout bounds one request to the issuer: discovery at start-up,
+// and its keys whenever they are fetched.
+const requestTimeout = 10 * time.Second
+
 var (
-	otelHTTPClient = http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+	otelHTTPClient = http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport), Timeout: requestTimeout}
 )
 
 // NewProvider creates an OIDC provider using the issuer's well-known configuration
