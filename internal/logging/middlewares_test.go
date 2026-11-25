@@ -6,6 +6,7 @@ package logging
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,27 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestLogEntry_LogsThePathWithoutTheQuery(t *testing.T) {
+func TestRedactedURI(t *testing.T) {
+	tests := []struct {
+		uri, want string
+	}{
+		{"/api/v0/tenants", "/api/v0/tenants"},
+		{"/api/v0/tenants/lookup?email=someone%40example.com&page_size=10", "/api/v0/tenants/lookup?email=REDACTED&page_size=REDACTED"},
+		{"/api/v0/tenants?debug&email=", "/api/v0/tenants?debug&email=REDACTED"},
+	}
+
+	for _, tt := range tests {
+		u, err := url.ParseRequestURI(tt.uri)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := redactedURI(u); got != tt.want {
+			t.Errorf("redactedURI(%q) = %q, want %q", tt.uri, got, tt.want)
+		}
+	}
+}
+
+func TestLogEntry_LogsTheRedactedURI(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	logger := NewMockLoggerInterface(ctrl)
 
@@ -23,7 +44,7 @@ func TestLogEntry_LogsThePathWithoutTheQuery(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v0/tenants/lookup?email=someone@example.com", nil)
 	NewLogFormatter(logger).NewLogEntry(req).Write(http.StatusOK, 0, http.Header{}, time.Millisecond, nil)
 
-	if !strings.Contains(line, "/api/v0/tenants/lookup ") || strings.Contains(line, "someone@example.com") {
-		t.Errorf("request line = %q, want the path without the query", line)
+	if !strings.Contains(line, "/api/v0/tenants/lookup?email=REDACTED ") {
+		t.Errorf("request line = %q, want the URI with its query values redacted", line)
 	}
 }
