@@ -51,7 +51,8 @@ func (l *LogFormatter) NewLogEntry(r *http.Request) middleware.LogEntry {
 		scheme = "https"
 	}
 
-	fmt.Fprintf(entry.buf, "%s://%s%s %s ", scheme, r.Host, r.RequestURI, r.Proto)
+	// The path only: a query can hold an email address.
+	fmt.Fprintf(entry.buf, "%s://%s%s %s ", scheme, r.Host, r.URL.Path, r.Proto)
 	fmt.Fprintf(entry.buf, "from %s ", r.RemoteAddr)
 
 	return entry
@@ -90,7 +91,7 @@ func LogContextMiddleware(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, UserAgentKey, r.UserAgent())
 		ctx = context.WithValue(ctx, SourceIpKey, r.RemoteAddr)
 		ctx = context.WithValue(ctx, ProtocolKey, r.Proto)
-		ctx = context.WithValue(ctx, RequestUriKey, r.RequestURI)
+		ctx = context.WithValue(ctx, RequestUriKey, r.URL.Path)
 		ctx = context.WithValue(ctx, RequestMethodKey, r.Method)
 
 		h := strings.Split(r.Host, ":")
