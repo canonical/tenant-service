@@ -15,14 +15,20 @@ This command will:
 2. Build and run the service locally.
 3. Start an OIDC client on `http://localhost:4446` to facilitate login flows.
 
-Permission events are disabled by default (`KAFKA_ENABLED=false`), since they are only consumed by the
-authorization service. To publish them locally, start the authorization service's dependencies
-(`make start-deps` in `authorization-service`, which provides Kafka on `localhost:9092` and creates the
-`tenant-service.permissions` topic) and run:
+Permission events are disabled by default (`PERMISSIONS_PUBLISHING_MODE=noop`), since they are only consumed by the
+authorization service. To publish them locally:
 
-```bash
-KAFKA_ENABLED=true ./start.sh
-```
+- **`platform` mode (Kafka)**: start the authorization service's dependencies (`make start-deps` in
+  `authorization-service`, which provides Kafka on `localhost:9092`) and its listener (`listen --mode platform`,
+  which creates the `permissions.tenant-service` topic), then run:
+
+  ```bash
+  PERMISSIONS_PUBLISHING_MODE=platform ./start.sh
+  ```
+
+- **`standalone` mode (gRPC + OAuth2 client credentials)**: configure `AUTHORIZATION_SERVICE_GRPC_ADDRESS`
+  and the Ory Hydra OAuth2 client-credentials variables (`SERVICE_TOKEN_URL`, `SERVICE_CLIENT_ID`,
+  `SERVICE_CLIENT_SECRET`, and optionally `SERVICE_TOKEN_SCOPES`) and run with `PERMISSIONS_PUBLISHING_MODE=standalone`.
 
 ## Kubernetes Development
 
@@ -66,10 +72,17 @@ The service is configured using environment variables.
 | `DB_MIN_CONNS` | Minimum open DB connections | `2` | No |
 | `DB_MAX_CONN_LIFETIME` | Maximum amount of time a connection may be reused | `1h` | No |
 | `DB_MAX_CONN_IDLE_TIME` | Maximum amount of time a connection may be idle | `30m` | No |
-| `KAFKA_ENABLED` | Publish permission events to Kafka (a no-op publisher is used when disabled) | `false` | No |
-| `KAFKA_BROKERS` | Comma-separated Kafka broker addresses | | If Kafka enabled |
-| `KAFKA_PERMISSIONS_TOPIC` | Topic for permission events | `tenant-service.permissions` | No |
-| `KAFKA_CLIENT_ID` | Service name set on published envelopes | `tenant-service` | No |
+| `PERMISSIONS_PUBLISHING_MODE` | Permission event publishing mode (`noop`, `platform`, `standalone`) | `noop` | No |
+| `KAFKA_BROKERS` | Comma-separated Kafka broker addresses | | If `platform` mode |
+| `KAFKA_PERMISSIONS_TOPIC` | Topic for permission events | `permissions.tenant-service` | No |
+| `AUTHORIZATION_SERVICE_GRPC_ADDRESS` | Authorization Service gRPC listener address (`host:port`) | | If `standalone` mode |
+| `AUTHORIZATION_SERVICE_GRPC_TIMEOUT` | Per-RPC timeout for `IngestPermissionUpdate` calls | `5s` | No |
+| `AUTHORIZATION_SERVICE_GRPC_WORKERS` | Number of tenant-sharded worker goroutines for `standalone` gRPC publishing | `5` | No |
+| `AUTHORIZATION_SERVICE_TLS_ENABLED` | Enable TLS for outgoing Authorization Service gRPC connections (disabling sends OAuth2 bearer tokens in plaintext; use only for local dev or mesh-terminated traffic) | `false` | No |
+| `SERVICE_TOKEN_URL` | OAuth2 token endpoint URL for client-credentials authentication | | If `standalone` mode |
+| `SERVICE_CLIENT_ID` | OAuth2 client ID for `standalone` mode gRPC authentication | | If `standalone` mode |
+| `SERVICE_CLIENT_SECRET` | OAuth2 client secret for `standalone` mode gRPC authentication | | If `standalone` mode |
+| `SERVICE_TOKEN_SCOPES` | Comma- or whitespace-separated OAuth2 scopes requested for token exchange | | No |
 | `AUTHENTICATION_ENABLED` | Enable JWT Authentication | `true` | No |
 | `AUTHENTICATION_ISSUER` | OIDC Issuer URL | | No |
 | `AUTHENTICATION_JWKS_URL` | Manual JWKS URL (optional) | | No |

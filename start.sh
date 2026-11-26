@@ -75,15 +75,15 @@ export AUTHENTICATION_JWKS_URL="http://localhost:4444/.well-known/jwks.json"
 export AUTHENTICATION_ENABLED="true"
 export AUTHENTICATION_ALLOWED_SUBJECTS="$AUTH_CLIENT_ID"
 export AUTHENTICATION_REQUIRED_SCOPE="tenant-service"
-# Kafka is opt-in. Permission events are only consumed by the authorization
-# service, so publishing is disabled by default for standalone development.
-# To publish to the authorization service's local stack (`make start-deps` in
-# authorization-service, which provides Kafka on :9092 and creates the topic):
-#   KAFKA_ENABLED=true ./start.sh
-export KAFKA_ENABLED="${KAFKA_ENABLED:-false}"
+# Permission event publishing is disabled by default (noop). To publish events:
+#   - platform mode (Kafka via `make start-deps` + `listen --mode platform` in authorization-service):
+#       PERMISSIONS_PUBLISHING_MODE=platform ./start.sh
+#   - standalone mode (Authorization Service `listen --mode standalone` or `hybrid` + OAuth2 client credentials):
+#       PERMISSIONS_PUBLISHING_MODE=standalone AUTHORIZATION_SERVICE_GRPC_ADDRESS=localhost:9091 \
+#       SERVICE_TOKEN_URL=http://localhost:4444/oauth2/token SERVICE_CLIENT_ID=... SERVICE_CLIENT_SECRET=... ./start.sh
+export PERMISSIONS_PUBLISHING_MODE="${PERMISSIONS_PUBLISHING_MODE:-noop}"
 export KAFKA_BROKERS="${KAFKA_BROKERS:-localhost:9092}"
-export KAFKA_PERMISSIONS_TOPIC="${KAFKA_PERMISSIONS_TOPIC:-tenant-service.permissions}"
-export KAFKA_CLIENT_ID="${KAFKA_CLIENT_ID:-tenant-service}"
+export KAFKA_PERMISSIONS_TOPIC="${KAFKA_PERMISSIONS_TOPIC:-permissions.tenant-service}"
 export WEBHOOKS_API_TOKEN="secret_api_key"
 export DSN="postgres://tenants:tenants@127.0.0.1:5432/tenants"
 
@@ -103,7 +103,13 @@ echo "==============================================="
 echo "App Client ID: $CLIENT_ID"
 echo "Auth Client ID: $AUTH_CLIENT_ID"
 echo "Auth Client Secret: $AUTH_CLIENT_SECRET"
-echo "Kafka enabled: $KAFKA_ENABLED (brokers: $KAFKA_BROKERS)"
+if [ "$PERMISSIONS_PUBLISHING_MODE" = "platform" ]; then
+  echo "Permissions publishing mode: $PERMISSIONS_PUBLISHING_MODE (brokers: $KAFKA_BROKERS, topic: $KAFKA_PERMISSIONS_TOPIC)"
+elif [ "$PERMISSIONS_PUBLISHING_MODE" = "standalone" ]; then
+  echo "Permissions publishing mode: $PERMISSIONS_PUBLISHING_MODE (grpc: ${AUTHORIZATION_SERVICE_GRPC_ADDRESS:-unset})"
+else
+  echo "Permissions publishing mode: $PERMISSIONS_PUBLISHING_MODE"
+fi
 echo "==============================================="
 echo "To get another API token, run:"
 echo "curl -X POST http://localhost:4444/oauth2/token \\"

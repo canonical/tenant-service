@@ -32,12 +32,12 @@ In `standalone` mode, the system SHALL asynchronously send `PermissionUpdateEnve
 
 #### Scenario: Pending gRPC permission updates are flushed on shutdown
 - **WHEN** the permission publisher is closed during service shutdown in `standalone` mode
-- **THEN** the system drains and sends any queued permission update envelopes before closing the underlying gRPC connection
+- **THEN** the system drains and sends any queued permission update envelopes up to a bounded drain deadline before cancelling remaining RPCs and closing the underlying gRPC connection
 
 ## MODIFIED Requirements
 
 ### Requirement: Permission Event Publishing on Self-Registration
-The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event for the tenant containing a `WRITE` operation for the tenant resource with relation `can_delete` via the configured permission publisher (`platform` Kafka topic `tenant-service.permissions` keyed by tenant ID, or `standalone` Authorization Service gRPC ingestion endpoint) when a tenant is created through self-registration. Tenants created by a platform admin via `CreateTenant` SHALL NOT publish permission events; their owners are granted through the Authorization Service API.
+The system SHALL asynchronously publish a `PermissionUpdateEnvelope` event for the tenant containing a `WRITE` operation for the tenant resource with relation `can_delete` via the configured permission publisher (`platform` Kafka topic `permissions.tenant-service` keyed by tenant ID, or `standalone` Authorization Service gRPC ingestion endpoint) when a tenant is created through self-registration. Tenants created by a platform admin via `CreateTenant` SHALL NOT publish permission events; their owners are granted through the Authorization Service API.
 
 #### Scenario: Self-registration creates tenant and publishes owner permission
 - **WHEN** a user completes self-registration triggering tenant creation

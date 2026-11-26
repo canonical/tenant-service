@@ -141,7 +141,7 @@ func setupTestEnvironment() (*TestEnvironment, error) {
 		"WEBHOOKS_API_TOKEN":              "secret_api_key",
 		"DSN":                             dsn,
 		"KRATOS_ADMIN_URL":                "http://localhost:4434",
-		"KAFKA_ENABLED":                   "false",
+		"PERMISSIONS_PUBLISHING_MODE":     "noop",
 		"PORT":                            "8000",
 		"LOG_LEVEL":                       "debug",
 		"TRACING_ENABLED":                 "false",

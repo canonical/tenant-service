@@ -9,18 +9,22 @@ import (
 	v1 "github.com/canonical/authorization-service/api/v1"
 )
 
-// Publisher defines the contract for publishing permission lifecycle events to Kafka.
+// Publisher defines the contract for publishing permission lifecycle events
+// to downstream authorization infrastructure (Kafka in platform mode or
+// Authorization Service gRPC ingestion in standalone mode).
 type Publisher interface {
 	// Publish publishes permission operations asynchronously for the specified tenant.
-	// Messages are keyed by tenantID to guarantee per-tenant FIFO ordering.
+	// Implementations preserve per-tenant FIFO ordering.
 	Publish(ctx context.Context, tenantID string, ops ...*v1.PermissionOperation)
 
 	// Close flushes any pending messages and releases underlying connections.
 	Close() error
 }
 
-// NoopPublisher is a no-op implementation of Publisher used when Kafka is disabled or during testing.
+// NoopPublisher is a no-op implementation of Publisher used when permission publishing is disabled or during testing.
 type NoopPublisher struct{}
+
+var _ Publisher = (*NoopPublisher)(nil)
 
 // NewNoopPublisher creates a new NoopPublisher.
 func NewNoopPublisher() *NoopPublisher {

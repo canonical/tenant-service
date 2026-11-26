@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -56,8 +57,8 @@ func serve() error {
 	}
 
 	logger := logging.NewLogger(specs.LogLevel)
-	logger.Debugf("env vars: port=%d, grpc_port=%d, log_level=%s, debug=%v, tracing_enabled=%v, kafka_enabled=%v, authentication_enabled=%v",
-		specs.Port, specs.GRPCPort, specs.LogLevel, specs.Debug, specs.TracingEnabled, specs.KafkaEnabled, specs.AuthenticationEnabled)
+	logger.Debugf("env vars: port=%d, grpc_port=%d, log_level=%s, debug=%v, tracing_enabled=%v, permissions_publishing_mode=%s, authentication_enabled=%v",
+		specs.Port, specs.GRPCPort, specs.LogLevel, specs.Debug, specs.TracingEnabled, specs.PermissionsPublishingMode, specs.AuthenticationEnabled)
 	defer logger.Sync()
 
 	monitor := prometheus.NewMonitor("tenant-service", logger)
@@ -78,30 +79,15 @@ func serve() error {
 	defer dbClient.Close()
 	s := storage.NewStorage(dbClient, tracer, monitor, logger)
 
-	var publisher permissions.Publisher
-	if specs.KafkaEnabled {
-		var err error
-		publisher, err = permissions.NewKafkaPublisher(
-			specs.KafkaBrokers,
-			specs.KafkaPermissionsTopic,
-			specs.KafkaClientID,
-			logger,
-			monitor,
-		)
-		if err != nil {
-			return fmt.Errorf("invalid kafka configuration: %w", err)
-		}
-		logger.Info("Kafka permissions publisher is enabled")
-	} else {
-		publisher = permissions.NewNoopPublisher()
-		logger.Info("Using noop permissions publisher")
+	publisher, err := permissions.NewPublisher(specs.PermissionsConfig(), logger, monitor)
+	if err != nil {
+		return err
 	}
 	defer func() {
 		if err := publisher.Close(); err != nil {
 			logger.Warnw("failed to close permissions publisher", "error", err)
 		}
 	}()
-
 
 	var jwtVerifier authentication.TokenVerifierInterface
 	if specs.AuthenticationEnabled {
@@ -196,7 +182,7 @@ func serve() error {
 
 	go func() {
 		logger.Infof("Starting gRPC server on port %v", specs.GRPCPort)
-		if err := grpcServer.Serve(lis); err != nil {
+		if err := grpcServer.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			logger.Fatalf("failed to serve gRPC: %v", err)
 		}
 	}()
@@ -241,9 +227,37 @@ func serve() error {
 	defer cancel()
 
 	logger.Security().SystemShutdown()
-	if err := srv.Shutdown(ctx); err != nil {
-		serverError = fmt.Errorf("server shutdown error: %w", err)
-	}
+
+	var shutdownErrMu sync.Mutex
+	var shutdownWg sync.WaitGroup
+	shutdownWg.Add(2)
+
+	go func() {
+		defer shutdownWg.Done()
+		if err := srv.Shutdown(ctx); err != nil {
+			shutdownErrMu.Lock()
+			serverError = fmt.Errorf("server shutdown error: %w", err)
+			shutdownErrMu.Unlock()
+		}
+	}()
+
+	go func() {
+		defer shutdownWg.Done()
+		grpcStopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(grpcStopped)
+		}()
+		select {
+		case <-grpcStopped:
+		case <-ctx.Done():
+			logger.Warn("gRPC server graceful stop timed out, forcing stop")
+			grpcServer.Stop()
+			<-grpcStopped
+		}
+	}()
+
+	shutdownWg.Wait()
 
 	return serverError
 }
@@ -254,4 +268,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-

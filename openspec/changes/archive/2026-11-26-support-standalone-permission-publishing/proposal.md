@@ -5,7 +5,7 @@ With `canonical/authorization-service#116`, the `authorization-service` listener
 ## What Changes
 
 - **BREAKING**: Replace `KAFKA_ENABLED` with `PERMISSIONS_PUBLISHING_MODE` supporting `noop` (default), `platform` (Kafka), and `standalone` (gRPC) in `internal/config` and `cmd`.
-- Add `standalone` configuration parameters in `internal/config` for the target `authorization-service` gRPC listener (`AUTHORIZATION_SERVICE_GRPC_ADDRESS`, `AUTHORIZATION_SERVICE_GRPC_TIMEOUT`, `AUTHORIZATION_SERVICE_TLS_ENABLED`) and Ory Hydra OAuth2 client credentials (`SERVICE_TOKEN_URL`, `SERVICE_CLIENT_ID`, `SERVICE_CLIENT_SECRET`, `SERVICE_TOKEN_SCOPES`).
+- Add `standalone` configuration parameters in `internal/config` for the target `authorization-service` gRPC listener (`AUTHORIZATION_SERVICE_GRPC_ADDRESS`, `AUTHORIZATION_SERVICE_GRPC_TIMEOUT`, `AUTHORIZATION_SERVICE_GRPC_WORKERS`, `AUTHORIZATION_SERVICE_TLS_ENABLED`) and Ory Hydra OAuth2 client credentials (`SERVICE_TOKEN_URL`, `SERVICE_CLIENT_ID`, `SERVICE_CLIENT_SECRET`, `SERVICE_TOKEN_SCOPES`).
 - Implement an asynchronous `GRPCPublisher` in `internal/permissions` conforming to `permissions.Publisher`, backed by `v1.PermissionIngestionServiceClient` and an OAuth2 client-credentials token source that attaches and refreshes `authorization: Bearer <token>` metadata on outgoing gRPC calls.
 
 ## Non-goals
