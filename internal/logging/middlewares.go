@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -94,10 +95,13 @@ func LogContextMiddleware(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, RequestUriKey, redactedURI(r.URL))
 		ctx = context.WithValue(ctx, RequestMethodKey, r.Method)
 
-		h := strings.Split(r.Host, ":")
-		ctx = context.WithValue(ctx, HostnameKey, h[0])
-		if len(h) > 1 {
-			ctx = context.WithValue(ctx, PortKey, h[1])
+		hostname, port, err := net.SplitHostPort(r.Host)
+		if err != nil {
+			hostname, port = r.Host, ""
+		}
+		ctx = context.WithValue(ctx, HostnameKey, hostname)
+		if port != "" {
+			ctx = context.WithValue(ctx, PortKey, port)
 		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))

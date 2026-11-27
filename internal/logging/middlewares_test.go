@@ -48,3 +48,32 @@ func TestLogEntry_LogsTheRedactedURI(t *testing.T) {
 		t.Errorf("request line = %q, want the URI with its query values redacted", line)
 	}
 }
+
+func TestLogContextMiddleware_Host(t *testing.T) {
+	testCases := []struct {
+		name     string
+		host     string
+		hostname string
+		port     any
+	}{
+		{name: "IPv6", host: "[::1]:8080", hostname: "::1", port: "8080"},
+		{name: "no port", host: "tenants.example", hostname: "tenants.example"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hostname, port any
+			handler := LogContextMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hostname, port = r.Context().Value(HostnameKey), r.Context().Value(PortKey)
+			}))
+
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			request.Host = tc.host
+			handler.ServeHTTP(httptest.NewRecorder(), request)
+
+			if hostname != tc.hostname || port != tc.port {
+				t.Errorf("expected hostname %q and port %v, got %v and %v", tc.hostname, tc.port, hostname, port)
+			}
+		})
+	}
+}
