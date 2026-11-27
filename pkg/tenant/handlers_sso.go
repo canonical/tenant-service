@@ -13,7 +13,6 @@ import (
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/tracing"
 	"github.com/canonical/tenant-service/internal/types"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -53,9 +52,6 @@ func (h *SSOPolicyHandler) GetTenantSSOPolicy(ctx context.Context, req *v0.GetTe
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
 
 	policy, err := h.service.GetTenantSSOPolicy(ctx, req.TenantId)
 	if err != nil {
@@ -71,9 +67,6 @@ func (h *SSOPolicyHandler) SetTenantSSOPolicy(ctx context.Context, req *v0.SetTe
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	// Connection ids in lower case, as the database returns them.
@@ -100,9 +93,6 @@ func (h *SSOPolicyHandler) SetTenantSSODomains(ctx context.Context, req *v0.SetT
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
 
 	policy, err := h.service.SetTenantSSODomains(ctx, req.TenantId, req.Domains)
 	if err != nil {
@@ -118,9 +108,6 @@ func (h *SSOPolicyHandler) RemoveTenantSSOBinding(ctx context.Context, req *v0.R
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	if err := h.service.RemoveTenantSSOBinding(ctx, req.TenantId, strings.ToLower(req.ConnectionId)); err != nil {

@@ -75,12 +75,6 @@ func (h *Handler) InviteMember(ctx context.Context, req *v0.InviteMemberRequest)
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
-	if _, err := mail.ParseAddress(req.Email); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid email: %v", err)
-	}
 
 	invitation, err := h.service.InviteMember(ctx, req.TenantId, req.Email)
 	if err != nil {
@@ -186,9 +180,6 @@ func (h *Handler) UpdateTenant(ctx context.Context, req *v0.UpdateTenantRequest)
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
 
 	for _, p := range req.UpdateMask.Paths {
 		if p != "name" && p != "enabled" {
@@ -227,9 +218,6 @@ func (h *Handler) DeleteTenant(ctx context.Context, req *v0.DeleteTenantRequest)
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
 
 	if err := h.service.DeleteTenant(ctx, req.TenantId); err != nil {
 		h.logger.Errorw("failed to delete tenant", "tenant_id", req.TenantId, "error", err)
@@ -245,9 +233,6 @@ func (h *Handler) ProvisionUser(ctx context.Context, req *v0.ProvisionUserReques
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	if err := h.service.ProvisionUser(ctx, req.TenantId, req.Email); err != nil {
@@ -269,12 +254,6 @@ func (h *Handler) RemoveTenantUser(ctx context.Context, req *v0.RemoveTenantUser
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
-	if _, err := uuid.Parse(req.UserId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: must be a valid UUID")
-	}
 
 	if err := h.service.RemoveTenantUser(ctx, req.TenantId, req.UserId); err != nil {
 		return nil, failed(h.logger, err, "failed to remove tenant user", "tenant_id", req.TenantId, "user_id", req.UserId)
@@ -289,9 +268,6 @@ func (h *Handler) ListUserTenants(ctx context.Context, req *v0.ListUserTenantsRe
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.UserId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id: must be a valid UUID")
 	}
 
 	opts := []types.ListOption{}
@@ -315,9 +291,6 @@ func (h *Handler) ListTenantUsers(ctx context.Context, req *v0.ListTenantUsersRe
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	opts := []types.ListOption{types.WithPageToken(req.PageToken), types.WithPageSize(req.PageSize)}

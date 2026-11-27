@@ -11,7 +11,6 @@ import (
 	"github.com/canonical/tenant-service/internal/logging"
 	"github.com/canonical/tenant-service/internal/monitoring"
 	"github.com/canonical/tenant-service/internal/tracing"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -66,9 +65,6 @@ func (h *SignInHandler) GetSignInContext(ctx context.Context, req *v0.GetSignInC
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
 	if req.Email == "" && req.IdentityId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "one of email or identity_id must be provided")
 	}
@@ -88,12 +84,6 @@ func (h *SignInHandler) JoinTenant(ctx context.Context, req *v0.JoinTenantReques
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
-	}
-	if _, err := uuid.Parse(req.IdentityId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid identity_id: must be a valid UUID")
-	}
 
 	if err := h.service.JoinTenant(ctx, req.TenantId, req.IdentityId); err != nil {
 		return nil, failed(h.logger, err, "failed to join tenant",
@@ -111,9 +101,6 @@ func (h *SignInHandler) CreatePersonalTenant(ctx context.Context, req *v0.Create
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.IdentityId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid identity_id: must be a valid UUID")
 	}
 
 	tenant, _, err := h.service.CreatePersonalTenant(ctx, req.IdentityId, "")

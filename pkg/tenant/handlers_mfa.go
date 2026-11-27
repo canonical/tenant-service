@@ -7,7 +7,6 @@ import (
 	"context"
 
 	v0 "github.com/canonical/identity-platform-api/v0/tenant"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,9 +17,6 @@ func (h *Handler) GetTenantMFAPolicy(ctx context.Context, req *v0.GetTenantMFAPo
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	policy, err := h.service.GetTenantMFAPolicy(ctx, req.TenantId)
@@ -37,9 +33,6 @@ func (h *Handler) SetTenantMFAPolicy(ctx context.Context, req *v0.SetTenantMFAPo
 
 	if err := h.validator.Validate(req); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
-	}
-	if _, err := uuid.Parse(req.TenantId); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid tenant_id: must be a valid UUID")
 	}
 
 	policy, err := h.service.SetTenantMFAPolicy(ctx, req.TenantId, mfaRequirementFromProto(req.Requirement))
