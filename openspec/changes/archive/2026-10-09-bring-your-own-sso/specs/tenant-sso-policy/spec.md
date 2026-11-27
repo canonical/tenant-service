@@ -52,7 +52,7 @@ The system reads the policy in one statement. Thus the answer shows one state of
 - **THEN** the call fails with `FAILED_PRECONDITION` and the reason `PERSONAL_TENANT`
 
 ### Requirement: Writing enforcement, auto-join and bindings
-The system SHALL let the SSO service replace a tenant's enforcement, auto-join and whole set of bindings with `PutTenantSSOPolicy`. The system SHALL leave the stored domains unchanged and SHALL return the policy that results. The system SHALL refuse the write at the first check that fails, and SHALL then write nothing. The system SHALL check these conditions in this order:
+The system SHALL let the SSO service replace a tenant's enforcement, auto-join and whole set of bindings with `SetTenantSSOPolicy`. The system SHALL leave the stored domains unchanged and SHALL return the policy that results. The system SHALL refuse the write at the first check that fails, and SHALL then write nothing. The system SHALL check these conditions in this order:
 
 1. The request is valid: `tenant_id` and every `connection_id` are UUIDs, and `enforcement` is `OPTIONAL` or `REQUIRED`. Otherwise the system answers `INVALID_ARGUMENT`. The SSO service cannot write `OFF`. A write with no active binding turns a tenant off.
 2. The tenant exists. Otherwise the system answers `NOT_FOUND`. The tenant is not a personal tenant. Otherwise the system answers `FAILED_PRECONDITION` with the reason `PERSONAL_TENANT`.
@@ -184,7 +184,7 @@ The database SHALL delete bindings and domains with their tenant. The connection
 - **AND** the service reports the violation as `FAILED_PRECONDITION`
 
 ### Requirement: SSO policy RPCs are for the SSO service only
-The system SHALL serve `GetTenantSSOPolicy`, `PutTenantSSOPolicy`, `SetTenantSSODomains` and `RemoveTenantSSOBinding` as the gRPC service `TenantSSOPolicyService`. The system SHALL serve them over gRPC only, with no HTTP route. The system SHALL authenticate the caller's token as it does for every other RPC that takes a token. The system SHALL log each write that changed the policy as an admin action (`put_tenant_sso_policy`, `set_tenant_sso_domains`, `remove_tenant_sso_binding`). Each admin action SHALL contain these items:
+The system SHALL serve `GetTenantSSOPolicy`, `SetTenantSSOPolicy`, `SetTenantSSODomains` and `RemoveTenantSSOBinding` as the gRPC service `TenantSSOPolicyService`. The system SHALL serve them over gRPC only, with no HTTP route. The system SHALL authenticate the caller's token as it does for every other RPC that takes a token. The system SHALL log each write that changed the policy as an admin action (`put_tenant_sso_policy`, `set_tenant_sso_domains`, `remove_tenant_sso_binding`). Each admin action SHALL contain these items:
 
 - the subject of the caller's token as the actor
 - the tenant id as the resource
