@@ -148,8 +148,10 @@ func TestKafkaPublisher_WithCorrelationID(t *testing.T) {
 	mockWriter := &mockKafkaWriter{}
 	publisher := NewKafkaPublisherWithWriter(mockWriter, "tenant-service", nil, nil)
 
+	prevTP := otel.GetTracerProvider()
 	tp := sdktrace.NewTracerProvider()
 	otel.SetTracerProvider(tp)
+	defer otel.SetTracerProvider(prevTP)
 	tracer := tp.Tracer("test")
 
 	ctx, span := tracer.Start(context.Background(), "test-span")
@@ -485,4 +487,32 @@ func TestEnvelopeCount(t *testing.T) {
 	for ops, want := range map[int]int{0: 0, 1: 1, 100: 1, 101: 2, 250: 3} {
 		assert.Equal(t, want, envelopeCount(ops), "ops=%d", ops)
 	}
+}
+
+func TestBuildEnvelopes(t *testing.T) {
+	assert.Nil(t, buildEnvelopes(context.Background(), "tenant-service"))
+
+	prevTP := otel.GetTracerProvider()
+	tp := sdktrace.NewTracerProvider()
+	otel.SetTracerProvider(tp)
+	defer otel.SetTracerProvider(prevTP)
+	ctx, span := tp.Tracer("test").Start(context.Background(), "test-span")
+	defer span.End()
+	expectedTraceID := span.SpanContext().TraceID().String()
+
+	ops := buildOps(105, "tenant-shared")
+	envs := buildEnvelopes(ctx, "tenant-service", ops...)
+	require.Len(t, envs, 2)
+	assert.Len(t, envs[0].Operations, 100)
+	assert.Len(t, envs[1].Operations, 5)
+	for _, env := range envs {
+		assert.Equal(t, "1.0", env.Version)
+		assert.Equal(t, "tenant-service", env.Service)
+		assert.NotEmpty(t, env.MessageId)
+		assert.NotEmpty(t, env.IdempotencyKey)
+		require.NotNil(t, env.CorrelationId)
+		assert.Equal(t, expectedTraceID, *env.CorrelationId)
+	}
+	assert.NotEqual(t, envs[0].MessageId, envs[1].MessageId)
+	assert.NotEqual(t, envs[0].IdempotencyKey, envs[1].IdempotencyKey)
 }

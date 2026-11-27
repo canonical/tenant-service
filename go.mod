@@ -5,7 +5,7 @@ go 1.26.6
 require (
 	buf.build/go/protovalidate v1.4.1
 	github.com/Masterminds/squirrel v1.5.4
-	github.com/canonical/authorization-service v1.0.0
+	github.com/canonical/authorization-service v1.0.1-0.20261110160538-e761187f9a61
 	github.com/canonical/identity-platform-api v0.0.0-20260924175044-8c1a27b95cef
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/exaring/otelpgx v0.13.0
