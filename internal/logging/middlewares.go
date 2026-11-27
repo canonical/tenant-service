@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -51,7 +53,7 @@ func (l *LogFormatter) NewLogEntry(r *http.Request) middleware.LogEntry {
 		scheme = "https"
 	}
 
-	fmt.Fprintf(entry.buf, "%s://%s%s %s ", scheme, r.Host, r.RequestURI, r.Proto)
+	fmt.Fprintf(entry.buf, "%s://%s%s %s ", scheme, r.Host, redactedURI(r.URL), r.Proto)
 	fmt.Fprintf(entry.buf, "from %s ", r.RemoteAddr)
 
 	return entry
@@ -90,15 +92,39 @@ func LogContextMiddleware(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, UserAgentKey, r.UserAgent())
 		ctx = context.WithValue(ctx, SourceIpKey, r.RemoteAddr)
 		ctx = context.WithValue(ctx, ProtocolKey, r.Proto)
-		ctx = context.WithValue(ctx, RequestUriKey, r.RequestURI)
+		ctx = context.WithValue(ctx, RequestUriKey, redactedURI(r.URL))
 		ctx = context.WithValue(ctx, RequestMethodKey, r.Method)
 
-		h := strings.Split(r.Host, ":")
-		ctx = context.WithValue(ctx, HostnameKey, h[0])
-		if len(h) > 1 {
-			ctx = context.WithValue(ctx, PortKey, h[1])
+		hostname, port, err := net.SplitHostPort(r.Host)
+		if err != nil {
+			hostname, port = r.Host, ""
+		}
+		ctx = context.WithValue(ctx, HostnameKey, hostname)
+		if port != "" {
+			ctx = context.WithValue(ctx, PortKey, port)
 		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// redactedURI is the request URI with every query value replaced, because a
+// query can hold an email address. The names stay, in their order.
+func redactedURI(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+
+	if u.RawQuery == "" {
+		return u.EscapedPath()
+	}
+
+	params := strings.Split(u.RawQuery, "&")
+	for i, param := range params {
+		if name, _, found := strings.Cut(param, "="); found {
+			params[i] = name + "=REDACTED"
+		}
+	}
+
+	return u.EscapedPath() + "?" + strings.Join(params, "&")
 }

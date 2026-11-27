@@ -245,6 +245,13 @@ func serve() error {
 		serverError = fmt.Errorf("server shutdown error: %w", err)
 	}
 
+	// The drain may have spent ctx: the last spans get their own bound.
+	flushCtx, cancelFlush := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancelFlush()
+	if err := tracer.Shutdown(flushCtx); err != nil {
+		logger.Errorf("failed to export the last spans: %v", err)
+	}
+
 	return serverError
 }
 
