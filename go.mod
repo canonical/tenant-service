@@ -17,8 +17,8 @@ require (
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/oapi-codegen/runtime v1.9.1
-	github.com/ory/client-go v1.22.98
-	github.com/pressly/goose/v3 v3.30.1
+	github.com/ory/client-go v1.22.100
+	github.com/pressly/goose/v3 v3.30.2
 	github.com/prometheus/client_golang v1.25.0
 	github.com/segmentio/kafka-go v0.4.51
 	github.com/spf13/cobra v1.10.2
@@ -68,7 +68,6 @@ require (
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.72.0 // indirect
 	github.com/prometheus/procfs v0.23.0 // indirect
-	github.com/sethvargo/go-retry v0.5.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
