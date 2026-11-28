@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.5.0](https://github.com/canonical/tenant-service/compare/v0.4.0...v0.5.0) (2026-11-28)
+
+
+### Features
+
+* create self-registered tenants enabled ([0a548cb](https://github.com/canonical/tenant-service/commit/0a548cb3777fc8c431d45987e780aea51ee36da1)), closes [#199](https://github.com/canonical/tenant-service/issues/199)
+* create self-registered tenants enabled ([#206](https://github.com/canonical/tenant-service/issues/206)) ([250e5d9](https://github.com/canonical/tenant-service/commit/250e5d9c1d2aa4a57336d22aff5ac0f90f26abda)), closes [#199](https://github.com/canonical/tenant-service/issues/199)
+
+
+### Bug Fixes
+
+* **ci:** add manual promote-image workflow for candidate recovery ([f076575](https://github.com/canonical/tenant-service/commit/f076575bcb89d5d0fbc5df08eac6dfd5435960d2))
+* **ci:** resolve repo explicitly in promote-image release graduation ([e099abe](https://github.com/canonical/tenant-service/commit/e099abe9d940b4df816fb4d3da2c560c1476e110))
+* **deps:** update go deps ([6920726](https://github.com/canonical/tenant-service/commit/69207261301f3ab2497278689a2f0c2053a21ee4))
+* **deps:** update go deps ([1f059f4](https://github.com/canonical/tenant-service/commit/1f059f490c85343140e281a025f895db23c7ca23))
+* **deps:** update go deps ([7e8f652](https://github.com/canonical/tenant-service/commit/7e8f6524194cd117812a9e47d53c3d58613cff08))
+* **deps:** update go deps (minor) ([#190](https://github.com/canonical/tenant-service/issues/190)) ([5810ff0](https://github.com/canonical/tenant-service/commit/5810ff0cd808143cc3a5b7c8c97a9a548184fd40))
+* **deps:** update go deps (patch) ([#203](https://github.com/canonical/tenant-service/issues/203)) ([6605566](https://github.com/canonical/tenant-service/commit/6605566f3a8e3651c08429431412685b083b42ae))
+* **deps:** update go deps (patch) ([#219](https://github.com/canonical/tenant-service/issues/219)) ([7bda9c5](https://github.com/canonical/tenant-service/commit/7bda9c555545765731a872a76455ad67350bc1b3))
+* **deps:** update module buf.build/go/protovalidate to v1.4.1 ([9ccdad3](https://github.com/canonical/tenant-service/commit/9ccdad3dfd7ae547919522b511c465ea13ee9a3b))
+* **deps:** update module buf.build/go/protovalidate to v1.4.1 ([#198](https://github.com/canonical/tenant-service/issues/198)) ([fd6d122](https://github.com/canonical/tenant-service/commit/fd6d122e232aef75ea4b4e4d3ec48f6bd00416b3))
+* **deps:** update module github.com/ory/client-go to v1.22.94 ([bd0e6c2](https://github.com/canonical/tenant-service/commit/bd0e6c2aa00fc06274dd66afefe2b8a46c549d62))
+* **deps:** update module github.com/ory/client-go to v1.22.94 ([#193](https://github.com/canonical/tenant-service/issues/193)) ([dabe898](https://github.com/canonical/tenant-service/commit/dabe898351a3308b22756db9d0a96cf23ac5213f))
+* **deps:** update module github.com/ory/client-go to v1.22.95 ([3683ec5](https://github.com/canonical/tenant-service/commit/3683ec5068a2226693ff7a1316f5462c03d613d6))
+* **deps:** update module github.com/ory/client-go to v1.22.95 ([#194](https://github.com/canonical/tenant-service/issues/194)) ([2641237](https://github.com/canonical/tenant-service/commit/2641237b401d4824d50c8189f666d91760e1b330))
+* **deps:** update module github.com/ory/client-go to v1.22.98 ([2b387a5](https://github.com/canonical/tenant-service/commit/2b387a5afd45ef086f1a1d8a9ff9109fdf153bc5))
+* **deps:** update module github.com/ory/client-go to v1.22.98 ([#212](https://github.com/canonical/tenant-service/issues/212)) ([1b2067c](https://github.com/canonical/tenant-service/commit/1b2067ca9f8d6117778dc7afdf869ad2f08c9df1))
+* **deps:** update module github.com/pressly/goose/v3 to v3.30.1 ([b670ed2](https://github.com/canonical/tenant-service/commit/b670ed2daf33cd31ec1e0cddcf71a1d0866eb969))
+* **deps:** update module github.com/pressly/goose/v3 to v3.30.1 ([#187](https://github.com/canonical/tenant-service/issues/187)) ([4cdf345](https://github.com/canonical/tenant-service/commit/4cdf34595ac1c2abe2d0c0de4343d3a923b23cc3))
+
 ## [0.4.0](https://github.com/canonical/tenant-service/compare/v0.3.1...v0.4.0) (2026-11-11)
 
 
