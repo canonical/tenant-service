@@ -3,7 +3,7 @@ module github.com/canonical/tenant-service/tests/e2e
 go 1.26.6
 
 require (
-	github.com/canonical/identity-platform-api v0.0.0-20260924175044-8c1a27b95cef
+	github.com/canonical/identity-platform-api v0.0.0-20261118120358-db9a1a737e97
 	github.com/canonical/tenant-service v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
@@ -208,8 +208,8 @@ require (
 	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20261116203732-fd2c7689a808 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261116203732-fd2c7689a808 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20261123191846-1e707ab9fbc2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261123191846-1e707ab9fbc2 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
